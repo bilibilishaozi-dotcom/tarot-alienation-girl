@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using UnityEngine;
 
@@ -18,6 +19,7 @@ public class BasicEnemy : MonoBehaviour, IDamageable
 
     [Header("Health")]
     [SerializeField] private int maxHealth = 3;
+    [SerializeField] private string displayName = "敌人";
     [SerializeField] private MonsterCardData dropCard;
     [SerializeField] private bool grantFoolCardIfEmpty = true;
     [SerializeField] private float deathDelay = 0.45f;
@@ -58,7 +60,14 @@ public class BasicEnemy : MonoBehaviour, IDamageable
     private bool rewardGranted;
 
     public int AttackDamage => attackDamage;
+    public int CurrentHealth => health;
+    public int MaxHealth => maxHealth;
+    public string DisplayName => displayName;
+    public bool IsDead => dead;
     public bool IsStrikeActive => !dead && action == EnemyAction.Strike;
+    public event Action HealthChanged;
+    public static event Action<BasicEnemy> Spawned;
+    public static event Action<BasicEnemy> Removed;
 
     private void Awake()
     {
@@ -86,6 +95,16 @@ public class BasicEnemy : MonoBehaviour, IDamageable
         EnsureAttackHitbox();
     }
 
+    private void OnEnable()
+    {
+        Spawned?.Invoke(this);
+    }
+
+    private void OnDisable()
+    {
+        Removed?.Invoke(this);
+    }
+
     private void Start()
     {
         origin = transform.position;
@@ -93,16 +112,20 @@ public class BasicEnemy : MonoBehaviour, IDamageable
             dropCard = Resources.Load<MonsterCardData>("Cards/Fool");
     }
 
-    public void Configure(int healthValue, bool dropsFoolCard, Player targetPlayer)
+    public void Configure(int healthValue, bool dropsFoolCard, Player targetPlayer, string nameOverride = null)
     {
-        maxHealth = healthValue;
-        health = healthValue;
+        maxHealth = Mathf.Max(1, healthValue);
+        health = maxHealth;
         player = targetPlayer;
+        if (!string.IsNullOrEmpty(nameOverride))
+            displayName = nameOverride;
         grantFoolCardIfEmpty = dropsFoolCard;
         if (!dropsFoolCard)
             dropCard = null;
         else if (dropCard == null)
             dropCard = Resources.Load<MonsterCardData>("Cards/Fool");
+
+        HealthChanged?.Invoke();
 
         if (bodyCollider is CapsuleCollider2D capsule)
         {
@@ -172,6 +195,7 @@ public class BasicEnemy : MonoBehaviour, IDamageable
         rb.linearVelocity = new Vector2(knockDirection * knockback.x, knockback.y);
         Face((int)knockDirection);
 
+        HealthChanged?.Invoke();
         if (health <= 0)
         {
             Die();

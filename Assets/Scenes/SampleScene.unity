@@ -244,6 +244,9 @@ MonoBehaviour:
   jumpAttackVelocity: {x: 5, y: 6}
   attackVelocityDuration: 0.1
   comboResetTime: 1
+  baseAttackDamage: 1
+  attackHitboxSize: {x: 1.25, y: 0.85}
+  attackHitboxOffset: {x: 0.95, y: -0.1}
   moveSpeed: 8
   jumpForce: 13
   wallJumpForce: {x: 6, y: 12}
@@ -251,8 +254,10 @@ MonoBehaviour:
   wallSlideSlowMultiplier: 0.4
   dashDuration: 0.25
   dashSpeed: 20
+  collisionSkin: 0.05
   groundCheckDistance: 1.4
   wallCheckDistance: 0.4
+  groundStickDistance: 0.12
   whatIsGround:
     serializedVersion: 2
     m_Bits: 64

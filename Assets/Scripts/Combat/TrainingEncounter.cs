@@ -13,11 +13,11 @@ public class TrainingEncounter : MonoBehaviour
         if (!spawnOnStart)
             return;
 
-        Spawn("BasicEnemy_Spore", firstOffset, firstHealth, true);
-        Spawn("BasicEnemy_Spore_2", secondOffset, secondHealth, false);
+        Spawn("BasicEnemy_Spore", firstOffset, firstHealth, true, "孢子");
+        Spawn("BasicEnemy_Spore_2", secondOffset, secondHealth, false, "孢子");
     }
 
-    private void Spawn(string enemyName, Vector2 offset, int health, bool dropsFoolCard)
+    private void Spawn(string enemyName, Vector2 offset, int health, bool dropsFoolCard, string displayName)
     {
         GameObject enemy = new GameObject(enemyName);
         enemy.transform.position = transform.position + (Vector3)offset;
@@ -25,6 +25,6 @@ public class TrainingEncounter : MonoBehaviour
         enemy.AddComponent<Rigidbody2D>();
         CapsuleCollider2D capsule = enemy.AddComponent<CapsuleCollider2D>();
         capsule.size = new Vector2(0.8f, 1.5f);
-        enemy.AddComponent<BasicEnemy>().Configure(health, dropsFoolCard, GetComponent<Player>());
+        enemy.AddComponent<BasicEnemy>().Configure(health, dropsFoolCard, GetComponent<Player>(), displayName);
     }
 }

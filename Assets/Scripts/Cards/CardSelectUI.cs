@@ -11,7 +11,6 @@ public class CardSelectUI : MonoBehaviour
     private GameObject panel;
     private Text titleText;
     private Text bodyText;
-    private Text statusText;
     private GameObject equipReminder;
     private bool choiceHidden;
 
@@ -68,13 +67,6 @@ public class CardSelectUI : MonoBehaviour
             titleText.text = "获得怪物卡";
             bodyText.text = card.displayName + "\n" + card.description;
         }
-
-        if (loadout.EquippedCard != null)
-            statusText.text = "当前卡牌：" + loadout.EquippedCard.displayName + "（攻击更远，伤害更高）";
-        else if (hasPending)
-            statusText.text = "当前卡牌：未装备";
-        else
-            statusText.text = "当前卡牌：无";
     }
 
     private void BuildUi()
@@ -96,14 +88,6 @@ public class CardSelectUI : MonoBehaviour
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920f, 1080f);
         canvasObject.AddComponent<GraphicRaycaster>();
-
-        statusText = CreateText(canvasObject.transform, "Status", font, 28, TextAnchor.UpperLeft);
-        RectTransform statusRect = statusText.rectTransform;
-        statusRect.anchorMin = new Vector2(0f, 1f);
-        statusRect.anchorMax = new Vector2(0f, 1f);
-        statusRect.pivot = new Vector2(0f, 1f);
-        statusRect.anchoredPosition = new Vector2(24f, -20f);
-        statusRect.sizeDelta = new Vector2(900f, 60f);
 
         panel = new GameObject("CardPanel");
         panel.transform.SetParent(canvasObject.transform, false);
@@ -129,7 +113,7 @@ public class CardSelectUI : MonoBehaviour
         reminderRect.anchorMin = new Vector2(0f, 1f);
         reminderRect.anchorMax = new Vector2(0f, 1f);
         reminderRect.pivot = new Vector2(0f, 1f);
-        reminderRect.anchoredPosition = new Vector2(24f, -80f);
+        reminderRect.anchoredPosition = new Vector2(24f, -112f);
         equipReminder.SetActive(false);
         panel.SetActive(false);
     }

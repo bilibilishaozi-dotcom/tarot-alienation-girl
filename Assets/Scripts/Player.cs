@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -63,6 +64,14 @@ public class Player : MonoBehaviour
     private float invulnerableTimer;
     public bool IsDodging { get; private set; }
 
+    [Header("Health")]
+    [SerializeField] private int maxHealth = 5;
+    public int CurrentHealth { get; private set; }
+    public int MaxHealth => maxHealth;
+    public bool IsDefeated { get; private set; }
+    public event Action HealthChanged;
+    public event Action<int> Damaged;
+
     //射线方向和跳墙方向可能会用到facingDir 检测是+1还是-1
     public int facingDir { get; private set; } = 1;
     public Vector2 moveInput { get; private set; }
@@ -86,6 +95,9 @@ public class Player : MonoBehaviour
 
     private void Awake()
     {
+        maxHealth = Mathf.Max(1, maxHealth);
+        CurrentHealth = maxHealth;
+
         anim = GetComponentInChildren<Animator>();
         rb = GetComponent<Rigidbody2D>();
         bodyCollider = GetComponent<CapsuleCollider2D>();
@@ -97,6 +109,8 @@ public class Player : MonoBehaviour
             cardLoadout = gameObject.AddComponent<PlayerCardLoadout>();
         if (GetComponent<CardSelectUI>() == null)
             gameObject.AddComponent<CardSelectUI>();
+        if (GetComponent<CombatHud>() == null)
+            gameObject.AddComponent<CombatHud>();
         if (GetComponent<TrainingEncounter>() == null)
             gameObject.AddComponent<TrainingEncounter>();
 
@@ -162,6 +176,9 @@ public class Player : MonoBehaviour
 
         if (enabled)
         {
+            if (IsDefeated)
+                return;
+
             input.Player.Enable();
             moveInput = ReadKeyboardMove();
         }
@@ -246,19 +263,47 @@ public class Player : MonoBehaviour
 
     public void TakeDamage(int amount, Vector2 hitFrom)
     {
-        if (amount <= 0 || IsDodging || invulnerableTimer > 0f)
+        if (amount <= 0 || IsDefeated || IsDodging || invulnerableTimer > 0f)
             return;
 
+        int lost = Mathf.Min(amount, CurrentHealth);
+        CurrentHealth -= lost;
         invulnerableTimer = 0.7f;
         hitStunTimer = 0.22f;
         float knockDirection = transform.position.x >= hitFrom.x ? 1f : -1f;
         rb.linearVelocity = new Vector2(knockDirection * 6f, 4.5f);
         if (bodySprite != null)
             bodySprite.color = new Color(1f, 0.3f, 0.3f, 1f);
+
+        if (CurrentHealth <= 0)
+            Defeat();
+
+        HealthChanged?.Invoke();
+        Damaged?.Invoke(lost);
+    }
+
+    private void Defeat()
+    {
+        IsDefeated = true;
+        EndAttackSwing();
+        EndDodge();
+        SetGameplayInputEnabled(false);
     }
 
     private void TickHurtTimers()
     {
+        if (IsDefeated)
+        {
+            if (hitStunTimer > 0f)
+                hitStunTimer -= Time.deltaTime;
+            else
+                rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+
+            if (bodySprite != null)
+                bodySprite.color = new Color(0.55f, 0.55f, 0.55f, 1f);
+            return;
+        }
+
         if (hitStunTimer > 0f)
             hitStunTimer -= Time.deltaTime;
 
@@ -281,7 +326,7 @@ public class Player : MonoBehaviour
 
     public void SetVelocity(float xVelocity, float yVelocity)
     {
-        if (hitStunTimer > 0f)
+        if (IsDefeated || hitStunTimer > 0f)
             return;
 
         Vector2 velocity = new Vector2(xVelocity, yVelocity);
