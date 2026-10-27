@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class CombatHud : MonoBehaviour
@@ -108,7 +107,13 @@ public class CombatHud : MonoBehaviour
     private void Update()
     {
         if (player != null && player.IsDefeated && Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame)
-            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        {
+            CardSelectUI cards = GetComponent<CardSelectUI>();
+            if (cards != null && cards.IsPanelOpen)
+                return;
+
+            GameFlow.ReloadActiveScene();
+        }
 
         if (flashAlpha > 0f)
         {

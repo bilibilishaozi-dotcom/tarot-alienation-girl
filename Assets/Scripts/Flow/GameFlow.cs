@@ -29,6 +29,23 @@ public static class GameFlow
         LoadLevel(LevelCatalog.FirstPlayable());
     }
 
+    public static void ReloadActiveScene()
+    {
+        if (reloadFrame == Time.frameCount)
+            return;
+
+        string sceneName = SceneManager.GetActiveScene().name;
+        if (string.IsNullOrEmpty(sceneName) || !Application.CanStreamedLevelBeLoaded(sceneName))
+        {
+            Debug.LogWarning("场景还没有放进 Build Settings：" + sceneName);
+            return;
+        }
+
+        reloadFrame = Time.frameCount;
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(sceneName);
+    }
+
     public static void Quit()
     {
         Time.timeScale = 1f;
@@ -38,6 +55,8 @@ public static class GameFlow
         Application.Quit();
 #endif
     }
+
+    private static int reloadFrame = -1;
 
     private static void Load(string sceneName)
     {

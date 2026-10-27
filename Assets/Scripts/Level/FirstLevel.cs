@@ -1,7 +1,6 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class FirstLevel : MonoBehaviour
@@ -39,6 +38,7 @@ public class FirstLevel : MonoBehaviour
         Time.timeScale = 1f;
         player = GetComponent<Player>();
         loadout = GetComponent<PlayerCardLoadout>();
+        cardUi = GetComponent<CardSelectUI>();
         root = new GameObject("LevelOne").transform;
         DisableLegacyGround();
         Build();
@@ -75,7 +75,7 @@ public class FirstLevel : MonoBehaviour
         if (player != null && !busy && !player.IsDefeated)
             UpdateLesson();
 
-        if (busy || player == null || player.IsDefeated)
+        if (busy || player == null || player.IsDefeated || ClearPanelOpen || IsCardOpen)
             return;
 
         if (player.transform.position.y < -6f)
@@ -89,9 +89,18 @@ public class FirstLevel : MonoBehaviour
 
         cleared = true;
         RefreshObjective();
+        if (endPanel == null)
+        {
+            Debug.LogWarning("通关面板不存在，无法进入结算。按 R 可以重载当前场景。");
+            return;
+        }
+
+        if (cardUi != null)
+            cardUi.HoldForClear();
+        if (player != null)
+            player.SetGameplayInputEnabled(false);
         Time.timeScale = 0f;
-        if (endPanel != null)
-            endPanel.SetActive(true);
+        endPanel.SetActive(true);
     }
 
     private void Build()
@@ -112,6 +121,8 @@ public class FirstLevel : MonoBehaviour
         Solid("Arch", new Vector2(20.4f, 5.5f), new Vector2(0.75f, 3.8f), new Color(0.2f, 0.17f, 0.16f), ground, 1);
 
         MonsterCardData fool = Resources.Load<MonsterCardData>("Cards/Fool");
+        if (fool == null)
+            Debug.LogWarning("没有找到 Resources/Cards/Fool，第一关无法获得愚者牌。");
         CreateCard(new Vector3(9.2f, 4.15f, 0f), fool);
         BasicEnemy spore = SpawnEnemy("PracticeSpore", 14.8f, 3, false, "孢子", new Color(0.62f, 0.28f, 0.78f), "Player", 5);
         spore.SetAsPractice();
@@ -448,11 +459,11 @@ public class FirstLevel : MonoBehaviour
     }
 
     private bool IsCardOpen => cardUi != null && (cardUi.IsPanelOpen || cardUi.IsStatusOpen);
+    private bool ClearPanelOpen => cleared && endPanel != null && endPanel.activeSelf;
 
     private void ReloadLevel()
     {
-        Time.timeScale = 1f;
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        GameFlow.ReloadActiveScene();
     }
 
     private IEnumerator FallRespawn()
@@ -467,7 +478,7 @@ public class FirstLevel : MonoBehaviour
         SnapCamera();
         yield return new WaitForSecondsRealtime(0.12f);
         yield return Fade(0.82f, 0f, 0.28f);
-        if (!player.IsDefeated)
+        if (!player.IsDefeated && !IsCardOpen && !ClearPanelOpen)
             player.SetGameplayInputEnabled(true);
         busy = false;
     }
@@ -555,9 +566,16 @@ public class FirstLevel : MonoBehaviour
 
     private void ContinueLevel()
     {
-        if (endPanel != null)
-            endPanel.SetActive(false);
-        Time.timeScale = 1f;
+        if (endPanel == null || !endPanel.activeSelf)
+            return;
+
+        endPanel.SetActive(false);
+        if (cardUi != null)
+            cardUi.ReleaseFromClear();
+        if (!IsCardOpen)
+            Time.timeScale = 1f;
+        if (player != null && !player.IsDefeated && !IsCardOpen)
+            player.SetGameplayInputEnabled(true);
     }
 
     private void CreateChoice(Transform parent, string label, Vector2 position, UnityEngine.Events.UnityAction onClick)

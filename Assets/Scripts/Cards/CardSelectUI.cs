@@ -21,6 +21,8 @@ public class CardSelectUI : MonoBehaviour
     private bool choiceHidden;
     private bool pausedForCard;
     private bool pausedForStatus;
+    private bool heldByClear;
+    private int ignoreEscapeFrame = -1;
 
     public bool IsPanelOpen => panel != null && panel.activeSelf;
     public bool IsStatusOpen => statusPanel != null && statusPanel.activeSelf;
@@ -50,10 +52,11 @@ public class CardSelectUI : MonoBehaviour
         if (loadout != null)
             loadout.Changed -= Refresh;
 
-        if (pausedForCard || pausedForStatus)
+        if (pausedForCard || pausedForStatus || heldByClear)
         {
             pausedForCard = false;
             pausedForStatus = false;
+            heldByClear = false;
             Time.timeScale = 1f;
         }
 
@@ -73,12 +76,13 @@ public class CardSelectUI : MonoBehaviour
 
     private void Update()
     {
-        if (Keyboard.current == null)
+        if (heldByClear || Keyboard.current == null)
             return;
 
+        bool escape = Keyboard.current.escapeKey.wasPressedThisFrame && Time.frameCount != ignoreEscapeFrame;
         if (panel != null && panel.activeSelf)
         {
-            if (Keyboard.current.escapeKey.wasPressedThisFrame)
+            if (escape)
                 HideWithoutEquipping();
             return;
         }
@@ -87,21 +91,39 @@ public class CardSelectUI : MonoBehaviour
         {
             if (IsStatusOpen)
                 CloseStatus();
-            else
+            else if (CanOpenStatus())
                 OpenStatus();
             return;
         }
 
-        if (IsStatusOpen && Keyboard.current.escapeKey.wasPressedThisFrame)
+        if (IsStatusOpen && escape)
             CloseStatus();
     }
 
     private void OnEquipPressed(InputAction.CallbackContext context)
     {
-        if (!context.performed || loadout == null || loadout.PendingCard == null)
+        if (heldByClear || !context.performed || loadout == null || loadout.PendingCard == null)
             return;
 
         loadout.EquipPending();
+    }
+
+    public void HoldForClear()
+    {
+        heldByClear = true;
+        HideModals();
+        pausedForCard = false;
+        pausedForStatus = false;
+    }
+
+    public void ReleaseFromClear()
+    {
+        if (!heldByClear)
+            return;
+
+        heldByClear = false;
+        ignoreEscapeFrame = Time.frameCount;
+        Refresh();
     }
 
     private void Refresh()
@@ -109,12 +131,20 @@ public class CardSelectUI : MonoBehaviour
         if (loadout == null)
             return;
 
+        if (heldByClear)
+        {
+            HideModals();
+            if (player != null)
+                player.SetGameplayInputEnabled(false);
+            return;
+        }
+
         bool hasPending = loadout.PendingCard != null;
         bool showPanel = hasPending && !choiceHidden;
         panel.SetActive(showPanel);
         equipReminder.SetActive(hasPending && choiceHidden);
         if (player != null)
-            player.SetGameplayInputEnabled(!showPanel);
+            player.SetGameplayInputEnabled(!showPanel && !IsStatusOpen);
         SetPaused(showPanel);
 
         if (showPanel)
@@ -146,7 +176,8 @@ public class CardSelectUI : MonoBehaviour
             return;
 
         pausedForCard = false;
-        Time.timeScale = 1f;
+        if (!pausedForStatus && !heldByClear)
+            Time.timeScale = 1f;
     }
 
     private void BuildUi()
@@ -182,10 +213,13 @@ public class CardSelectUI : MonoBehaviour
         bodyText = CreateText(panel.transform, "Body", font, 26, TextAnchor.UpperCenter);
         SetTop(bodyText.rectTransform, -80f, new Vector2(640f, 250f));
 
-        equipButton = CreateButton(panel.transform, "装备", font, new Vector2(-120f, -168f), () => loadout.EquipPending());
+        equipButton = CreateButton(panel.transform, "装备", font, new Vector2(-120f, -168f), EquipFromButton);
         CreateButton(panel.transform, "稍后", font, new Vector2(120f, -168f), HideWithoutEquipping);
         equipReminder = CreateButton(canvasObject.transform, "装备愚者", font, new Vector2(220f, -90f), () =>
         {
+            if (heldByClear)
+                return;
+
             choiceHidden = false;
             Refresh();
         }).gameObject;
@@ -215,11 +249,7 @@ public class CardSelectUI : MonoBehaviour
         statusText = CreateText(statusPanel.transform, "Body", font, 26, TextAnchor.UpperLeft);
         SetTop(statusText.rectTransform, -88f, new Vector2(560f, 300f));
 
-        statusEquipButton = CreateButton(statusPanel.transform, "装备", font, new Vector2(0f, -200f), () =>
-        {
-            if (loadout != null)
-                loadout.EquipPending();
-        });
+        statusEquipButton = CreateButton(statusPanel.transform, "装备", font, new Vector2(0f, -200f), EquipFromButton);
         statusEquipButton.gameObject.SetActive(false);
         statusPanel.SetActive(false);
     }
@@ -241,13 +271,13 @@ public class CardSelectUI : MonoBehaviour
     {
         if (statusPanel != null)
             statusPanel.SetActive(false);
-        if (player != null && (panel == null || !panel.activeSelf))
+        if (player != null && (panel == null || !panel.activeSelf) && !heldByClear)
             player.SetGameplayInputEnabled(true);
         if (!pausedForStatus)
             return;
 
         pausedForStatus = false;
-        if (!pausedForCard)
+        if (!pausedForCard && !heldByClear)
             Time.timeScale = 1f;
     }
 
@@ -290,8 +320,37 @@ public class CardSelectUI : MonoBehaviour
 
     private void HideWithoutEquipping()
     {
+        if (heldByClear)
+            return;
+
         choiceHidden = true;
         Refresh();
+    }
+
+    private void EquipFromButton()
+    {
+        if (heldByClear || loadout == null)
+            return;
+
+        loadout.EquipPending();
+    }
+
+    private bool CanOpenStatus()
+    {
+        if (player == null || player.input == null)
+            return true;
+
+        return player.input.Player.enabled;
+    }
+
+    private void HideModals()
+    {
+        if (panel != null)
+            panel.SetActive(false);
+        if (statusPanel != null)
+            statusPanel.SetActive(false);
+        if (equipReminder != null)
+            equipReminder.SetActive(false);
     }
 
     private static void SetTop(RectTransform rect, float y, Vector2 size)
