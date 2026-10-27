@@ -9,12 +9,16 @@ public class FirstLevel : MonoBehaviour
     private const float GrateLeft = 24.2f;
     private const float GrateHeight = 3.8f;
 
+    private const string ChapterLine = "裂隙暂时合上了。\n她收好愚者牌，往更深处走去。";
+
     private Player player;
     private PlayerCardLoadout loadout;
     private Transform root;
     private GameObject gate;
-    private BasicEnemy sentinel;
+    private BasicEnemy spore;
+    private RiftGuardian boss;
     private Text objectiveText;
+    private Text bossNameSign;
     private CardSelectUI cardUi;
     private Image fadeImage;
     private Text fadeText;
@@ -25,11 +29,11 @@ public class FirstLevel : MonoBehaviour
     private SpriteRenderer extensionMark;
     private Vector3 spawnPoint;
     private float standCenter;
-    private float normalFront;
-    private float extendedFront;
+    private float cardX = 20.6f;
     private bool gateOpen;
     private bool cleared;
     private bool busy;
+    private bool endingStarted;
 
     private static Sprite pixel;
 
@@ -60,8 +64,8 @@ public class FirstLevel : MonoBehaviour
     {
         if (loadout != null)
             loadout.Changed -= RefreshObjective;
-        if (sentinel != null)
-            sentinel.Died -= OpenGate;
+        if (boss != null)
+            boss.Died -= OnBossDefeated;
     }
 
     private void Update()
@@ -123,11 +127,13 @@ public class FirstLevel : MonoBehaviour
         MonsterCardData fool = Resources.Load<MonsterCardData>("Cards/Fool");
         if (fool == null)
             Debug.LogWarning("没有找到 Resources/Cards/Fool，第一关无法获得愚者牌。");
-        CreateCard(new Vector3(9.2f, 4.15f, 0f), fool);
-        BasicEnemy spore = SpawnEnemy("PracticeSpore", 14.8f, 3, false, "孢子", new Color(0.62f, 0.28f, 0.78f), "Player", 5);
+        spore = SpawnEnemy("PracticeSpore", 14.8f, 3, false, "孢子", new Color(0.62f, 0.28f, 0.78f), "Player", 5);
         spore.SetAsPractice();
         spore.SetVisualScale(new Vector3(0.78f, 0.78f, 1f));
         BuildReachGate(ground, fool);
+        CreateCard(new Vector3(cardX, 2.2f, 0f), fool);
+        CreateSprite(root, "CardMat", new Vector3(cardX, 0.16f, 0f), new Vector3(1.5f, 0.1f, 1f), new Color(0.95f, 0.78f, 0.28f, 0.9f), "Ground", 2);
+        Sign("ForwardSign", root, new Vector3(8.4f, 3.55f, 0f), "往前", 140f);
         CreateExit();
         BuildGuideArrow();
     }
@@ -135,31 +141,47 @@ public class FirstLevel : MonoBehaviour
     private void BuildReachGate(int ground, MonsterCardData fool)
     {
         CapsuleCollider2D body = player.GetComponent<CapsuleCollider2D>();
-        float halfBody = body.size.x * 0.5f;
+        if (body == null)
+            Debug.LogWarning("玩家没有 CapsuleCollider2D，第一关用默认身体尺寸计算攻击距离和 Boss 招式。");
+        float halfBody = body != null ? body.size.x * 0.5f : 0.385f;
         standCenter = GrateLeft - halfBody - 0.06f;
+        float normalReach = player.AttackFrontReach(1f);
         float foolReach = fool != null ? fool.reachMultiplier : 2.15f;
-        normalFront = standCenter + player.AttackFrontReach(1f);
-        extendedFront = standCenter + player.AttackFrontReach(foolReach);
+        float normalFront = standCenter + normalReach;
+        float extendedFront = standCenter + player.AttackFrontReach(foolReach);
         float enemyLeft = Mathf.Lerp(normalFront, extendedFront, 0.38f);
+        // 挥击只覆盖黄线站桩点。突进从这里再向后延伸一段普通攻击距离。
+        float slashMinX = standCenter - 0.08f;
+        float thrustMinX = slashMinX - normalReach;
+        cardX = Mathf.Clamp(thrustMinX - 1.55f, 19.4f, 21.3f);
 
-        GameObject enemyObject = new GameObject("Sentinel");
+        GameObject enemyObject = new GameObject("RiftGuardian");
         enemyObject.transform.SetParent(root, false);
-        enemyObject.transform.localScale = new Vector3(1.2f, 1.35f, 1f);
-        enemyObject.AddComponent<SpriteRenderer>();
-        enemyObject.AddComponent<Rigidbody2D>();
+        enemyObject.transform.localScale = new Vector3(1.35f, 1.62f, 1f);
+        SpriteRenderer enemySprite = enemyObject.AddComponent<SpriteRenderer>();
+        Rigidbody2D enemyBody = enemyObject.AddComponent<Rigidbody2D>();
+        enemyBody.bodyType = RigidbodyType2D.Kinematic;
+        enemyBody.gravityScale = 0f;
+        enemyBody.constraints = RigidbodyConstraints2D.FreezeAll;
         CapsuleCollider2D capsule = enemyObject.AddComponent<CapsuleCollider2D>();
-        sentinel = enemyObject.AddComponent<BasicEnemy>();
-        sentinel.RootAt(player, 4, "裂隙守卫");
-        sentinel.SetBodyColor(new Color(0.9f, 0.24f, 0.18f));
-        sentinel.Died += OpenGate;
+        capsule.size = new Vector2(0.8f, 1.5f);
+        capsule.offset = new Vector2(0f, -0.05f);
+        boss = enemyObject.AddComponent<RiftGuardian>();
         float enemyHalf = capsule.size.x * 0.5f * Mathf.Abs(enemyObject.transform.lossyScale.x);
         float enemyBottom = capsule.offset.y - capsule.size.y * 0.5f;
         float enemyCenter = enemyLeft + enemyHalf;
         enemyObject.transform.position = new Vector3(enemyCenter, 0.04f - enemyObject.transform.localScale.y * enemyBottom, 0f);
-        SpriteRenderer enemySprite = enemyObject.GetComponent<SpriteRenderer>();
         enemySprite.sortingLayerName = "Ground";
         enemySprite.sortingOrder = 2;
         CreateSprite(enemyObject.transform, "Core", new Vector3(0f, 0.2f, 0f), new Vector3(0.34f, 0.42f, 1f), new Color(1f, 0.86f, 0.45f), "Ground", 3);
+        CreateSprite(enemyObject.transform, "Aura", Vector3.zero, new Vector3(1.25f, 1.85f, 1f), new Color(0.9f, 0.24f, 0.18f, 0.33f), "Player", -8);
+        CreateSprite(enemyObject.transform, "HornL", new Vector3(-0.28f, 0.62f, 0f), new Vector3(0.16f, 0.32f, 1f), new Color(0.55f, 0.08f, 0.08f), "Ground", 3);
+        CreateSprite(enemyObject.transform, "HornR", new Vector3(0.28f, 0.62f, 0f), new Vector3(0.16f, 0.32f, 1f), new Color(0.55f, 0.08f, 0.08f), "Ground", 3);
+
+        float playerHeight = body != null ? body.size.y * Mathf.Abs(player.transform.lossyScale.y) : 1.9f;
+        float playerWidth = body != null ? body.size.x * Mathf.Abs(player.transform.lossyScale.x) : 0.77f;
+        boss.Bind(player, 12, "裂隙守卫", slashMinX, GrateLeft, thrustMinX, 0f, FloorTop + playerHeight + 0.22f, playerHeight * 0.4f, Mathf.Max(1.15f, playerWidth * 2.2f));
+        boss.Died += OnBossDefeated;
 
         float grateWidth = Mathf.Max(2.4f, enemyCenter + enemyHalf + 0.32f - GrateLeft);
         gate = new GameObject("Grate");
@@ -180,7 +202,7 @@ public class FirstLevel : MonoBehaviour
         extensionMark = GroundMark("FoolReach", normalFront, extendedFront, 0.4f, 0.11f, new Color(1f, 0.78f, 0.2f, 0.95f), 4);
         extensionMark.enabled = false;
 
-        Sign("SentinelLabel", root, new Vector3(enemyCenter, 4.25f, 0f), "裂隙守卫", 240f);
+        bossNameSign = Sign("SentinelLabel", root, new Vector3(enemyCenter, 4.85f, 0f), "裂隙守卫", 240f);
     }
 
     private void BuildBars(Transform grate, int ground, float grateWidth)
@@ -277,6 +299,14 @@ public class FirstLevel : MonoBehaviour
             return;
 
         gateOpen = true;
+        if (normalMark != null)
+            normalMark.enabled = false;
+        if (gapMark != null)
+            gapMark.enabled = false;
+        if (extensionMark != null)
+            extensionMark.enabled = false;
+        if (guideArrow != null)
+            guideArrow.enabled = false;
         if (gate != null)
         {
             Collider2D[] blocking = gate.GetComponentsInChildren<Collider2D>();
@@ -314,8 +344,16 @@ public class FirstLevel : MonoBehaviour
         if (defineSpawn)
         {
             CapsuleCollider2D body = player.GetComponent<CapsuleCollider2D>();
-            float bottom = body.offset.y - body.size.y * 0.5f;
-            spawnPoint = new Vector3(0.4f, FloorTop - bottom + 0.06f, 0f);
+            if (body == null)
+            {
+                Debug.LogWarning("玩家没有 CapsuleCollider2D，使用默认出生高度。");
+                spawnPoint = new Vector3(0.4f, 1.4f, 0f);
+            }
+            else
+            {
+                float bottom = body.offset.y - body.size.y * 0.5f;
+                spawnPoint = new Vector3(0.4f, FloorTop - bottom + 0.06f, 0f);
+            }
         }
 
         player.transform.position = spawnPoint;
@@ -377,20 +415,97 @@ public class FirstLevel : MonoBehaviour
             return;
 
         if (cleared)
-            objectiveText.text = "第一关完成";
-        else if (gateOpen)
-            objectiveText.text = "";
-        else if (FoolEquipped)
-            objectiveText.text = "已装备愚者";
-        else if (loadout != null && loadout.PendingCard != null)
-            objectiveText.text = "按 J 或回车装备愚者";
-        else
-            objectiveText.text = "去高台拿牌";
+        {
+            SetObjective("第一关完成");
+            return;
+        }
+
+        if (endingStarted)
+        {
+            SetObjective("裂隙正在关闭");
+            return;
+        }
+
+        float x = player != null ? player.transform.position.x : 0f;
+        bool sporeAlive = spore != null && !spore.IsDead;
+        if (sporeAlive && x > 11.2f && x < 18.2f)
+        {
+            SetObjective("打倒孢子");
+            return;
+        }
+
+        if (boss != null && boss.IsAwake && !boss.IsDead)
+        {
+            if (boss.HasAttacked)
+                SetObjective("");
+            else if (boss.IsTelegraphing)
+                SetObjective("看地面预兆再躲开");
+            else
+                SetObjective("守卫醒来了");
+            return;
+        }
+
+        if (FoolEquipped)
+        {
+            SetObjective("站上黄线，打栏杆后的守卫");
+            return;
+        }
+
+        if (loadout != null && loadout.PendingCard != null)
+        {
+            SetObjective("J 或回车装备，Esc 先去试试");
+            return;
+        }
+
+        if (!HasFool && x > 18f)
+        {
+            SetObjective("拾取愚者");
+            return;
+        }
+
+        if (x < 3.4f)
+        {
+            SetObjective("方向键移动，空格跳跃");
+            return;
+        }
+
+        SetObjective(sporeAlive ? "J 攻击，跳过高台往前" : "继续往前拿愚者");
+    }
+
+    private void SetObjective(string value)
+    {
+        if (objectiveText == null || objectiveText.text == value)
+            return;
+
+        objectiveText.text = value;
+    }
+
+    private bool HasFool =>
+        FoolEquipped ||
+        (loadout != null && loadout.PendingCard != null) ||
+        OwnsFool();
+
+    private bool OwnsFool()
+    {
+        if (loadout == null)
+            return false;
+
+        for (int i = 0; i < loadout.OwnedCards.Count; i++)
+        {
+            MonsterCardData card = loadout.OwnedCards[i];
+            if (card != null && card.effectType == CardEffectType.FoolLunge)
+                return true;
+        }
+
+        return false;
     }
 
     private void UpdateLesson()
     {
         bool fool = FoolEquipped;
+        if (boss != null)
+            boss.SetFoolReady(fool);
+        RefreshObjective();
         if (normalMark != null)
             normalMark.enabled = !gateOpen;
         if (gapMark != null)
@@ -444,7 +559,7 @@ public class FirstLevel : MonoBehaviour
 
         const float flagX = 31.2f;
         float distance = flagX - player.transform.position.x;
-        bool show = gateOpen && !cleared && Mathf.Abs(distance) > 2.4f;
+        bool show = gateOpen && !cleared && !endingStarted && Mathf.Abs(distance) > 2.4f;
         if (!show)
         {
             guideArrow.enabled = false;
@@ -535,18 +650,18 @@ public class FirstLevel : MonoBehaviour
         fadeRect.offsetMax = Vector2.zero;
         fadeImage.raycastTarget = false;
 
-        fadeText = CreateUiText(canvasObject.transform, "FadeText", 42, TextAnchor.MiddleCenter, new Color(1f, 0.94f, 0.8f, 0f));
+        fadeText = CreateUiText(canvasObject.transform, "FadeText", 36, TextAnchor.MiddleCenter, new Color(1f, 0.94f, 0.8f, 0f));
         RectTransform fadeTextRect = fadeText.rectTransform;
         fadeTextRect.anchorMin = new Vector2(0.5f, 0.5f);
         fadeTextRect.anchorMax = new Vector2(0.5f, 0.5f);
-        fadeTextRect.sizeDelta = new Vector2(800f, 80f);
+        fadeTextRect.sizeDelta = new Vector2(920f, 160f);
 
         endPanel = new GameObject("ClearPanel");
         endPanel.transform.SetParent(canvasObject.transform, false);
         Image endImage = endPanel.AddComponent<Image>();
         endImage.color = new Color(0.07f, 0.05f, 0.09f, 0.94f);
         RectTransform endRect = endPanel.GetComponent<RectTransform>();
-        endRect.sizeDelta = new Vector2(560f, 460f);
+        endRect.sizeDelta = new Vector2(640f, 640f);
         Sprite panelSkin = UiArt.Load(UiArt.Panel);
         if (panelSkin != null)
         {
@@ -558,9 +673,14 @@ public class FirstLevel : MonoBehaviour
         endTitle.text = "第一关完成";
         StretchTop(endTitle.rectTransform, -28f, 56f);
 
-        CreateChoice(endPanel.transform, "继续试玩当前关卡", new Vector2(0f, 30f), ContinueLevel);
-        CreateChoice(endPanel.transform, "选择关卡", new Vector2(0f, -60f), GameFlow.LoadLevelSelect);
-        CreateChoice(endPanel.transform, "返回标题", new Vector2(0f, -150f), GameFlow.LoadTitle);
+        Text ending = CreateUiText(endPanel.transform, "Ending", 26, TextAnchor.UpperCenter, new Color(1f, 0.94f, 0.82f));
+        ending.text = ChapterLine;
+        StretchTop(ending.rectTransform, -96f, 100f);
+
+        CreateChoice(endPanel.transform, "重玩本关", new Vector2(0f, 28f), ReplayLevel);
+        CreateChoice(endPanel.transform, "返回标题", new Vector2(0f, -58f), GameFlow.LoadTitle);
+        CreateChoice(endPanel.transform, "继续试玩当前关卡", new Vector2(0f, -144f), ContinueLevel);
+        CreateChoice(endPanel.transform, "选择关卡", new Vector2(0f, -230f), GameFlow.LoadLevelSelect);
         endPanel.SetActive(false);
     }
 
@@ -570,12 +690,60 @@ public class FirstLevel : MonoBehaviour
             return;
 
         endPanel.SetActive(false);
+        busy = false;
+        if (fadeText != null)
+            fadeText.text = "";
         if (cardUi != null)
             cardUi.ReleaseFromClear();
         if (!IsCardOpen)
             Time.timeScale = 1f;
         if (player != null && !player.IsDefeated && !IsCardOpen)
             player.SetGameplayInputEnabled(true);
+        if (fadeImage != null && fadeImage.color.a > 0.01f)
+            StartCoroutine(Fade(fadeImage.color.a, 0f, 0.25f));
+    }
+
+    private void ReplayLevel()
+    {
+        GameFlow.ReloadActiveScene();
+    }
+
+    private void OnBossDefeated()
+    {
+        if (endingStarted || (player != null && player.IsDefeated))
+            return;
+
+        endingStarted = true;
+        busy = true;
+        if (cardUi != null)
+            cardUi.HoldForClear();
+        Time.timeScale = 1f;
+        if (player != null)
+        {
+            player.SetGameplayInputEnabled(false);
+            if (player.rb != null)
+                player.rb.linearVelocity = Vector2.zero;
+        }
+
+        if (boss != null)
+            CreateSprite(root, "RiftAsh", new Vector3(boss.transform.position.x, 0.12f, 0f), new Vector3(1.8f, 0.22f, 1f), new Color(0.16f, 0.05f, 0.08f, 0.95f), "Ground", 2);
+        CreateSprite(root, "RiftCalm", new Vector3(standCenter, 0.2f, 0f), new Vector3(1.8f, 0.12f, 1f), new Color(0.55f, 0.85f, 1f, 0.9f), "Ground", 4);
+        if (bossNameSign != null)
+            bossNameSign.transform.parent.gameObject.SetActive(false);
+
+        OpenGate();
+        StartCoroutine(PlayEnding());
+    }
+
+    private IEnumerator PlayEnding()
+    {
+        SetObjective("裂隙正在关闭");
+        yield return new WaitForSeconds(1.05f);
+        if (fadeText != null)
+            fadeText.text = ChapterLine;
+        yield return Fade(0f, 0.8f, 0.4f);
+        yield return new WaitForSeconds(0.7f);
+        Complete();
     }
 
     private void CreateChoice(Transform parent, string label, Vector2 position, UnityEngine.Events.UnityAction onClick)

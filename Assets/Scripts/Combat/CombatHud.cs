@@ -35,7 +35,8 @@ public class CombatHud : MonoBehaviour
 
     private sealed class EnemyHealthView
     {
-        public BasicEnemy Enemy;
+        public MonoBehaviour Body;
+        public IHudTarget Target;
         public Action Handler;
         public RectTransform Root;
         public RectTransform Fill;
@@ -62,6 +63,8 @@ public class CombatHud : MonoBehaviour
 
         BasicEnemy.Spawned += TrackEnemy;
         BasicEnemy.Removed += UntrackEnemy;
+        RiftGuardian.Spawned += TrackBoss;
+        RiftGuardian.Removed += UntrackBoss;
         RefreshPlayerHealth();
         RefreshCard();
     }
@@ -71,6 +74,10 @@ public class CombatHud : MonoBehaviour
         BasicEnemy[] existing = FindObjectsByType<BasicEnemy>(FindObjectsSortMode.None);
         for (int i = 0; i < existing.Length; i++)
             TrackEnemy(existing[i]);
+
+        RiftGuardian[] bosses = FindObjectsByType<RiftGuardian>(FindObjectsSortMode.None);
+        for (int i = 0; i < bosses.Length; i++)
+            TrackBoss(bosses[i]);
     }
 
     private void OnDisable()
@@ -86,12 +93,14 @@ public class CombatHud : MonoBehaviour
 
         BasicEnemy.Spawned -= TrackEnemy;
         BasicEnemy.Removed -= UntrackEnemy;
+        RiftGuardian.Spawned -= TrackBoss;
+        RiftGuardian.Removed -= UntrackBoss;
 
         for (int i = enemyViews.Count - 1; i >= 0; i--)
         {
             EnemyHealthView view = enemyViews[i];
-            if (view.Enemy != null && view.Handler != null)
-                view.Enemy.HealthChanged -= view.Handler;
+            if (view.Body != null && view.Target != null && view.Handler != null)
+                view.Target.HealthChanged -= view.Handler;
             if (view.Root != null)
                 Destroy(view.Root.gameObject);
             enemyViews.RemoveAt(i);
@@ -151,7 +160,7 @@ public class CombatHud : MonoBehaviour
         for (int i = enemyViews.Count - 1; i >= 0; i--)
         {
             EnemyHealthView view = enemyViews[i];
-            if (view.Enemy == null)
+            if (view.Body == null || view.Target == null)
             {
                 if (view.Root != null)
                     Destroy(view.Root.gameObject);
@@ -159,10 +168,10 @@ public class CombatHud : MonoBehaviour
                 continue;
             }
 
-            bool show = !view.Enemy.IsDead;
+            bool show = !view.Target.IsDead;
             if (show && cam != null)
             {
-                Vector3 screen = cam.WorldToScreenPoint(view.Enemy.transform.position + Vector3.up * 1.15f);
+                Vector3 screen = cam.WorldToScreenPoint(view.Target.HudWorldPoint);
                 show = screen.z > 0f;
                 if (show && RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screen, null, out Vector2 local))
                     view.Root.anchoredPosition = local;
@@ -220,26 +229,50 @@ public class CombatHud : MonoBehaviour
 
     private void TrackEnemy(BasicEnemy enemy)
     {
-        if (!built || enemy == null || enemyViews.Exists(view => view.Enemy == enemy))
-            return;
+        Track(enemy, enemy);
+    }
 
-        EnemyHealthView view = CreateEnemyView();
-        view.Enemy = enemy;
-        view.Handler = () => RefreshEnemy(view);
-        enemy.HealthChanged += view.Handler;
-        enemyViews.Add(view);
-        RefreshEnemy(view);
+    private void TrackBoss(RiftGuardian boss)
+    {
+        Track(boss, boss);
     }
 
     private void UntrackEnemy(BasicEnemy enemy)
     {
+        Untrack(enemy);
+    }
+
+    private void UntrackBoss(RiftGuardian boss)
+    {
+        Untrack(boss);
+    }
+
+    private void Track(MonoBehaviour body, IHudTarget target)
+    {
+        if (!built || body == null || target == null || enemyViews.Exists(view => view.Body == body))
+            return;
+
+        EnemyHealthView view = CreateEnemyView();
+        view.Body = body;
+        view.Target = target;
+        view.Handler = () => RefreshEnemy(view);
+        target.HealthChanged += view.Handler;
+        enemyViews.Add(view);
+        RefreshEnemy(view);
+    }
+
+    private void Untrack(MonoBehaviour body)
+    {
+        if (body == null)
+            return;
+
         for (int i = enemyViews.Count - 1; i >= 0; i--)
         {
-            if (enemyViews[i].Enemy != enemy)
+            if (enemyViews[i].Body != body)
                 continue;
 
-            if (enemy != null && enemyViews[i].Handler != null)
-                enemy.HealthChanged -= enemyViews[i].Handler;
+            if (enemyViews[i].Target != null && enemyViews[i].Handler != null)
+                enemyViews[i].Target.HealthChanged -= enemyViews[i].Handler;
             if (enemyViews[i].Root != null)
                 Destroy(enemyViews[i].Root.gameObject);
             enemyViews.RemoveAt(i);
@@ -248,14 +281,14 @@ public class CombatHud : MonoBehaviour
 
     private void RefreshEnemy(EnemyHealthView view)
     {
-        if (view.Enemy == null)
+        if (view.Body == null || view.Target == null)
             return;
 
-        int max = Mathf.Max(1, view.Enemy.MaxHealth);
-        float ratio = Mathf.Clamp01((float)view.Enemy.CurrentHealth / max);
+        int max = Mathf.Max(1, view.Target.MaxHealth);
+        float ratio = Mathf.Clamp01((float)view.Target.CurrentHealth / max);
         SetFill(view.Fill, ratio);
-        view.Label.text = view.Enemy.DisplayName + "  " + view.Enemy.CurrentHealth + "/" + view.Enemy.MaxHealth;
-        view.Root.gameObject.SetActive(!view.Enemy.IsDead);
+        view.Label.text = view.Target.DisplayName + "  " + view.Target.CurrentHealth + "/" + view.Target.MaxHealth;
+        view.Root.gameObject.SetActive(!view.Target.IsDead);
     }
 
     private void Build()
@@ -330,10 +363,10 @@ public class CombatHud : MonoBehaviour
         view.Root.anchorMin = new Vector2(0.5f, 0.5f);
         view.Root.anchorMax = new Vector2(0.5f, 0.5f);
         view.Root.pivot = new Vector2(0.5f, 0f);
-        view.Root.sizeDelta = new Vector2(150f, 36f);
+        view.Root.sizeDelta = new Vector2(210f, 40f);
 
         view.Label = CreateText(view.Root, "Label", font, 18, TextAnchor.MiddleCenter);
-        Place(view.Label.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 14f), new Vector2(150f, 22f));
+        Place(view.Label.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 16f), new Vector2(210f, 22f));
 
         RectTransform bar = CreateRect(view.Root, "Bar");
         Place(bar, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), Vector2.zero, new Vector2(72f, 10f));
