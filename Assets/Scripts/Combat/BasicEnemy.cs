@@ -5,7 +5,7 @@ using UnityEngine;
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(Collider2D))]
 [RequireComponent(typeof(SpriteRenderer))]
-public class BasicEnemy : MonoBehaviour, IDamageable
+public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
 {
     private enum EnemyAction
     {
@@ -65,6 +65,7 @@ public class BasicEnemy : MonoBehaviour, IDamageable
     public int MaxHealth => maxHealth;
     public string DisplayName => displayName;
     public bool IsDead => dead;
+    public Vector3 HudWorldPoint => transform.position + Vector3.up * 1.15f;
     public bool IsStrikeActive => !dead && action == EnemyAction.Strike;
     public event Action HealthChanged;
     public event Action Died;

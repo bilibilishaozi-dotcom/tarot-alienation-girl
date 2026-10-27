@@ -1,6 +1,3 @@
-using JetBrains.Annotations;
-using NUnit.Framework.Interfaces;
-using Unity.IO.LowLevel.Unsafe;
 using UnityEngine;
 
 public class StateMachine
