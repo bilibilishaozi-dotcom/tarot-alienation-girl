@@ -12,7 +12,12 @@ public class CardSelectUI : MonoBehaviour
     private Text titleText;
     private Text bodyText;
     private GameObject equipReminder;
+    private Button equipButton;
+    private InputAction equipAction;
     private bool choiceHidden;
+    private bool pausedForCard;
+
+    public bool IsPanelOpen => panel != null && panel.activeSelf;
 
     private void Awake()
     {
@@ -25,12 +30,33 @@ public class CardSelectUI : MonoBehaviour
     {
         if (loadout != null)
             loadout.Changed += Refresh;
+
+        equipAction = new InputAction(type: InputActionType.Button);
+        equipAction.AddBinding("<Keyboard>/j");
+        equipAction.AddBinding("<Keyboard>/enter");
+        equipAction.AddBinding("<Keyboard>/numpadEnter");
+        equipAction.performed += OnEquipPressed;
+        equipAction.Enable();
     }
 
     private void OnDisable()
     {
         if (loadout != null)
             loadout.Changed -= Refresh;
+
+        if (pausedForCard)
+        {
+            pausedForCard = false;
+            Time.timeScale = 1f;
+        }
+
+        if (equipAction == null)
+            return;
+
+        equipAction.performed -= OnEquipPressed;
+        equipAction.Disable();
+        equipAction.Dispose();
+        equipAction = null;
     }
 
     private void Start()
@@ -43,10 +69,16 @@ public class CardSelectUI : MonoBehaviour
         if (loadout == null || panel == null || !panel.activeSelf || Keyboard.current == null)
             return;
 
-        if (Keyboard.current.enterKey.wasPressedThisFrame || Keyboard.current.jKey.wasPressedThisFrame)
-            loadout.EquipPending();
-        else if (Keyboard.current.escapeKey.wasPressedThisFrame)
+        if (Keyboard.current.escapeKey.wasPressedThisFrame)
             HideWithoutEquipping();
+    }
+
+    private void OnEquipPressed(InputAction.CallbackContext context)
+    {
+        if (!context.performed || loadout == null || loadout.PendingCard == null)
+            return;
+
+        loadout.EquipPending();
     }
 
     private void Refresh()
@@ -60,13 +92,35 @@ public class CardSelectUI : MonoBehaviour
         equipReminder.SetActive(hasPending && choiceHidden);
         if (player != null)
             player.SetGameplayInputEnabled(!showPanel);
+        SetPaused(showPanel);
 
         if (showPanel)
         {
             MonsterCardData card = loadout.PendingCard;
-            titleText.text = "获得怪物卡";
-            bodyText.text = card.displayName + "\n" + card.description;
+            titleText.text = "获得占星牌";
+            bodyText.text = card.displayName + "\n" + card.description
+                + "\n\n刀光会变成金色，并且伸得更远，伤害变成两倍。"
+                + "\n贴着栏杆攻击，可以打到对面的敌人。"
+                + "\n\nJ 或回车：装备    Esc：稍后";
+            if (equipButton != null && EventSystem.current != null)
+                EventSystem.current.SetSelectedGameObject(equipButton.gameObject);
         }
+    }
+
+    private void SetPaused(bool pause)
+    {
+        if (pause)
+        {
+            pausedForCard = true;
+            Time.timeScale = 0f;
+            return;
+        }
+
+        if (!pausedForCard)
+            return;
+
+        pausedForCard = false;
+        Time.timeScale = 1f;
     }
 
     private void BuildUi()
@@ -78,7 +132,7 @@ public class CardSelectUI : MonoBehaviour
             eventSystem.AddComponent<InputSystemUIInputModule>();
         }
 
-        Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        Font font = GameFont.Get();
 
         GameObject canvasObject = new GameObject("CardCanvas");
         Canvas canvas = canvasObject.AddComponent<Canvas>();
@@ -94,16 +148,16 @@ public class CardSelectUI : MonoBehaviour
         Image panelImage = panel.AddComponent<Image>();
         panelImage.color = new Color(0.08f, 0.06f, 0.1f, 0.92f);
         RectTransform panelRect = panel.GetComponent<RectTransform>();
-        panelRect.sizeDelta = new Vector2(640f, 360f);
+        panelRect.sizeDelta = new Vector2(720f, 480f);
 
         titleText = CreateText(panel.transform, "Title", font, 36, TextAnchor.UpperCenter);
         SetTop(titleText.rectTransform, -24f, new Vector2(580f, 52f));
 
         bodyText = CreateText(panel.transform, "Body", font, 26, TextAnchor.UpperCenter);
-        SetTop(bodyText.rectTransform, -88f, new Vector2(560f, 150f));
+        SetTop(bodyText.rectTransform, -80f, new Vector2(640f, 250f));
 
-        CreateButton(panel.transform, "装备", font, new Vector2(-120f, -120f), () => loadout.EquipPending());
-        CreateButton(panel.transform, "稍后", font, new Vector2(120f, -120f), HideWithoutEquipping);
+        equipButton = CreateButton(panel.transform, "装备", font, new Vector2(-120f, -168f), () => loadout.EquipPending());
+        CreateButton(panel.transform, "稍后", font, new Vector2(120f, -168f), HideWithoutEquipping);
         equipReminder = CreateButton(canvasObject.transform, "装备愚者", font, new Vector2(220f, -90f), () =>
         {
             choiceHidden = false;

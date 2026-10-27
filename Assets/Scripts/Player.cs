@@ -31,7 +31,7 @@ public class Player : MonoBehaviour
     public Vector2[] attackVelocity;
     public Vector2 jumpAttackVelocity;
     public float attackVelocityDuration = 0.1f;
-    public float comboResetTime = 1;
+    public float comboResetTime = 0.45f;
     [SerializeField] private int baseAttackDamage = 1;
     [SerializeField] private Vector2 attackHitboxSize = new Vector2(1.25f, 0.85f);
     [SerializeField] private Vector2 attackHitboxOffset = new Vector2(0.95f, -0.1f);
@@ -78,6 +78,12 @@ public class Player : MonoBehaviour
     public int CurrentAttackDamage => Mathf.Max(1, Mathf.RoundToInt(baseAttackDamage * (cardLoadout != null ? cardLoadout.DamageMultiplier : 1f)));
     public float AttackLungeMultiplier => cardLoadout != null ? cardLoadout.LungeMultiplier : 1f;
     public float AttackReachMultiplier => cardLoadout != null ? cardLoadout.ReachMultiplier : 1f;
+
+    public float AttackFrontReach(float reachMultiplier)
+    {
+        float extra = attackHitboxSize.x * (Mathf.Max(1f, reachMultiplier) - 1f);
+        return attackHitboxOffset.x + attackHitboxSize.x * 0.5f + extra;
+    }
 
     [Header("Collision detection")]
     //[SerializeField]代表虽然是私密值，但是显示在Unity属性栏中
@@ -131,6 +137,8 @@ public class Player : MonoBehaviour
         basicAttackState = new Player_BasicAttackState(this, stateMachine, "basicAttack");
         jumpAttackState = new Player_JumpAttackState(this, stateMachine, "jumpAttack");
         EnsureAttackHitbox();
+        if (GetComponent<FirstLevel>() == null)
+            gameObject.AddComponent<FirstLevel>();
     }
 
     private void OnEnable()
@@ -292,20 +300,15 @@ public class Player : MonoBehaviour
 
     private void TickHurtTimers()
     {
+        TickHitStun();
+
         if (IsDefeated)
         {
-            if (hitStunTimer > 0f)
-                hitStunTimer -= Time.deltaTime;
-            else
-                rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
-
+            rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
             if (bodySprite != null)
                 bodySprite.color = new Color(0.55f, 0.55f, 0.55f, 1f);
             return;
         }
-
-        if (hitStunTimer > 0f)
-            hitStunTimer -= Time.deltaTime;
 
         if (invulnerableTimer > 0f)
         {
@@ -322,6 +325,19 @@ public class Player : MonoBehaviour
         {
             bodySprite.color = bodySpriteColor;
         }
+    }
+
+    private void TickHitStun()
+    {
+        if (hitStunTimer <= 0f)
+            return;
+
+        hitStunTimer -= Time.deltaTime;
+        if (hitStunTimer > 0f)
+            return;
+
+        hitStunTimer = 0f;
+        rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
     }
 
     public void SetVelocity(float xVelocity, float yVelocity)

@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class TrainingEncounter : MonoBehaviour
 {
-    [SerializeField] private bool spawnOnStart = true;
+    [SerializeField] private bool spawnOnStart = false;
     [SerializeField] private Vector2 firstOffset = new Vector2(6f, 1.5f);
     [SerializeField] private Vector2 secondOffset = new Vector2(12f, 1.5f);
     [SerializeField] private int firstHealth = 3;

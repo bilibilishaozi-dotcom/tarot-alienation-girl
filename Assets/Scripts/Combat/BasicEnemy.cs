@@ -23,7 +23,7 @@ public class BasicEnemy : MonoBehaviour, IDamageable
     [SerializeField] private MonsterCardData dropCard;
     [SerializeField] private bool grantFoolCardIfEmpty = true;
     [SerializeField] private float deathDelay = 0.45f;
-    [SerializeField] private Vector2 knockback = new Vector2(3.5f, 2.5f);
+    [SerializeField] private Vector2 knockback = new Vector2(1.4f, 0.8f);
 
     [Header("Movement")]
     [SerializeField] private float moveSpeed = 1.6f;
@@ -58,6 +58,7 @@ public class BasicEnemy : MonoBehaviour, IDamageable
     private int moveDirection = 1;
     private bool dead;
     private bool rewardGranted;
+    private bool rooted;
 
     public int AttackDamage => attackDamage;
     public int CurrentHealth => health;
@@ -66,6 +67,7 @@ public class BasicEnemy : MonoBehaviour, IDamageable
     public bool IsDead => dead;
     public bool IsStrikeActive => !dead && action == EnemyAction.Strike;
     public event Action HealthChanged;
+    public event Action Died;
     public static event Action<BasicEnemy> Spawned;
     public static event Action<BasicEnemy> Removed;
 
@@ -134,6 +136,19 @@ public class BasicEnemy : MonoBehaviour, IDamageable
         }
     }
 
+    public void RootAt(Player targetPlayer, int healthValue, string nameOverride)
+    {
+        rooted = true;
+        Configure(healthValue, false, targetPlayer, nameOverride);
+    }
+
+    public void SetBodyColor(Color color)
+    {
+        baseColor = color;
+        if (spriteRenderer != null)
+            spriteRenderer.color = color;
+    }
+
     private void Update()
     {
         if (dead)
@@ -143,10 +158,24 @@ public class BasicEnemy : MonoBehaviour, IDamageable
         switch (action)
         {
             case EnemyAction.Patrol:
+                if (rooted)
+                {
+                    HoldStill();
+                    FaceTowardPlayer();
+                    break;
+                }
+
                 Patrol();
                 TryNoticePlayer();
                 break;
             case EnemyAction.Chase:
+                if (rooted)
+                {
+                    HoldStill();
+                    action = EnemyAction.Patrol;
+                    break;
+                }
+
                 Chase();
                 break;
             case EnemyAction.Windup:
@@ -175,7 +204,7 @@ public class BasicEnemy : MonoBehaviour, IDamageable
                 {
                     spriteRenderer.color = baseColor;
                     transform.localScale = baseScale;
-                    action = CanSeePlayer() ? EnemyAction.Chase : EnemyAction.Patrol;
+                    action = !rooted && CanSeePlayer() ? EnemyAction.Chase : EnemyAction.Patrol;
                 }
                 break;
         }
@@ -188,11 +217,12 @@ public class BasicEnemy : MonoBehaviour, IDamageable
 
         EndStrike();
         health = Mathf.Max(0, health - amount);
-        spriteRenderer.color = new Color(1f, 0.75f, 0.75f, 1f);
-        transform.localScale = baseScale;
+        bool heavy = amount >= 2;
+        spriteRenderer.color = heavy ? new Color(1f, 0.9f, 0.4f, 1f) : Color.white;
+        transform.localScale = new Vector3(baseScale.x * (heavy ? 1.28f : 1.08f), baseScale.y * (heavy ? 0.38f : 0.68f), baseScale.z);
 
         float knockDirection = transform.position.x >= hitFrom.x ? 1f : -1f;
-        rb.linearVelocity = new Vector2(knockDirection * knockback.x, knockback.y);
+        rb.linearVelocity = rooted ? Vector2.zero : new Vector2(knockDirection * knockback.x, knockback.y);
         Face((int)knockDirection);
 
         HealthChanged?.Invoke();
@@ -203,7 +233,7 @@ public class BasicEnemy : MonoBehaviour, IDamageable
         }
 
         action = EnemyAction.Hurt;
-        actionTimer = hurtDuration;
+        actionTimer = hurtDuration + (heavy ? 0.32f : 0f);
     }
 
     private void Patrol()
@@ -338,6 +368,7 @@ public class BasicEnemy : MonoBehaviour, IDamageable
             CardReward.Grant(reward);
         }
 
+        Died?.Invoke();
         StartCoroutine(PlayDeath());
     }
 

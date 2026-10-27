@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardId: fool
   displayName: "\u611A\u8005"
-  description: "\u653B\u51FB\u53D8\u4E3A\u66F4\u957F\u7684\u7A81\u8FDB\u65A9\uFF0C\u5E76\u63D0\u9AD8\u4F24\u5BB3\u3002"
+  description: "\u653B\u51FB\u53D8\u4E3A\u66F4\u957F\u7684\u7A81\u8FDB\u65A9\uFF0C\u8D34\u7740\u969C\u788D\u4E5F\u80FD\u6253\u5230\u5BF9\u9762\u7684\u654C\u4EBA\u3002"
   effectType: 0
   damageMultiplier: 2
   lungeMultiplier: 1.75

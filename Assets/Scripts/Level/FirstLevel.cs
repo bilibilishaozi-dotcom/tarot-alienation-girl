@@ -1,0 +1,632 @@
+using System.Collections;
+using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+
+public class FirstLevel : MonoBehaviour
+{
+    private const float FloorTop = 0f;
+    private const float GrateLeft = 24.2f;
+    private const float GrateWidth = 1.35f;
+    private const float GrateHeight = 3.8f;
+
+    private Player player;
+    private PlayerCardLoadout loadout;
+    private Transform root;
+    private GameObject gate;
+    private BasicEnemy sentinel;
+    private Text objectiveText;
+    private CardSelectUI cardUi;
+    private Image fadeImage;
+    private Text fadeText;
+    private GameObject endPanel;
+    private Vector3 spawnPoint;
+    private bool gateOpen;
+    private bool cleared;
+    private bool busy;
+
+    private static Sprite pixel;
+
+    private void Awake()
+    {
+        player = GetComponent<Player>();
+        loadout = GetComponent<PlayerCardLoadout>();
+        root = new GameObject("LevelOne").transform;
+        DisableLegacyGround();
+        Build();
+        PlacePlayer(true);
+        SnapCamera();
+    }
+
+    private void Start()
+    {
+        cardUi = GetComponent<CardSelectUI>();
+        BuildObjective();
+        BuildNotices();
+        if (loadout != null)
+            loadout.Changed += RefreshObjective;
+        RefreshObjective();
+    }
+
+    private void OnDestroy()
+    {
+        if (loadout != null)
+            loadout.Changed -= RefreshObjective;
+        if (sentinel != null)
+            sentinel.Died -= OpenGate;
+    }
+
+    private void Update()
+    {
+        if (Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame && !IsCardOpen)
+            ReloadLevel();
+
+        if (cleared && endPanel != null && endPanel.activeSelf && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            endPanel.SetActive(false);
+
+        if (busy || player == null || player.IsDefeated)
+            return;
+
+        if (player.transform.position.y < -6f)
+            StartCoroutine(FallRespawn());
+    }
+
+    public void Complete()
+    {
+        if (cleared)
+            return;
+
+        cleared = true;
+        RefreshObjective();
+        if (endPanel != null)
+            endPanel.SetActive(true);
+    }
+
+    private void Build()
+    {
+        int ground = LayerMask.NameToLayer("Ground");
+        if (ground < 0)
+            ground = 6;
+
+        Solid("Floor", new Vector2(16.25f, -1f), new Vector2(36.5f, 2f), new Color(0.31f, 0.27f, 0.23f), ground, 0);
+        Solid("LeftWall", new Vector2(-2.35f, 3.75f), new Vector2(0.7f, 7.5f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
+        Solid("RightWall", new Vector2(34.15f, 3f), new Vector2(0.7f, 6f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
+
+        Solid("Step", new Vector2(3.05f, 0.725f), new Vector2(2.9f, 1.45f), new Color(0.43f, 0.36f, 0.28f), ground, 1);
+        Solid("CardPlatform", new Vector2(7.55f, 1.45f), new Vector2(6.5f, 2.9f), new Color(0.46f, 0.38f, 0.29f), ground, 1);
+
+        Solid("PenLeft", new Vector2(12.5f, 0.6f), new Vector2(0.5f, 1.2f), new Color(0.26f, 0.22f, 0.2f), ground, 1);
+        Solid("PenRight", new Vector2(17.2f, 0.6f), new Vector2(0.5f, 1.2f), new Color(0.26f, 0.22f, 0.2f), ground, 1);
+        Solid("Arch", new Vector2(20.4f, 5.5f), new Vector2(0.75f, 3.8f), new Color(0.2f, 0.17f, 0.16f), ground, 1);
+
+        MonsterCardData fool = Resources.Load<MonsterCardData>("Cards/Fool");
+        CreateCard(new Vector3(9.2f, 4.15f, 0f), fool);
+        SpawnEnemy("PracticeSpore", 14.8f, 3, false, "孢子", new Color(0.45f, 0.18f, 0.55f), "Player", 5);
+        BuildReachGate(ground, fool);
+        CreateExit();
+
+        Sign("StartHint", root, new Vector3(0.4f, 2.75f, 0f), "A D 移动   空格跳跃   左键攻击", 460f);
+        Sign("StepHint", root, new Vector3(3.05f, 2.55f, 0f), "空格跳上去，向右继续", 320f);
+        Sign("AttackHint", root, new Vector3(14.8f, 2.45f, 0f), "鼠标左键攻击", 260f);
+    }
+
+    private void BuildReachGate(int ground, MonsterCardData fool)
+    {
+        gate = new GameObject("Grate");
+        gate.layer = ground;
+        gate.transform.SetParent(root, false);
+        gate.transform.position = new Vector3(GrateLeft + GrateWidth * 0.5f, GrateHeight * 0.5f, 0f);
+        Rigidbody2D gateBody = gate.AddComponent<Rigidbody2D>();
+        gateBody.bodyType = RigidbodyType2D.Kinematic;
+        gateBody.gravityScale = 0f;
+        gateBody.freezeRotation = true;
+        BuildBars(gate.transform, ground);
+
+        CapsuleCollider2D body = player.GetComponent<CapsuleCollider2D>();
+        float halfBody = body.size.x * 0.5f;
+        float standCenter = GrateLeft - halfBody - 0.05f;
+        float foolReach = fool != null ? fool.reachMultiplier : 1.65f;
+        float normalFront = standCenter + player.AttackFrontReach(1f);
+        float extendedFront = standCenter + player.AttackFrontReach(foolReach);
+        float nearEdge = Mathf.Lerp(normalFront, extendedFront, 0.42f);
+
+        GameObject enemyObject = new GameObject("Sentinel");
+        enemyObject.transform.SetParent(root, false);
+        enemyObject.AddComponent<SpriteRenderer>();
+        enemyObject.AddComponent<Rigidbody2D>();
+        CapsuleCollider2D capsule = enemyObject.AddComponent<CapsuleCollider2D>();
+        sentinel = enemyObject.AddComponent<BasicEnemy>();
+        sentinel.RootAt(player, 4, "裂隙守卫");
+        sentinel.SetBodyColor(new Color(0.62f, 0.14f, 0.16f));
+        sentinel.Died += OpenGate;
+        float enemyHalf = capsule.size.x * 0.5f;
+        enemyObject.transform.position = new Vector3(nearEdge + enemyHalf, 1.35f, 0f);
+        SpriteRenderer enemySprite = enemyObject.GetComponent<SpriteRenderer>();
+        enemySprite.sortingLayerName = "Ground";
+        enemySprite.sortingOrder = 2;
+
+        Decor("StandPlate", new Vector2(standCenter, 0.09f), new Vector2(1.25f, 0.16f), new Color(0.78f, 0.58f, 0.22f), 3);
+        Sign("GrateHint", root, new Vector3(standCenter, 2.55f, 0f), "攻击可以越过栏杆", 320f);
+    }
+
+    private void BuildBars(Transform grate, int ground)
+    {
+        const int count = 5;
+        const float barWidth = 0.18f;
+        float gap = (GrateWidth - barWidth * count) / (count - 1);
+        for (int i = 0; i < count; i++)
+        {
+            float left = -GrateWidth * 0.5f + i * (barWidth + gap);
+            GameObject bar = new GameObject("Bar" + i);
+            bar.layer = ground;
+            bar.transform.SetParent(grate, false);
+            bar.transform.localPosition = new Vector3(left + barWidth * 0.5f, 0f, 0f);
+            bar.transform.localScale = new Vector3(barWidth, GrateHeight, 1f);
+            SpriteRenderer sprite = bar.AddComponent<SpriteRenderer>();
+            sprite.sprite = PixelSprite();
+            sprite.color = new Color(0.34f, 0.3f, 0.4f, 1f);
+            sprite.sortingLayerName = "Ground";
+            sprite.sortingOrder = 5;
+            BoxCollider2D box = bar.AddComponent<BoxCollider2D>();
+            box.size = Vector2.one;
+        }
+
+        CreateSprite(grate, "Lintel", new Vector3(0f, GrateHeight * 0.5f - 0.18f, 0f), new Vector3(GrateWidth, 0.36f, 1f), new Color(0.24f, 0.2f, 0.28f), "Ground", 6);
+    }
+
+    private void CreateCard(Vector3 position, MonsterCardData card)
+    {
+        GameObject pickup = new GameObject("FoolCardPickup");
+        pickup.transform.SetParent(root, false);
+        pickup.transform.position = position;
+        CreateSprite(pickup.transform, "Glow", Vector3.zero, new Vector3(1.55f, 1.85f, 1f), new Color(1f, 0.82f, 0.35f, 0.28f), "Player", 5);
+        CreateSprite(pickup.transform, "Face", Vector3.zero, new Vector3(0.72f, 1.08f, 1f), new Color(0.95f, 0.76f, 0.28f), "Player", 6);
+        CreateSprite(pickup.transform, "Mark", new Vector3(0f, 0.06f, 0f), new Vector3(0.36f, 0.48f, 1f), new Color(0.42f, 0.16f, 0.58f), "Player", 7);
+
+        BoxCollider2D trigger = pickup.AddComponent<BoxCollider2D>();
+        trigger.isTrigger = true;
+        trigger.size = new Vector2(1.5f, 1.9f);
+        pickup.AddComponent<CardPickup>().Arm(card);
+        Sign("CardLabel", pickup.transform, position + Vector3.up * 1.15f, "愚者", 160f);
+    }
+
+    private void CreateExit()
+    {
+        CreateSprite(root, "ExitPole", new Vector3(31.15f, 1.15f, 0f), new Vector3(0.12f, 2.3f, 1f), new Color(0.35f, 0.28f, 0.2f), "Player", 3);
+        CreateSprite(root, "ExitBanner", new Vector3(31.55f, 1.9f, 0f), new Vector3(0.7f, 0.48f, 1f), new Color(0.82f, 0.22f, 0.18f), "Player", 4);
+        Sign("ExitLabel", root, new Vector3(31.3f, 2.7f, 0f), "出口", 140f);
+
+        GameObject exit = new GameObject("LevelExit");
+        exit.transform.SetParent(root, false);
+        exit.transform.position = new Vector3(31.2f, 1.2f, 0f);
+        BoxCollider2D trigger = exit.AddComponent<BoxCollider2D>();
+        trigger.isTrigger = true;
+        trigger.size = new Vector2(1.8f, 2.4f);
+        exit.AddComponent<LevelExit>().Arm(this);
+    }
+
+    private BasicEnemy SpawnEnemy(string objectName, float x, int health, bool rooted, string displayName, Color color, string sortingLayer, int sortingOrder)
+    {
+        GameObject enemy = new GameObject(objectName);
+        enemy.transform.SetParent(root, false);
+        enemy.transform.position = new Vector3(x, 1.35f, 0f);
+        SpriteRenderer sprite = enemy.AddComponent<SpriteRenderer>();
+        enemy.AddComponent<Rigidbody2D>();
+        enemy.AddComponent<CapsuleCollider2D>();
+        BasicEnemy basic = enemy.AddComponent<BasicEnemy>();
+        if (rooted)
+            basic.RootAt(player, health, displayName);
+        else
+            basic.Configure(health, false, player, displayName);
+
+        basic.SetBodyColor(color);
+        sprite.sortingLayerName = sortingLayer;
+        sprite.sortingOrder = sortingOrder;
+        return basic;
+    }
+
+    private void OpenGate()
+    {
+        if (gateOpen)
+            return;
+
+        gateOpen = true;
+        if (gate != null)
+        {
+            Collider2D[] blocking = gate.GetComponentsInChildren<Collider2D>();
+            for (int i = 0; i < blocking.Length; i++)
+                blocking[i].enabled = false;
+            StartCoroutine(SinkGate());
+        }
+
+        RefreshObjective();
+    }
+
+    private IEnumerator SinkGate()
+    {
+        Vector3 start = gate.transform.position;
+        Vector3 end = start + Vector3.down * (GrateHeight + 0.4f);
+        float elapsed = 0f;
+        const float duration = 0.45f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
+            gate.transform.position = Vector3.Lerp(start, end, t);
+            yield return null;
+        }
+
+        gate.SetActive(false);
+    }
+
+    private void PlacePlayer(bool defineSpawn)
+    {
+        if (defineSpawn)
+        {
+            CapsuleCollider2D body = player.GetComponent<CapsuleCollider2D>();
+            float bottom = body.offset.y - body.size.y * 0.5f;
+            spawnPoint = new Vector3(0.4f, FloorTop - bottom + 0.06f, 0f);
+        }
+
+        player.transform.position = spawnPoint;
+        player.rb.position = spawnPoint;
+        player.rb.linearVelocity = Vector2.zero;
+    }
+
+    private void SnapCamera()
+    {
+        Vector3 focus = spawnPoint + Vector3.up * 1.4f;
+        Camera cam = Camera.main;
+        if (cam != null)
+        {
+            Vector3 position = cam.transform.position;
+            position.x = focus.x;
+            position.y = focus.y;
+            cam.transform.position = position;
+        }
+
+        GameObject vcam = GameObject.Find("CinemachineCamera");
+        if (vcam == null)
+            return;
+
+        Vector3 vcamPosition = vcam.transform.position;
+        vcamPosition.x = focus.x;
+        vcamPosition.y = focus.y;
+        vcam.transform.position = vcamPosition;
+    }
+
+    private void BuildObjective()
+    {
+        GameObject canvasObject = new GameObject("LevelObjective");
+        Canvas canvas = canvasObject.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 90;
+        CanvasScaler scaler = canvasObject.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+
+        Image bar = CreateUiImage(canvasObject.transform, "Bar", new Color(0.05f, 0.04f, 0.07f, 0.78f));
+        RectTransform barRect = bar.rectTransform;
+        barRect.anchorMin = new Vector2(0.5f, 1f);
+        barRect.anchorMax = new Vector2(0.5f, 1f);
+        barRect.pivot = new Vector2(0.5f, 1f);
+        barRect.anchoredPosition = new Vector2(0f, -18f);
+        barRect.sizeDelta = new Vector2(820f, 96f);
+
+        Text title = CreateUiText(bar.transform, "Title", 30, TextAnchor.UpperCenter, new Color(1f, 0.9f, 0.62f));
+        title.text = "第一关  愚者的裂隙";
+        StretchTop(title.rectTransform, -8f, 40f);
+
+        objectiveText = CreateUiText(bar.transform, "Objective", 26, TextAnchor.UpperCenter, Color.white);
+        StretchTop(objectiveText.rectTransform, -46f, 40f);
+    }
+
+    private void RefreshObjective()
+    {
+        if (objectiveText == null)
+            return;
+
+        if (cleared)
+            objectiveText.text = "第一关完成";
+        else if (gateOpen)
+            objectiveText.text = "裂隙已打开，走到右边的出口";
+        else if (FoolEquipped)
+            objectiveText.text = "贴着金色地面，攻击可以越过栏杆";
+        else if (loadout != null && loadout.PendingCard != null)
+            objectiveText.text = "游戏已暂停。按 J 或回车装备愚者";
+        else
+            objectiveText.text = "A D 移动，空格跳上高台拿牌";
+    }
+
+    private bool IsCardOpen => cardUi != null && cardUi.IsPanelOpen;
+
+    private void ReloadLevel()
+    {
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+    }
+
+    private IEnumerator FallRespawn()
+    {
+        busy = true;
+        player.SetGameplayInputEnabled(false);
+        if (fadeText != null)
+            fadeText.text = "掉下去了，回到起点";
+        AttackFeedback.Thud(player.transform.position);
+        yield return Fade(0f, 0.82f, 0.2f);
+        PlacePlayer(false);
+        SnapCamera();
+        yield return new WaitForSecondsRealtime(0.12f);
+        yield return Fade(0.82f, 0f, 0.28f);
+        if (!player.IsDefeated)
+            player.SetGameplayInputEnabled(true);
+        busy = false;
+    }
+
+    private IEnumerator Fade(float from, float to, float duration)
+    {
+        if (fadeImage == null)
+            yield break;
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            SetFade(Mathf.Lerp(from, to, t));
+            yield return null;
+        }
+
+        SetFade(to);
+    }
+
+    private void SetFade(float alpha)
+    {
+        if (fadeImage == null)
+            return;
+
+        Color color = fadeImage.color;
+        color.a = alpha;
+        fadeImage.color = color;
+        if (fadeText != null)
+        {
+            Color textColor = fadeText.color;
+            textColor.a = alpha > 0.2f ? 1f : alpha / 0.2f;
+            fadeText.color = textColor;
+        }
+    }
+
+    private void BuildNotices()
+    {
+        GameObject canvasObject = new GameObject("LevelNotice");
+        Canvas canvas = canvasObject.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 120;
+        CanvasScaler scaler = canvasObject.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        canvasObject.AddComponent<GraphicRaycaster>();
+
+        fadeImage = CreateUiImage(canvasObject.transform, "Fade", new Color(0.02f, 0.02f, 0.03f, 0f));
+        RectTransform fadeRect = fadeImage.rectTransform;
+        fadeRect.anchorMin = Vector2.zero;
+        fadeRect.anchorMax = Vector2.one;
+        fadeRect.offsetMin = Vector2.zero;
+        fadeRect.offsetMax = Vector2.zero;
+        fadeImage.raycastTarget = false;
+
+        fadeText = CreateUiText(canvasObject.transform, "FadeText", 42, TextAnchor.MiddleCenter, new Color(1f, 0.94f, 0.8f, 0f));
+        RectTransform fadeTextRect = fadeText.rectTransform;
+        fadeTextRect.anchorMin = new Vector2(0.5f, 0.5f);
+        fadeTextRect.anchorMax = new Vector2(0.5f, 0.5f);
+        fadeTextRect.sizeDelta = new Vector2(800f, 80f);
+
+        endPanel = new GameObject("ClearPanel");
+        endPanel.transform.SetParent(canvasObject.transform, false);
+        Image endImage = endPanel.AddComponent<Image>();
+        endImage.color = new Color(0.07f, 0.05f, 0.09f, 0.94f);
+        RectTransform endRect = endPanel.GetComponent<RectTransform>();
+        endRect.sizeDelta = new Vector2(640f, 280f);
+
+        Text endTitle = CreateUiText(endPanel.transform, "Title", 40, TextAnchor.UpperCenter, new Color(1f, 0.88f, 0.55f));
+        endTitle.text = "第一关完成";
+        StretchTop(endTitle.rectTransform, -28f, 56f);
+
+        Text endBody = CreateUiText(endPanel.transform, "Body", 26, TextAnchor.UpperCenter, Color.white);
+        endBody.text = "按 R 重玩这一关\n按 Esc 留下，继续看看";
+        StretchTop(endBody.rectTransform, -100f, 80f);
+
+        CreateChoice(endPanel.transform, "重玩", new Vector2(-120f, -70f), ReloadLevel);
+        CreateChoice(endPanel.transform, "继续", new Vector2(120f, -70f), () => endPanel.SetActive(false));
+        endPanel.SetActive(false);
+    }
+
+    private void CreateChoice(Transform parent, string label, Vector2 position, UnityEngine.Events.UnityAction onClick)
+    {
+        GameObject buttonObject = new GameObject(label);
+        buttonObject.transform.SetParent(parent, false);
+        Image image = buttonObject.AddComponent<Image>();
+        image.color = new Color(0.35f, 0.22f, 0.45f, 1f);
+        Button button = buttonObject.AddComponent<Button>();
+        button.targetGraphic = image;
+        button.onClick.AddListener(onClick);
+        RectTransform rect = buttonObject.GetComponent<RectTransform>();
+        rect.sizeDelta = new Vector2(180f, 52f);
+        rect.anchoredPosition = position;
+        Text text = CreateUiText(buttonObject.transform, "Label", 26, TextAnchor.MiddleCenter, Color.white);
+        text.text = label;
+        text.rectTransform.sizeDelta = rect.sizeDelta;
+    }
+
+    private bool FoolEquipped =>
+        loadout != null &&
+        loadout.EquippedCard != null &&
+        loadout.EquippedCard.effectType == CardEffectType.FoolLunge;
+
+    private void DisableLegacyGround()
+    {
+        GameObject legacy = GameObject.Find("Platform");
+        if (legacy != null)
+            legacy.SetActive(false);
+    }
+
+    private GameObject Solid(string name, Vector2 center, Vector2 size, Color color, int layer, int sortingOrder)
+    {
+        GameObject block = new GameObject(name);
+        block.layer = layer;
+        block.transform.SetParent(root, false);
+        block.transform.position = new Vector3(center.x, center.y, 0f);
+        block.transform.localScale = new Vector3(size.x, size.y, 1f);
+        SpriteRenderer sprite = block.AddComponent<SpriteRenderer>();
+        sprite.sprite = PixelSprite();
+        sprite.color = color;
+        sprite.sortingLayerName = "Ground";
+        sprite.sortingOrder = sortingOrder;
+        BoxCollider2D box = block.AddComponent<BoxCollider2D>();
+        box.size = Vector2.one;
+        return block;
+    }
+
+    private void Decor(string name, Vector2 center, Vector2 size, Color color, int sortingOrder)
+    {
+        CreateSprite(root, name, new Vector3(center.x, center.y, 0f), new Vector3(size.x, size.y, 1f), color, "Ground", sortingOrder);
+    }
+
+    private static SpriteRenderer CreateSprite(Transform parent, string name, Vector3 localPosition, Vector3 localScale, Color color, string sortingLayer, int sortingOrder)
+    {
+        GameObject obj = new GameObject(name);
+        obj.transform.SetParent(parent, false);
+        obj.transform.localPosition = localPosition;
+        obj.transform.localScale = localScale;
+        SpriteRenderer sprite = obj.AddComponent<SpriteRenderer>();
+        sprite.sprite = PixelSprite();
+        sprite.color = color;
+        sprite.sortingLayerName = sortingLayer;
+        sprite.sortingOrder = sortingOrder;
+        return sprite;
+    }
+
+    private void Sign(string name, Transform parent, Vector3 worldPosition, string message, float width)
+    {
+        GameObject canvasObject = new GameObject(name);
+        canvasObject.transform.SetParent(parent, false);
+        canvasObject.transform.position = worldPosition;
+        canvasObject.transform.localScale = Vector3.one * 0.012f;
+        Canvas canvas = canvasObject.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.WorldSpace;
+        canvas.sortingLayerName = "Player";
+        canvas.sortingOrder = 12;
+        RectTransform rect = canvasObject.GetComponent<RectTransform>();
+        rect.sizeDelta = new Vector2(width, 70f);
+
+        Text text = CreateUiText(canvasObject.transform, "Text", 32, TextAnchor.MiddleCenter, new Color(1f, 0.94f, 0.75f));
+        text.text = message;
+        text.rectTransform.anchorMin = Vector2.zero;
+        text.rectTransform.anchorMax = Vector2.one;
+        text.rectTransform.offsetMin = Vector2.zero;
+        text.rectTransform.offsetMax = Vector2.zero;
+    }
+
+    private static Text CreateUiText(Transform parent, string name, int size, TextAnchor anchor, Color color)
+    {
+        GameObject textObject = new GameObject(name);
+        textObject.transform.SetParent(parent, false);
+        Text text = textObject.AddComponent<Text>();
+        text.font = GameFont.Get();
+        text.fontSize = size;
+        text.alignment = anchor;
+        text.color = color;
+        text.horizontalOverflow = HorizontalWrapMode.Wrap;
+        text.verticalOverflow = VerticalWrapMode.Overflow;
+        text.raycastTarget = false;
+        return text;
+    }
+
+    private static Image CreateUiImage(Transform parent, string name, Color color)
+    {
+        GameObject imageObject = new GameObject(name);
+        imageObject.transform.SetParent(parent, false);
+        Image image = imageObject.AddComponent<Image>();
+        image.color = color;
+        image.raycastTarget = false;
+        return image;
+    }
+
+    private static void StretchTop(RectTransform rect, float y, float height)
+    {
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(1f, 1f);
+        rect.pivot = new Vector2(0.5f, 1f);
+        rect.anchoredPosition = new Vector2(0f, y);
+        rect.sizeDelta = new Vector2(-24f, height);
+    }
+
+    private static Sprite PixelSprite()
+    {
+        if (pixel != null)
+            return pixel;
+
+        Texture2D texture = new Texture2D(4, 4);
+        Color[] pixels = new Color[16];
+        for (int i = 0; i < pixels.Length; i++)
+            pixels[i] = Color.white;
+        texture.SetPixels(pixels);
+        texture.filterMode = FilterMode.Point;
+        texture.Apply();
+        pixel = Sprite.Create(texture, new Rect(0f, 0f, 4f, 4f), new Vector2(0.5f, 0.5f), 4f);
+        return pixel;
+    }
+}
+
+public class CardPickup : MonoBehaviour
+{
+    private MonsterCardData card;
+    private Vector3 origin;
+    private bool taken;
+
+    public void Arm(MonsterCardData data)
+    {
+        card = data;
+        origin = transform.position;
+    }
+
+    private void Update()
+    {
+        if (taken)
+            return;
+
+        float wave = Mathf.Sin(Time.time * 2.2f) * 0.1f;
+        transform.position = origin + Vector3.up * wave;
+    }
+
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        if (taken || card == null || other.GetComponent<Player>() == null)
+            return;
+
+        taken = true;
+        CardReward.Grant(card);
+        gameObject.SetActive(false);
+    }
+}
+
+public class LevelExit : MonoBehaviour
+{
+    private FirstLevel level;
+    private bool used;
+
+    public void Arm(FirstLevel owner)
+    {
+        level = owner;
+    }
+
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        if (used || level == null || other.GetComponent<Player>() == null)
+            return;
+
+        used = true;
+        level.Complete();
+    }
+}

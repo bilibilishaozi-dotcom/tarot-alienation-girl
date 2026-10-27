@@ -255,7 +255,7 @@ public class CombatHud : MonoBehaviour
 
     private void Build()
     {
-        Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        Font font = GameFont.Get();
 
         canvasObject = new GameObject("CombatCanvas");
         Canvas canvas = canvasObject.AddComponent<Canvas>();
@@ -319,7 +319,7 @@ public class CombatHud : MonoBehaviour
 
     private EnemyHealthView CreateEnemyView()
     {
-        Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        Font font = GameFont.Get();
         EnemyHealthView view = new EnemyHealthView();
         view.Root = CreateRect(canvasRect, "EnemyHealth");
         view.Root.anchorMin = new Vector2(0.5f, 0.5f);
