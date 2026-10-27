@@ -215,14 +215,18 @@ public class Player : MonoBehaviour
         return new Vector2(x, y);
     }
 
+    public bool AttackSwingActive { get; private set; }
+
     public void BeginAttackSwing()
     {
+        AttackSwingActive = true;
         if (attackHitbox != null)
             attackHitbox.BeginSwing();
     }
 
     public void EndAttackSwing()
     {
+        AttackSwingActive = false;
         if (attackHitbox != null)
             attackHitbox.EndSwing();
     }

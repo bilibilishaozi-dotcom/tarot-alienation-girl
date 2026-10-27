@@ -8,7 +8,6 @@ public class FirstLevel : MonoBehaviour
 {
     private const float FloorTop = 0f;
     private const float GrateLeft = 24.2f;
-    private const float GrateWidth = 1.35f;
     private const float GrateHeight = 3.8f;
 
     private Player player;
@@ -21,7 +20,14 @@ public class FirstLevel : MonoBehaviour
     private Image fadeImage;
     private Text fadeText;
     private GameObject endPanel;
+    private SpriteRenderer guideArrow;
+    private SpriteRenderer normalMark;
+    private SpriteRenderer gapMark;
+    private SpriteRenderer extensionMark;
     private Vector3 spawnPoint;
+    private float standCenter;
+    private float normalFront;
+    private float extendedFront;
     private bool gateOpen;
     private bool cleared;
     private bool busy;
@@ -30,6 +36,7 @@ public class FirstLevel : MonoBehaviour
 
     private void Awake()
     {
+        Time.timeScale = 1f;
         player = GetComponent<Player>();
         loadout = GetComponent<PlayerCardLoadout>();
         root = new GameObject("LevelOne").transform;
@@ -63,7 +70,10 @@ public class FirstLevel : MonoBehaviour
             ReloadLevel();
 
         if (cleared && endPanel != null && endPanel.activeSelf && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
-            endPanel.SetActive(false);
+            ContinueLevel();
+
+        if (player != null && !busy && !player.IsDefeated)
+            UpdateLesson();
 
         if (busy || player == null || player.IsDefeated)
             return;
@@ -79,6 +89,7 @@ public class FirstLevel : MonoBehaviour
 
         cleared = true;
         RefreshObjective();
+        Time.timeScale = 0f;
         if (endPanel != null)
             endPanel.SetActive(true);
     }
@@ -96,68 +107,85 @@ public class FirstLevel : MonoBehaviour
         Solid("Step", new Vector2(3.05f, 0.725f), new Vector2(2.9f, 1.45f), new Color(0.43f, 0.36f, 0.28f), ground, 1);
         Solid("CardPlatform", new Vector2(7.55f, 1.45f), new Vector2(6.5f, 2.9f), new Color(0.46f, 0.38f, 0.29f), ground, 1);
 
-        Solid("PenLeft", new Vector2(12.5f, 0.6f), new Vector2(0.5f, 1.2f), new Color(0.26f, 0.22f, 0.2f), ground, 1);
-        Solid("PenRight", new Vector2(17.2f, 0.6f), new Vector2(0.5f, 1.2f), new Color(0.26f, 0.22f, 0.2f), ground, 1);
+        Solid("PenLeft", new Vector2(12.5f, 0.45f), new Vector2(0.45f, 0.9f), new Color(0.26f, 0.22f, 0.2f), ground, 1);
+        Solid("PenRight", new Vector2(17.2f, 0.45f), new Vector2(0.45f, 0.9f), new Color(0.26f, 0.22f, 0.2f), ground, 1);
         Solid("Arch", new Vector2(20.4f, 5.5f), new Vector2(0.75f, 3.8f), new Color(0.2f, 0.17f, 0.16f), ground, 1);
 
         MonsterCardData fool = Resources.Load<MonsterCardData>("Cards/Fool");
         CreateCard(new Vector3(9.2f, 4.15f, 0f), fool);
-        SpawnEnemy("PracticeSpore", 14.8f, 3, false, "孢子", new Color(0.45f, 0.18f, 0.55f), "Player", 5);
+        BasicEnemy spore = SpawnEnemy("PracticeSpore", 14.8f, 3, false, "孢子", new Color(0.62f, 0.28f, 0.78f), "Player", 5);
+        spore.SetAsPractice();
+        spore.SetVisualScale(new Vector3(0.78f, 0.78f, 1f));
         BuildReachGate(ground, fool);
         CreateExit();
-
-        Sign("StartHint", root, new Vector3(0.4f, 2.75f, 0f), "A D 移动   空格跳跃   左键攻击", 460f);
-        Sign("StepHint", root, new Vector3(3.05f, 2.55f, 0f), "空格跳上去，向右继续", 320f);
-        Sign("AttackHint", root, new Vector3(14.8f, 2.45f, 0f), "鼠标左键攻击", 260f);
+        BuildGuideArrow();
     }
 
     private void BuildReachGate(int ground, MonsterCardData fool)
     {
-        gate = new GameObject("Grate");
-        gate.layer = ground;
-        gate.transform.SetParent(root, false);
-        gate.transform.position = new Vector3(GrateLeft + GrateWidth * 0.5f, GrateHeight * 0.5f, 0f);
-        Rigidbody2D gateBody = gate.AddComponent<Rigidbody2D>();
-        gateBody.bodyType = RigidbodyType2D.Kinematic;
-        gateBody.gravityScale = 0f;
-        gateBody.freezeRotation = true;
-        BuildBars(gate.transform, ground);
-
         CapsuleCollider2D body = player.GetComponent<CapsuleCollider2D>();
         float halfBody = body.size.x * 0.5f;
-        float standCenter = GrateLeft - halfBody - 0.05f;
-        float foolReach = fool != null ? fool.reachMultiplier : 1.65f;
-        float normalFront = standCenter + player.AttackFrontReach(1f);
-        float extendedFront = standCenter + player.AttackFrontReach(foolReach);
-        float nearEdge = Mathf.Lerp(normalFront, extendedFront, 0.42f);
+        standCenter = GrateLeft - halfBody - 0.06f;
+        float foolReach = fool != null ? fool.reachMultiplier : 2.15f;
+        normalFront = standCenter + player.AttackFrontReach(1f);
+        extendedFront = standCenter + player.AttackFrontReach(foolReach);
+        float enemyLeft = Mathf.Lerp(normalFront, extendedFront, 0.38f);
 
         GameObject enemyObject = new GameObject("Sentinel");
         enemyObject.transform.SetParent(root, false);
+        enemyObject.transform.localScale = new Vector3(1.2f, 1.35f, 1f);
         enemyObject.AddComponent<SpriteRenderer>();
         enemyObject.AddComponent<Rigidbody2D>();
         CapsuleCollider2D capsule = enemyObject.AddComponent<CapsuleCollider2D>();
         sentinel = enemyObject.AddComponent<BasicEnemy>();
         sentinel.RootAt(player, 4, "裂隙守卫");
-        sentinel.SetBodyColor(new Color(0.62f, 0.14f, 0.16f));
+        sentinel.SetBodyColor(new Color(0.9f, 0.24f, 0.18f));
         sentinel.Died += OpenGate;
-        float enemyHalf = capsule.size.x * 0.5f;
-        enemyObject.transform.position = new Vector3(nearEdge + enemyHalf, 1.35f, 0f);
+        float enemyHalf = capsule.size.x * 0.5f * Mathf.Abs(enemyObject.transform.lossyScale.x);
+        float enemyBottom = capsule.offset.y - capsule.size.y * 0.5f;
+        float enemyCenter = enemyLeft + enemyHalf;
+        enemyObject.transform.position = new Vector3(enemyCenter, 0.04f - enemyObject.transform.localScale.y * enemyBottom, 0f);
         SpriteRenderer enemySprite = enemyObject.GetComponent<SpriteRenderer>();
         enemySprite.sortingLayerName = "Ground";
         enemySprite.sortingOrder = 2;
+        CreateSprite(enemyObject.transform, "Core", new Vector3(0f, 0.2f, 0f), new Vector3(0.34f, 0.42f, 1f), new Color(1f, 0.86f, 0.45f), "Ground", 3);
 
-        Decor("StandPlate", new Vector2(standCenter, 0.09f), new Vector2(1.25f, 0.16f), new Color(0.78f, 0.58f, 0.22f), 3);
-        Sign("GrateHint", root, new Vector3(standCenter, 2.55f, 0f), "攻击可以越过栏杆", 320f);
+        float grateWidth = Mathf.Max(2.4f, enemyCenter + enemyHalf + 0.32f - GrateLeft);
+        gate = new GameObject("Grate");
+        gate.layer = ground;
+        gate.transform.SetParent(root, false);
+        gate.transform.position = new Vector3(GrateLeft + grateWidth * 0.5f, GrateHeight * 0.5f, 0f);
+        Rigidbody2D gateBody = gate.AddComponent<Rigidbody2D>();
+        gateBody.bodyType = RigidbodyType2D.Kinematic;
+        gateBody.gravityScale = 0f;
+        gateBody.freezeRotation = true;
+        BuildBars(gate.transform, ground, grateWidth);
+
+        float plateLeft = enemyLeft - player.AttackFrontReach(foolReach);
+        GroundMark("StandPlate", plateLeft, standCenter, 0.1f, 0.16f, new Color(0.95f, 0.72f, 0.22f, 1f), 3);
+        GroundMark("StandLip", standCenter, GrateLeft, 0.16f, 0.1f, new Color(1f, 0.92f, 0.55f, 1f), 4);
+        normalMark = GroundMark("NormalReach", GrateLeft, normalFront, 0.28f, 0.07f, new Color(0.75f, 0.84f, 1f, 0.9f), 3);
+        gapMark = GroundMark("ReachGap", normalFront, enemyLeft, 0.28f, 0.07f, new Color(0.85f, 0.28f, 0.22f, 0.95f), 3);
+        extensionMark = GroundMark("FoolReach", normalFront, extendedFront, 0.4f, 0.11f, new Color(1f, 0.78f, 0.2f, 0.95f), 4);
+        extensionMark.enabled = false;
+
+        Sign("SentinelLabel", root, new Vector3(enemyCenter, 4.25f, 0f), "裂隙守卫", 240f);
     }
 
-    private void BuildBars(Transform grate, int ground)
+    private void BuildBars(Transform grate, int ground, float grateWidth)
     {
-        const int count = 5;
-        const float barWidth = 0.18f;
-        float gap = (GrateWidth - barWidth * count) / (count - 1);
+        const float barWidth = 0.24f;
+        int count = 5;
+        float gap = (grateWidth - barWidth * count) / (count - 1);
+        while (gap > 0.48f && count < 8)
+        {
+            count++;
+            gap = (grateWidth - barWidth * count) / (count - 1);
+        }
+
         for (int i = 0; i < count; i++)
         {
-            float left = -GrateWidth * 0.5f + i * (barWidth + gap);
+            float left = -grateWidth * 0.5f + i * (barWidth + gap);
             GameObject bar = new GameObject("Bar" + i);
             bar.layer = ground;
             bar.transform.SetParent(grate, false);
@@ -165,14 +193,20 @@ public class FirstLevel : MonoBehaviour
             bar.transform.localScale = new Vector3(barWidth, GrateHeight, 1f);
             SpriteRenderer sprite = bar.AddComponent<SpriteRenderer>();
             sprite.sprite = PixelSprite();
-            sprite.color = new Color(0.34f, 0.3f, 0.4f, 1f);
+            sprite.color = new Color(0.55f, 0.58f, 0.66f, 1f);
             sprite.sortingLayerName = "Ground";
             sprite.sortingOrder = 5;
             BoxCollider2D box = bar.AddComponent<BoxCollider2D>();
             box.size = Vector2.one;
         }
 
-        CreateSprite(grate, "Lintel", new Vector3(0f, GrateHeight * 0.5f - 0.18f, 0f), new Vector3(GrateWidth, 0.36f, 1f), new Color(0.24f, 0.2f, 0.28f), "Ground", 6);
+        CreateSprite(grate, "Lintel", new Vector3(0f, GrateHeight * 0.5f - 0.18f, 0f), new Vector3(grateWidth, 0.36f, 1f), new Color(0.24f, 0.2f, 0.28f), "Ground", 6);
+    }
+
+    private SpriteRenderer GroundMark(string name, float left, float right, float y, float height, Color color, int sortingOrder)
+    {
+        float width = Mathf.Max(0.08f, right - left);
+        return CreateSprite(root, name, new Vector3((left + right) * 0.5f, y, 0f), new Vector3(width, height, 1f), color, "Ground", sortingOrder);
     }
 
     private void CreateCard(Vector3 position, MonsterCardData card)
@@ -237,6 +271,10 @@ public class FirstLevel : MonoBehaviour
             Collider2D[] blocking = gate.GetComponentsInChildren<Collider2D>();
             for (int i = 0; i < blocking.Length; i++)
                 blocking[i].enabled = false;
+            SpriteRenderer[] bars = gate.GetComponentsInChildren<SpriteRenderer>();
+            for (int i = 0; i < bars.Length; i++)
+                bars[i].color = new Color(0.9f, 0.94f, 1f, 1f);
+            AttackFeedback.Thud(gate.transform.position);
             StartCoroutine(SinkGate());
         }
 
@@ -248,7 +286,7 @@ public class FirstLevel : MonoBehaviour
         Vector3 start = gate.transform.position;
         Vector3 end = start + Vector3.down * (GrateHeight + 0.4f);
         float elapsed = 0f;
-        const float duration = 0.45f;
+        const float duration = 0.85f;
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
@@ -330,16 +368,86 @@ public class FirstLevel : MonoBehaviour
         if (cleared)
             objectiveText.text = "第一关完成";
         else if (gateOpen)
-            objectiveText.text = "裂隙已打开，走到右边的出口";
+            objectiveText.text = "";
         else if (FoolEquipped)
-            objectiveText.text = "贴着金色地面，攻击可以越过栏杆";
+            objectiveText.text = "已装备愚者";
         else if (loadout != null && loadout.PendingCard != null)
-            objectiveText.text = "游戏已暂停。按 J 或回车装备愚者";
+            objectiveText.text = "按 J 或回车装备愚者";
         else
-            objectiveText.text = "A D 移动，空格跳上高台拿牌";
+            objectiveText.text = "去高台拿牌";
     }
 
-    private bool IsCardOpen => cardUi != null && cardUi.IsPanelOpen;
+    private void UpdateLesson()
+    {
+        bool fool = FoolEquipped;
+        if (normalMark != null)
+            normalMark.enabled = !gateOpen;
+        if (gapMark != null)
+            gapMark.enabled = !fool && !gateOpen;
+        if (extensionMark != null)
+        {
+            extensionMark.enabled = fool && !gateOpen;
+            if (extensionMark.enabled)
+            {
+                float pulse = 0.55f + Mathf.PingPong(Time.time, 0.4f);
+                extensionMark.color = new Color(1f, 0.78f, 0.2f, pulse);
+            }
+        }
+
+        UpdateGuideArrow();
+    }
+
+    private void BuildGuideArrow()
+    {
+        Texture2D texture = new Texture2D(16, 16);
+        texture.filterMode = FilterMode.Point;
+        Color[] pixels = new Color[256];
+        for (int y = 0; y < 16; y++)
+        {
+            for (int x = 0; x < 16; x++)
+            {
+                bool shaft = x >= 1 && x <= 7 && Mathf.Abs(y - 7) <= 1;
+                bool head = x >= 7 && x <= 14 && Mathf.Abs(y - 7) <= (14 - x) * 0.72f;
+                pixels[y * 16 + x] = shaft || head ? Color.white : Color.clear;
+            }
+        }
+
+        texture.SetPixels(pixels);
+        texture.Apply();
+        Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, 16f, 16f), new Vector2(0.5f, 0.5f), 16f);
+
+        GameObject arrow = new GameObject("GuideArrow");
+        arrow.transform.SetParent(root, false);
+        guideArrow = arrow.AddComponent<SpriteRenderer>();
+        guideArrow.sprite = sprite;
+        guideArrow.color = new Color(1f, 0.82f, 0.15f, 1f);
+        guideArrow.sortingLayerName = "Player";
+        guideArrow.sortingOrder = 20;
+        guideArrow.enabled = false;
+    }
+
+    private void UpdateGuideArrow()
+    {
+        if (guideArrow == null || player == null)
+            return;
+
+        const float flagX = 31.2f;
+        float distance = flagX - player.transform.position.x;
+        bool show = gateOpen && !cleared && Mathf.Abs(distance) > 2.4f;
+        if (!show)
+        {
+            guideArrow.enabled = false;
+            return;
+        }
+
+        float dir = Mathf.Sign(distance);
+        bool blinkOn = Mathf.Repeat(Time.time, 0.5f) < 0.26f;
+        guideArrow.enabled = blinkOn;
+        guideArrow.transform.position = player.transform.position + new Vector3(dir * 1.7f, 1.25f, 0f);
+        guideArrow.transform.localScale = new Vector3(dir * 1.35f, 1.35f, 1f);
+    }
+
+    private bool IsCardOpen => cardUi != null && (cardUi.IsPanelOpen || cardUi.IsStatusOpen);
 
     private void ReloadLevel()
     {
@@ -427,19 +535,29 @@ public class FirstLevel : MonoBehaviour
         Image endImage = endPanel.AddComponent<Image>();
         endImage.color = new Color(0.07f, 0.05f, 0.09f, 0.94f);
         RectTransform endRect = endPanel.GetComponent<RectTransform>();
-        endRect.sizeDelta = new Vector2(640f, 280f);
+        endRect.sizeDelta = new Vector2(560f, 460f);
+        Sprite panelSkin = UiArt.Load(UiArt.Panel);
+        if (panelSkin != null)
+        {
+            endImage.sprite = panelSkin;
+            endImage.color = Color.white;
+        }
 
         Text endTitle = CreateUiText(endPanel.transform, "Title", 40, TextAnchor.UpperCenter, new Color(1f, 0.88f, 0.55f));
         endTitle.text = "第一关完成";
         StretchTop(endTitle.rectTransform, -28f, 56f);
 
-        Text endBody = CreateUiText(endPanel.transform, "Body", 26, TextAnchor.UpperCenter, Color.white);
-        endBody.text = "按 R 重玩这一关\n按 Esc 留下，继续看看";
-        StretchTop(endBody.rectTransform, -100f, 80f);
-
-        CreateChoice(endPanel.transform, "重玩", new Vector2(-120f, -70f), ReloadLevel);
-        CreateChoice(endPanel.transform, "继续", new Vector2(120f, -70f), () => endPanel.SetActive(false));
+        CreateChoice(endPanel.transform, "继续试玩当前关卡", new Vector2(0f, 30f), ContinueLevel);
+        CreateChoice(endPanel.transform, "选择关卡", new Vector2(0f, -60f), GameFlow.LoadLevelSelect);
+        CreateChoice(endPanel.transform, "返回标题", new Vector2(0f, -150f), GameFlow.LoadTitle);
         endPanel.SetActive(false);
+    }
+
+    private void ContinueLevel()
+    {
+        if (endPanel != null)
+            endPanel.SetActive(false);
+        Time.timeScale = 1f;
     }
 
     private void CreateChoice(Transform parent, string label, Vector2 position, UnityEngine.Events.UnityAction onClick)
@@ -447,12 +565,14 @@ public class FirstLevel : MonoBehaviour
         GameObject buttonObject = new GameObject(label);
         buttonObject.transform.SetParent(parent, false);
         Image image = buttonObject.AddComponent<Image>();
-        image.color = new Color(0.35f, 0.22f, 0.45f, 1f);
+        Sprite skin = UiArt.Load(UiArt.Button);
+        image.sprite = skin;
+        image.color = skin != null ? Color.white : new Color(0.35f, 0.22f, 0.45f, 1f);
         Button button = buttonObject.AddComponent<Button>();
         button.targetGraphic = image;
         button.onClick.AddListener(onClick);
         RectTransform rect = buttonObject.GetComponent<RectTransform>();
-        rect.sizeDelta = new Vector2(180f, 52f);
+        rect.sizeDelta = new Vector2(360f, 64f);
         rect.anchoredPosition = position;
         Text text = CreateUiText(buttonObject.transform, "Label", 26, TextAnchor.MiddleCenter, Color.white);
         text.text = label;
@@ -507,7 +627,7 @@ public class FirstLevel : MonoBehaviour
         return sprite;
     }
 
-    private void Sign(string name, Transform parent, Vector3 worldPosition, string message, float width)
+    private Text Sign(string name, Transform parent, Vector3 worldPosition, string message, float width)
     {
         GameObject canvasObject = new GameObject(name);
         canvasObject.transform.SetParent(parent, false);
@@ -526,6 +646,7 @@ public class FirstLevel : MonoBehaviour
         text.rectTransform.anchorMax = Vector2.one;
         text.rectTransform.offsetMin = Vector2.zero;
         text.rectTransform.offsetMax = Vector2.zero;
+        return text;
     }
 
     private static Text CreateUiText(Transform parent, string name, int size, TextAnchor anchor, Color color)

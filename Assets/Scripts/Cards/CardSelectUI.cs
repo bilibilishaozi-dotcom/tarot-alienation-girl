@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -14,10 +15,15 @@ public class CardSelectUI : MonoBehaviour
     private GameObject equipReminder;
     private Button equipButton;
     private InputAction equipAction;
+    private GameObject statusPanel;
+    private Text statusText;
+    private Button statusEquipButton;
     private bool choiceHidden;
     private bool pausedForCard;
+    private bool pausedForStatus;
 
     public bool IsPanelOpen => panel != null && panel.activeSelf;
+    public bool IsStatusOpen => statusPanel != null && statusPanel.activeSelf;
 
     private void Awake()
     {
@@ -44,9 +50,10 @@ public class CardSelectUI : MonoBehaviour
         if (loadout != null)
             loadout.Changed -= Refresh;
 
-        if (pausedForCard)
+        if (pausedForCard || pausedForStatus)
         {
             pausedForCard = false;
+            pausedForStatus = false;
             Time.timeScale = 1f;
         }
 
@@ -66,11 +73,27 @@ public class CardSelectUI : MonoBehaviour
 
     private void Update()
     {
-        if (loadout == null || panel == null || !panel.activeSelf || Keyboard.current == null)
+        if (Keyboard.current == null)
             return;
 
-        if (Keyboard.current.escapeKey.wasPressedThisFrame)
-            HideWithoutEquipping();
+        if (panel != null && panel.activeSelf)
+        {
+            if (Keyboard.current.escapeKey.wasPressedThisFrame)
+                HideWithoutEquipping();
+            return;
+        }
+
+        if (Keyboard.current.cKey.wasPressedThisFrame)
+        {
+            if (IsStatusOpen)
+                CloseStatus();
+            else
+                OpenStatus();
+            return;
+        }
+
+        if (IsStatusOpen && Keyboard.current.escapeKey.wasPressedThisFrame)
+            CloseStatus();
     }
 
     private void OnEquipPressed(InputAction.CallbackContext context)
@@ -99,12 +122,15 @@ public class CardSelectUI : MonoBehaviour
             MonsterCardData card = loadout.PendingCard;
             titleText.text = "获得占星牌";
             bodyText.text = card.displayName + "\n" + card.description
-                + "\n\n刀光会变成金色，并且伸得更远，伤害变成两倍。"
-                + "\n贴着栏杆攻击，可以打到对面的敌人。"
-                + "\n\nJ 或回车：装备    Esc：稍后";
+                + "\n\n可以先按 Esc，用现在的攻击去前面试一次。"
+                + "\n装备之后再挥刀，就能看出距离和颜色的差别。"
+                + "\n\nJ 或回车：装备    Esc：先去试试";
             if (equipButton != null && EventSystem.current != null)
                 EventSystem.current.SetSelectedGameObject(equipButton.gameObject);
         }
+
+        if (IsStatusOpen)
+            FillStatus();
     }
 
     private void SetPaused(bool pause)
@@ -170,6 +196,96 @@ public class CardSelectUI : MonoBehaviour
         reminderRect.anchoredPosition = new Vector2(24f, -112f);
         equipReminder.SetActive(false);
         panel.SetActive(false);
+        BuildStatus(canvasObject.transform, font);
+    }
+
+    private void BuildStatus(Transform parent, Font font)
+    {
+        statusPanel = new GameObject("StatusPanel");
+        statusPanel.transform.SetParent(parent, false);
+        Image image = statusPanel.AddComponent<Image>();
+        image.color = new Color(0.08f, 0.06f, 0.1f, 0.94f);
+        RectTransform rect = statusPanel.GetComponent<RectTransform>();
+        rect.sizeDelta = new Vector2(640f, 520f);
+
+        Text title = CreateText(statusPanel.transform, "Title", font, 36, TextAnchor.UpperCenter);
+        title.text = "状态";
+        SetTop(title.rectTransform, -24f, new Vector2(520f, 52f));
+
+        statusText = CreateText(statusPanel.transform, "Body", font, 26, TextAnchor.UpperLeft);
+        SetTop(statusText.rectTransform, -88f, new Vector2(560f, 300f));
+
+        statusEquipButton = CreateButton(statusPanel.transform, "装备", font, new Vector2(0f, -200f), () =>
+        {
+            if (loadout != null)
+                loadout.EquipPending();
+        });
+        statusEquipButton.gameObject.SetActive(false);
+        statusPanel.SetActive(false);
+    }
+
+    private void OpenStatus()
+    {
+        if (statusPanel == null)
+            return;
+
+        statusPanel.SetActive(true);
+        FillStatus();
+        if (player != null)
+            player.SetGameplayInputEnabled(false);
+        pausedForStatus = true;
+        Time.timeScale = 0f;
+    }
+
+    private void CloseStatus()
+    {
+        if (statusPanel != null)
+            statusPanel.SetActive(false);
+        if (player != null && (panel == null || !panel.activeSelf))
+            player.SetGameplayInputEnabled(true);
+        if (!pausedForStatus)
+            return;
+
+        pausedForStatus = false;
+        if (!pausedForCard)
+            Time.timeScale = 1f;
+    }
+
+    private void FillStatus()
+    {
+        if (statusText == null || loadout == null)
+            return;
+
+        int health = player != null ? player.CurrentHealth : 0;
+        int maxHealth = player != null ? player.MaxHealth : 0;
+        int damage = player != null ? player.CurrentAttackDamage : 1;
+        string equipped = loadout.EquippedCard != null ? loadout.EquippedCard.displayName : "无";
+        string effect = loadout.EquippedCard != null ? "\n" + loadout.EquippedCard.description : string.Empty;
+
+        string bag = "空";
+        IReadOnlyList<MonsterCardData> cards = loadout.OwnedCards;
+        if (cards != null && cards.Count > 0)
+        {
+            bag = string.Empty;
+            for (int i = 0; i < cards.Count; i++)
+            {
+                if (cards[i] == null)
+                    continue;
+                if (bag.Length > 0)
+                    bag += "\n";
+                bool wearing = loadout.EquippedCard != null && loadout.EquippedCard.cardId == cards[i].cardId;
+                bag += cards[i].displayName + (wearing ? "    装备中" : "    持有");
+            }
+        }
+
+        statusText.text = "生命    " + health + " / " + maxHealth
+            + "\n攻击    " + damage
+            + "\n\n当前装备    " + equipped
+            + effect
+            + "\n\n卡牌背包\n" + bag
+            + "\n\nC 或 Esc 关闭";
+        if (statusEquipButton != null)
+            statusEquipButton.gameObject.SetActive(loadout.PendingCard != null);
     }
 
     private void HideWithoutEquipping()

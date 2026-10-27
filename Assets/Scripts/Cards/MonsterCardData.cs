@@ -10,9 +10,9 @@ public class MonsterCardData : ScriptableObject
 {
     public string cardId = "fool";
     public string displayName = "愚者";
-    [TextArea] public string description = "攻击变为更长的突进斩，贴着障碍也能打到对面的敌人。";
+    [TextArea] public string description = "攻击会伸得更远，刀光变成金色，伤害变成两倍。";
     public CardEffectType effectType = CardEffectType.FoolLunge;
     public float damageMultiplier = 2f;
     public float lungeMultiplier = 1.75f;
-    public float reachMultiplier = 1.65f;
+    public float reachMultiplier = 2.15f;
 }

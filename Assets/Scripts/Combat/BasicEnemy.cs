@@ -149,6 +149,20 @@ public class BasicEnemy : MonoBehaviour, IDamageable
             spriteRenderer.color = color;
     }
 
+    public void SetAsPractice()
+    {
+        noticeRange = 2.2f;
+        patrolDistance = 1.4f;
+        attackRange = 1.1f;
+        chaseSpeed = 1.8f;
+    }
+
+    public void SetVisualScale(Vector3 scale)
+    {
+        transform.localScale = scale;
+        baseScale = scale;
+    }
+
     private void Update()
     {
         if (dead)
