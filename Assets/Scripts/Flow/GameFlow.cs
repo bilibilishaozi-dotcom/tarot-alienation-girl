@@ -6,6 +6,8 @@ public static class GameFlow
     public const string TitleScene = "Title";
     public const string LevelSelectScene = "LevelSelect";
 
+    public static string ActiveLevelId { get; private set; } = LevelCatalog.BasicCombatId;
+
     public static void LoadTitle()
     {
         Load(TitleScene);
@@ -21,12 +23,32 @@ public static class GameFlow
         if (slot == null || !slot.available || string.IsNullOrEmpty(slot.sceneName))
             return;
 
+        if (!Application.CanStreamedLevelBeLoaded(slot.sceneName))
+        {
+            Debug.LogWarning("场景还没有放进 Build Settings：" + slot.sceneName);
+            return;
+        }
+
+        ActiveLevelId = string.IsNullOrEmpty(slot.levelId) ? LevelCatalog.BasicCombatId : slot.levelId;
         Load(slot.sceneName);
     }
 
     public static void LoadFirstLevel()
     {
         LoadLevel(LevelCatalog.FirstPlayable());
+    }
+
+    public static bool LoadFoolTrial()
+    {
+        LevelSlot slot = LevelCatalog.Find(LevelCatalog.FoolTrialId);
+        if (slot == null)
+        {
+            Debug.LogWarning("关卡目录里没有可进入的愚者牌试用关。");
+            return false;
+        }
+
+        LoadLevel(slot);
+        return ActiveLevelId == LevelCatalog.FoolTrialId;
     }
 
     public static void ReloadActiveScene()

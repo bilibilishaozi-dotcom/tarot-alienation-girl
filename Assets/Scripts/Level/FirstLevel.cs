@@ -15,8 +15,11 @@ public class FirstLevel : MonoBehaviour
     private PlayerCardLoadout loadout;
     private Transform root;
     private GameObject gate;
-    private BasicEnemy spore;
     private RiftGuardian boss;
+    private BasicEnemy[] arena;
+    private GameObject basicSeal;
+    private bool basicExitOpen;
+    private bool foolTrial;
     private Text objectiveText;
     private Text bossNameSign;
     private CardSelectUI cardUi;
@@ -40,6 +43,7 @@ public class FirstLevel : MonoBehaviour
     private void Awake()
     {
         Time.timeScale = 1f;
+        foolTrial = GameFlow.ActiveLevelId == LevelCatalog.FoolTrialId;
         player = GetComponent<Player>();
         loadout = GetComponent<PlayerCardLoadout>();
         cardUi = GetComponent<CardSelectUI>();
@@ -66,6 +70,14 @@ public class FirstLevel : MonoBehaviour
             loadout.Changed -= RefreshObjective;
         if (boss != null)
             boss.Died -= OnBossDefeated;
+        if (arena == null)
+            return;
+
+        for (int i = 0; i < arena.Length; i++)
+        {
+            if (arena[i] != null)
+                arena[i].Died -= OnArenaEnemyDied;
+        }
     }
 
     private void Update()
@@ -113,27 +125,130 @@ public class FirstLevel : MonoBehaviour
         if (ground < 0)
             ground = 6;
 
+        if (foolTrial)
+            BuildFoolTrial(ground);
+        else
+            BuildBasicCombat(ground);
+    }
+
+    private void BuildBasicCombat(int ground)
+    {
+        const float floorTop = 0f;
+        Solid("Floor", new Vector2(13f, floorTop - 1f), new Vector2(28.4f, 2f), new Color(0.31f, 0.27f, 0.23f), ground, 0);
+        Solid("LeftWall", new Vector2(-1.7f, 3.2f), new Vector2(0.7f, 6.4f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
+        Solid("RightWall", new Vector2(27.6f, 3.2f), new Vector2(0.7f, 6.4f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
+
+        // 两座薄平台。哨兵只在台面上巡逻，追击和受击也不会走下边缘。
+        const float deckTop = 1.7f;
+        const float deckThickness = 0.4f;
+        float deckCenterY = deckTop - deckThickness * 0.5f;
+        Solid("PlatformA", new Vector2(5.8f, deckCenterY), new Vector2(4.8f, deckThickness), new Color(0.46f, 0.38f, 0.29f), ground, 1);
+        Solid("PlatformB", new Vector2(12f, deckCenterY), new Vector2(4.8f, deckThickness), new Color(0.46f, 0.38f, 0.29f), ground, 1);
+
+        // 低台大约 0.62 高。跳跃攻击的刀光贴近身体，离开低台、面向右侧敌人时按鼠标左键能打到。
+        const float lipTop = 0.62f;
+        Solid("LowLip", new Vector2(17.4f, lipTop * 0.5f), new Vector2(3.6f, lipTop), new Color(0.43f, 0.36f, 0.28f), ground, 1);
+        const float plinthTop = 0.28f;
+        Solid("EnemyPlinth", new Vector2(20.6f, plinthTop * 0.5f), new Vector2(1.8f, plinthTop), new Color(0.34f, 0.28f, 0.24f), ground, 1);
+        Sign("AirSign", root, new Vector3(18.2f, 1.55f, 0f), "空中攻击", 180f);
+
+        float feetLift = 0.92f;
+        arena = new BasicEnemy[3];
+        arena[0] = SpawnLeashed("SentryA", 5.8f, deckTop + feetLift, "哨兵甲", new Color(0.72f, 0.28f, 0.22f), 4f, 7.6f, ground);
+        arena[1] = SpawnLeashed("SentryB", 12f, deckTop + feetLift, "哨兵乙", new Color(0.28f, 0.38f, 0.72f), 10.2f, 13.8f, ground);
+        arena[2] = SpawnLeashed("LowEnemy", 20.6f, plinthTop + feetLift, "低处敌人", new Color(0.62f, 0.28f, 0.78f), 20.25f, 20.95f, ground);
+
+        basicSeal = Solid("ExitSeal", new Vector2(24.2f, 1.7f), new Vector2(0.7f, 3.4f), new Color(0.45f, 0.2f, 0.22f), ground, 3);
+        Sign("ExitLabel", root, new Vector3(24.2f, 3.7f, 0f), "出口", 140f);
+        CreateBasicExit(26f);
+    }
+
+    private BasicEnemy SpawnLeashed(string objectName, float x, float y, string displayName, Color color, float minX, float maxX, int ground)
+    {
+        BasicEnemy enemy = SpawnEnemy(objectName, x, 3, false, displayName, color, "Player", 6);
+        enemy.transform.position = new Vector3(x, y, 0f);
+        enemy.SetAsPractice();
+        enemy.StayOnPlatform(minX, maxX, 1 << ground);
+        enemy.Died += OnArenaEnemyDied;
+        return enemy;
+    }
+
+    private void CreateBasicExit(float x)
+    {
+        GameObject exit = new GameObject("LevelExit");
+        exit.transform.SetParent(root, false);
+        exit.transform.position = new Vector3(x, 1.2f, 0f);
+        BoxCollider2D trigger = exit.AddComponent<BoxCollider2D>();
+        trigger.isTrigger = true;
+        trigger.size = new Vector2(1.6f, 2.6f);
+        exit.AddComponent<LevelExit>().Arm(this);
+    }
+
+    private void OnArenaEnemyDied()
+    {
+        if (basicExitOpen || arena == null)
+            return;
+
+        for (int i = 0; i < arena.Length; i++)
+        {
+            if (arena[i] != null && !arena[i].IsDead)
+                return;
+        }
+
+        OpenBasicExit();
+    }
+
+    private void OpenBasicExit()
+    {
+        if (basicExitOpen)
+            return;
+
+        basicExitOpen = true;
+        if (basicSeal != null)
+        {
+            Collider2D[] blocking = basicSeal.GetComponentsInChildren<Collider2D>();
+            for (int i = 0; i < blocking.Length; i++)
+                blocking[i].enabled = false;
+            AttackFeedback.Thud(basicSeal.transform.position);
+            StartCoroutine(SinkSeal());
+        }
+
+        RefreshObjective();
+    }
+
+    private IEnumerator SinkSeal()
+    {
+        if (basicSeal == null)
+            yield break;
+
+        Vector3 start = basicSeal.transform.position;
+        Vector3 end = start + Vector3.down * 3.6f;
+        float elapsed = 0f;
+        const float duration = 0.45f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
+            basicSeal.transform.position = Vector3.Lerp(start, end, t);
+            yield return null;
+        }
+
+        basicSeal.SetActive(false);
+    }
+
+    private void BuildFoolTrial(int ground)
+    {
         Solid("Floor", new Vector2(16.25f, -1f), new Vector2(36.5f, 2f), new Color(0.31f, 0.27f, 0.23f), ground, 0);
         Solid("LeftWall", new Vector2(-2.35f, 3.75f), new Vector2(0.7f, 7.5f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
         Solid("RightWall", new Vector2(34.15f, 3f), new Vector2(0.7f, 6f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
-
-        Solid("Step", new Vector2(3.05f, 0.725f), new Vector2(2.9f, 1.45f), new Color(0.43f, 0.36f, 0.28f), ground, 1);
-        Solid("CardPlatform", new Vector2(7.55f, 1.45f), new Vector2(6.5f, 2.9f), new Color(0.46f, 0.38f, 0.29f), ground, 1);
-
-        Solid("PenLeft", new Vector2(12.5f, 0.45f), new Vector2(0.45f, 0.9f), new Color(0.26f, 0.22f, 0.2f), ground, 1);
-        Solid("PenRight", new Vector2(17.2f, 0.45f), new Vector2(0.45f, 0.9f), new Color(0.26f, 0.22f, 0.2f), ground, 1);
         Solid("Arch", new Vector2(20.4f, 5.5f), new Vector2(0.75f, 3.8f), new Color(0.2f, 0.17f, 0.16f), ground, 1);
 
         MonsterCardData fool = Resources.Load<MonsterCardData>("Cards/Fool");
         if (fool == null)
-            Debug.LogWarning("没有找到 Resources/Cards/Fool，第一关无法获得愚者牌。");
-        spore = SpawnEnemy("PracticeSpore", 14.8f, 3, false, "孢子", new Color(0.62f, 0.28f, 0.78f), "Player", 5);
-        spore.SetAsPractice();
-        spore.SetVisualScale(new Vector3(0.78f, 0.78f, 1f));
+            Debug.LogWarning("没有找到 Resources/Cards/Fool，愚者牌试用关无法获得愚者牌。");
         BuildReachGate(ground, fool);
         CreateCard(new Vector3(cardX, 2.2f, 0f), fool);
         CreateSprite(root, "CardMat", new Vector3(cardX, 0.16f, 0f), new Vector3(1.5f, 0.1f, 1f), new Color(0.95f, 0.78f, 0.28f, 0.9f), "Ground", 2);
-        Sign("ForwardSign", root, new Vector3(8.4f, 3.55f, 0f), "往前", 140f);
         CreateExit();
         BuildGuideArrow();
     }
@@ -402,7 +517,7 @@ public class FirstLevel : MonoBehaviour
         barRect.sizeDelta = new Vector2(820f, 96f);
 
         Text title = CreateUiText(bar.transform, "Title", 30, TextAnchor.UpperCenter, new Color(1f, 0.9f, 0.62f));
-        title.text = "第一关  愚者的裂隙";
+        title.text = foolTrial ? "愚者牌试用" : "第一关  基础战斗";
         StretchTop(title.rectTransform, -8f, 40f);
 
         objectiveText = CreateUiText(bar.transform, "Objective", 26, TextAnchor.UpperCenter, Color.white);
@@ -414,9 +529,15 @@ public class FirstLevel : MonoBehaviour
         if (objectiveText == null)
             return;
 
+        if (!foolTrial)
+        {
+            RefreshBasicObjective();
+            return;
+        }
+
         if (cleared)
         {
-            SetObjective("第一关完成");
+            SetObjective("愚者牌试用完成");
             return;
         }
 
@@ -427,13 +548,6 @@ public class FirstLevel : MonoBehaviour
         }
 
         float x = player != null ? player.transform.position.x : 0f;
-        bool sporeAlive = spore != null && !spore.IsDead;
-        if (sporeAlive && x > 11.2f && x < 18.2f)
-        {
-            SetObjective("打倒孢子");
-            return;
-        }
-
         if (boss != null && boss.IsAwake && !boss.IsDead)
         {
             if (boss.HasAttacked)
@@ -447,29 +561,64 @@ public class FirstLevel : MonoBehaviour
 
         if (FoolEquipped)
         {
-            SetObjective("站上黄线，打栏杆后的守卫");
+            SetObjective("站上黄线，鼠标左键攻击栏杆后的守卫");
             return;
         }
 
         if (loadout != null && loadout.PendingCard != null)
         {
-            SetObjective("J 或回车装备，Esc 先去试试");
+            SetObjective("J 或回车装备，Esc 先用鼠标左键试试");
             return;
         }
 
-        if (!HasFool && x > 18f)
+        if (!HasFool && x > 12f)
         {
             SetObjective("拾取愚者");
             return;
         }
 
-        if (x < 3.4f)
+        if (x < 4f)
         {
-            SetObjective("方向键移动，空格跳跃");
+            SetObjective("WASD 移动，空格跳跃，左 Shift 冲刺");
             return;
         }
 
-        SetObjective(sporeAlive ? "J 攻击，跳过高台往前" : "继续往前拿愚者");
+        SetObjective("往前拾取愚者");
+    }
+
+    private void RefreshBasicObjective()
+    {
+        if (basicExitOpen)
+        {
+            SetObjective("走进出口，进入愚者牌试用");
+            return;
+        }
+
+        float x = player != null ? player.transform.position.x : 0f;
+        if (x < 3f)
+        {
+            SetObjective("WASD 移动，空格跳跃，左 Shift 冲刺");
+            return;
+        }
+
+        if (ArenaAlive(2) && x > 14.6f)
+        {
+            SetObjective("跳起后马上按鼠标左键，或离开低台时按");
+            return;
+        }
+
+        if (ArenaAlive(0) || ArenaAlive(1))
+        {
+            SetObjective("跳上平台，鼠标左键攻击哨兵");
+            return;
+        }
+
+        SetObjective("鼠标左键攻击。三个敌人都倒下后出口开启");
+    }
+
+    private bool ArenaAlive(int index)
+    {
+        return arena != null && index >= 0 && index < arena.Length && arena[index] != null && !arena[index].IsDead;
     }
 
     private void SetObjective(string value)
@@ -670,7 +819,7 @@ public class FirstLevel : MonoBehaviour
         }
 
         Text endTitle = CreateUiText(endPanel.transform, "Title", 40, TextAnchor.UpperCenter, new Color(1f, 0.88f, 0.55f));
-        endTitle.text = "第一关完成";
+        endTitle.text = "愚者牌试用完成";
         StretchTop(endTitle.rectTransform, -28f, 56f);
 
         Text ending = CreateUiText(endPanel.transform, "Ending", 26, TextAnchor.UpperCenter, new Color(1f, 0.94f, 0.82f));
@@ -763,6 +912,20 @@ public class FirstLevel : MonoBehaviour
         Text text = CreateUiText(buttonObject.transform, "Label", 26, TextAnchor.MiddleCenter, Color.white);
         text.text = label;
         text.rectTransform.sizeDelta = rect.sizeDelta;
+    }
+
+    public bool UseExit()
+    {
+        if (!foolTrial && !basicExitOpen)
+            return false;
+
+        if (foolTrial)
+        {
+            Complete();
+            return true;
+        }
+
+        return GameFlow.LoadFoolTrial();
     }
 
     private bool FoolEquipped =>
@@ -933,7 +1096,9 @@ public class LevelExit : MonoBehaviour
         if (used || level == null || other.GetComponent<Player>() == null)
             return;
 
+        if (!level.UseExit())
+            return;
+
         used = true;
-        level.Complete();
     }
 }

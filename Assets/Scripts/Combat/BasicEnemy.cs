@@ -59,6 +59,11 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
     private bool dead;
     private bool rewardGranted;
     private bool rooted;
+    private bool platformLock;
+    private float platformMinX;
+    private float platformMaxX;
+    private Vector3 platformHome;
+    private LayerMask platformGround;
 
     public int AttackDamage => attackDamage;
     public int CurrentHealth => health;
@@ -158,6 +163,17 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
         chaseSpeed = 1.8f;
     }
 
+    public void StayOnPlatform(float minX, float maxX, LayerMask ground)
+    {
+        platformLock = true;
+        platformMinX = Mathf.Min(minX, maxX);
+        platformMaxX = Mathf.Max(minX, maxX);
+        platformHome = transform.position;
+        platformGround = ground;
+        float room = (platformMaxX - platformMinX) * 0.5f;
+        patrolDistance = Mathf.Min(patrolDistance, Mathf.Max(0.2f, room));
+    }
+
     public void SetVisualScale(Vector3 scale)
     {
         transform.localScale = scale;
@@ -225,6 +241,30 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
         }
     }
 
+    private void LateUpdate()
+    {
+        if (dead || !platformLock)
+            return;
+
+        Vector3 position = rb.position;
+        if (position.y < platformHome.y - 0.3f)
+        {
+            rb.position = platformHome;
+            transform.position = platformHome;
+            rb.linearVelocity = Vector2.zero;
+            return;
+        }
+
+        float clampedX = Mathf.Clamp(position.x, platformMinX, platformMaxX);
+        if (Mathf.Approximately(clampedX, position.x))
+            return;
+
+        position.x = clampedX;
+        rb.position = position;
+        transform.position = position;
+        rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+    }
+
     public void TakeDamage(int amount, Vector2 hitFrom)
     {
         if (dead)
@@ -237,7 +277,7 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
         transform.localScale = new Vector3(baseScale.x * (heavy ? 1.28f : 1.08f), baseScale.y * (heavy ? 0.38f : 0.68f), baseScale.z);
 
         float knockDirection = transform.position.x >= hitFrom.x ? 1f : -1f;
-        rb.linearVelocity = rooted ? Vector2.zero : new Vector2(knockDirection * knockback.x, knockback.y);
+        rb.linearVelocity = rooted || platformLock ? Vector2.zero : new Vector2(knockDirection * knockback.x, knockback.y);
         Face((int)knockDirection);
 
         HealthChanged?.Invoke();
@@ -261,8 +301,14 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
         else if (transform.position.x <= left)
             moveDirection = 1;
 
-        if (ObstacleAhead(moveDirection))
+        if (ObstacleAhead(moveDirection) || LeavesPlatform(moveDirection))
             moveDirection *= -1;
+
+        if (ObstacleAhead(moveDirection) || LeavesPlatform(moveDirection))
+        {
+            HoldStill();
+            return;
+        }
 
         Move(moveDirection, moveSpeed);
     }
@@ -294,7 +340,7 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
             return;
         }
 
-        if (ObstacleAhead(direction))
+        if (ObstacleAhead(direction) || LeavesPlatform(direction))
         {
             HoldStill();
             return;
@@ -445,6 +491,24 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
         spriteRenderer.flipX = moveDirection < 0;
         if (attackPoint != null)
             attackPoint.localPosition = new Vector3(attackHitboxOffset * moveDirection, 0.1f, 0f);
+    }
+
+    private bool LeavesPlatform(int direction)
+    {
+        if (!platformLock || direction == 0)
+            return false;
+
+        float ahead = transform.position.x + direction * 0.12f;
+        if (ahead < platformMinX || ahead > platformMaxX)
+            return true;
+
+        if (bodyCollider == null || platformGround.value == 0)
+            return false;
+
+        Vector2 probe = new Vector2(
+            bodyCollider.bounds.center.x + direction * (bodyCollider.bounds.extents.x + 0.16f),
+            bodyCollider.bounds.min.y + 0.05f);
+        return Physics2D.Raycast(probe, Vector2.down, 0.6f, platformGround).collider == null;
     }
 
     private bool ObstacleAhead(int direction)
