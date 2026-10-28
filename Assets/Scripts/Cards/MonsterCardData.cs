@@ -2,7 +2,9 @@ using UnityEngine;
 
 public enum CardEffectType
 {
-    FoolLunge = 0
+    FoolLunge = 0,
+    ChariotDash = 1,
+    StrengthSlam = 2
 }
 
 [CreateAssetMenu(fileName = "MonsterCard", menuName = "Tarot/Monster Card")]
@@ -15,4 +17,6 @@ public class MonsterCardData : ScriptableObject
     public float damageMultiplier = 2f;
     public float lungeMultiplier = 1.75f;
     public float reachMultiplier = 2.15f;
+    public int echoDamage = 1;
+    public int slamDamage = 3;
 }

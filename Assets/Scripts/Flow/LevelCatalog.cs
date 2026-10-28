@@ -4,6 +4,10 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "LevelCatalog", menuName = "Flow/Level Catalog")]
 public class LevelCatalog : ScriptableObject
 {
+    public const string BasicCombatId = "basic";
+    public const string FoolTrialId = "fool";
+    public const string ChariotTrialId = "chariot";
+
     public LevelSlot[] levels;
 
     public static LevelSlot[] Current()
@@ -28,10 +32,27 @@ public class LevelCatalog : ScriptableObject
         return null;
     }
 
+    public static LevelSlot Find(string levelId)
+    {
+        if (string.IsNullOrEmpty(levelId))
+            return null;
+
+        LevelSlot[] slots = Current();
+        for (int i = 0; i < slots.Length; i++)
+        {
+            LevelSlot slot = slots[i];
+            if (slot != null && slot.levelId == levelId && slot.available && !string.IsNullOrEmpty(slot.sceneName))
+                return slot;
+        }
+
+        return null;
+    }
+
     private static LevelSlot[] Fallback => new[]
     {
-        new LevelSlot { displayName = "第一关  愚者的裂隙", sceneName = "SampleScene", available = true },
-        new LevelSlot { displayName = "第二关", sceneName = "", available = false }
+        new LevelSlot { displayName = "第一关  基础战斗", sceneName = "SampleScene", levelId = BasicCombatId, available = true },
+        new LevelSlot { displayName = "愚者牌试用", sceneName = "SampleScene", levelId = FoolTrialId, available = true },
+        new LevelSlot { displayName = "牌之回响", sceneName = "SampleScene", levelId = ChariotTrialId, available = true }
     };
 }
 
@@ -40,6 +61,7 @@ public class LevelSlot
 {
     public string displayName = "第一关";
     public string sceneName = "SampleScene";
+    public string levelId = LevelCatalog.BasicCombatId;
     public Sprite preview;
     public bool available = true;
 }

@@ -13,11 +13,18 @@ MonoBehaviour:
   m_Name: LevelCatalog
   m_EditorClassIdentifier: 
   levels:
-  - displayName: "\u7B2C\u4E00\u5173  \u611A\u8005\u7684\u88C2\u9699"
+  - displayName: "\u7B2C\u4E00\u5173  \u57FA\u7840\u6218\u6597"
     sceneName: SampleScene
+    levelId: basic
     preview: {fileID: 21300000, guid: f1a2b3c4d5e64789a0b1c2d3e4f50619, type: 3}
     available: 1
-  - displayName: "\u7B2C\u4E8C\u5173"
-    sceneName: 
-    preview: {fileID: 0}
-    available: 0
+  - displayName: "\u611A\u8005\u724C\u8BD5\u7528"
+    sceneName: SampleScene
+    levelId: fool
+    preview: {fileID: 21300000, guid: f1a2b3c4d5e64789a0b1c2d3e4f50619, type: 3}
+    available: 1
+  - displayName: "\u724C\u4E4B\u56DE\u54CD"
+    sceneName: SampleScene
+    levelId: chariot
+    preview: {fileID: 21300000, guid: f1a2b3c4d5e64789a0b1c2d3e4f50619, type: 3}
+    available: 1

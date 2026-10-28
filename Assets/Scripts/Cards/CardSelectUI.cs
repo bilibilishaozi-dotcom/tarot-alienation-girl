@@ -152,7 +152,7 @@ public class CardSelectUI : MonoBehaviour
             MonsterCardData card = loadout.PendingCard;
             titleText.text = "获得占星牌";
             bodyText.text = card.displayName + "\n" + card.description
-                + "\n\n可以先按 Esc，用现在的攻击去前面试一次。"
+                + "\n\n可以先按 Esc，用鼠标左键去前面试一次。"
                 + "\n装备之后再挥刀，就能看出距离和颜色的差别。"
                 + "\n\nJ 或回车：装备    Esc：先去试试";
             if (equipButton != null && EventSystem.current != null)

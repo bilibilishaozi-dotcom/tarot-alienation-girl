@@ -5,11 +5,20 @@ using UnityEngine;
 public class PlayerCardLoadout : MonoBehaviour
 {
     private readonly List<MonsterCardData> owned = new List<MonsterCardData>();
+    private ICardEffect active;
 
     public MonsterCardData PendingCard { get; private set; }
     public MonsterCardData EquippedCard { get; private set; }
     public IReadOnlyList<MonsterCardData> OwnedCards => owned;
     public event Action Changed;
+
+    public float DamageMultiplier { get; private set; } = 1f;
+    public float LungeMultiplier { get; private set; } = 1f;
+    public float ReachMultiplier { get; private set; } = 1f;
+    public bool DashEcho { get; private set; }
+    public int EchoDamage { get; private set; }
+    public bool LandingSlam { get; private set; }
+    public int SlamDamage { get; private set; }
 
     private void OnEnable()
     {
@@ -19,22 +28,92 @@ public class PlayerCardLoadout : MonoBehaviour
     private void OnDisable()
     {
         CardReward.Granted -= OnCardGranted;
+        DetachActive();
     }
 
-    public float DamageMultiplier => IsFoolEquipped ? EquippedCard.damageMultiplier : 1f;
-    public float LungeMultiplier => IsFoolEquipped ? EquippedCard.lungeMultiplier : 1f;
-    public float ReachMultiplier => IsFoolEquipped ? EquippedCard.reachMultiplier : 1f;
+    public void Equip(MonsterCardData card)
+    {
+        if (card == null)
+            return;
 
-    private bool IsFoolEquipped => EquippedCard != null && EquippedCard.effectType == CardEffectType.FoolLunge;
+        Remember(card);
+        if (EquippedCard != null && EquippedCard.cardId == card.cardId)
+        {
+            if (PendingCard != null)
+            {
+                PendingCard = null;
+                Changed?.Invoke();
+            }
+
+            return;
+        }
+
+        DetachActive();
+        EquippedCard = card;
+        PendingCard = null;
+        Player player = GetComponent<Player>();
+        active = CardEffects.Create(card.effectType);
+        if (active != null && player != null)
+            active.Attach(player, card);
+        Changed?.Invoke();
+        CardPossession.Play(player, card);
+    }
 
     public void EquipPending()
     {
         if (PendingCard == null)
             return;
 
-        EquippedCard = PendingCard;
-        PendingCard = null;
-        Changed?.Invoke();
+        Equip(PendingCard);
+    }
+
+    public void ApplyFool(float damage, float lunge, float reach)
+    {
+        DamageMultiplier = Mathf.Max(0.1f, damage);
+        LungeMultiplier = Mathf.Max(0.1f, lunge);
+        ReachMultiplier = Mathf.Max(0.1f, reach);
+    }
+
+    public void ClearFool()
+    {
+        DamageMultiplier = 1f;
+        LungeMultiplier = 1f;
+        ReachMultiplier = 1f;
+    }
+
+    public void ApplyChariot(int echoDamage)
+    {
+        DashEcho = true;
+        EchoDamage = Mathf.Max(1, echoDamage);
+    }
+
+    public void ClearChariot()
+    {
+        DashEcho = false;
+        EchoDamage = 0;
+    }
+
+    public void ApplyStrength(int slamDamage)
+    {
+        LandingSlam = true;
+        SlamDamage = Mathf.Max(1, slamDamage);
+    }
+
+    public void ClearStrength()
+    {
+        LandingSlam = false;
+        SlamDamage = 0;
+    }
+
+    private void DetachActive()
+    {
+        Player player = GetComponent<Player>();
+        if (active != null && player != null)
+            active.Detach(player);
+        active = null;
+        ClearFool();
+        ClearChariot();
+        ClearStrength();
     }
 
     private void OnCardGranted(MonsterCardData card)
