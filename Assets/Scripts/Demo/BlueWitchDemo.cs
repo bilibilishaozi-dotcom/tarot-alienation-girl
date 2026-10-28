@@ -47,9 +47,13 @@ public class BlueWitchDemo : MonoBehaviour
     const float ImpactSharpTime = 0.04f;
     const float AirBlendIn = 0.12f;
     const float SpringSettleTime = 0.7f;
-    const float JumpBufferTime = 0.1f;
+    const float JumpBufferTime = 0.14f;
     const float AnticipationMove = 0.5f;
     const float ClampBlendTime = 0.1f;
+    const float PoseCrossTime = 0.1f;
+    const float AnchorBlendTime = 0.08f;
+    const float JointMaxDegreesPerSecond = 12f * 60f;
+    const float ImpactFullSpeed = 4f;
     const float MaxDeltaTime = 1f / 30f;
     const float WallFaceX = 4.4f; // 髋部根点碰到墙的位置，不是身体外缘
     const float WallDrop = -1.4f;
@@ -132,16 +136,28 @@ public class BlueWitchDemo : MonoBehaviour
     float jumpBuffer;
     float impactSharpTimer;
     float clampWeight;
+    float poseBlendLeft;
+    float anchorBlend;
+    float landImpact = 1f;
+    float pendingLandKick;
     float[] springX;
     float[] springV;
     Phase phase = Phase.Ground;
     bool onWall;
+    bool poseWall;
+    bool wasPlanted = true;
+    bool snapAnchor;
     Pose shown;
+    Pose crouchFrom;
+    Pose poseFrom;
 
     void Awake()
     {
         Time.timeScale = 1f;
         shown = IdleRest();
+        crouchFrom = shown;
+        poseFrom = shown;
+        rigOffset = -FeetBelowRoot - SoleLow(shown);
         springX = new float[SpringCount];
         springV = new float[SpringCount];
         BuildRig();
@@ -160,6 +176,7 @@ public class BlueWitchDemo : MonoBehaviour
         bool canJump = phase == Phase.Ground || (phase == Phase.Land && phaseTime >= ImpactHold);
         if (jumpBuffer > 0f && canJump)
         {
+            crouchFrom = shown;
             phase = Phase.Crouch;
             phaseTime = 0f;
             jumpBuffer = 0f;
@@ -184,16 +201,39 @@ public class BlueWitchDemo : MonoBehaviour
             phase = Phase.Ground;
 
         StepMotion(direction, dt);
-        BlendAndApply(ChoosePose(direction), direction, dt);
+        if (onWall != poseWall)
+        {
+            poseFrom = shown;
+            poseBlendLeft = PoseCrossTime;
+            poseWall = onWall;
+        }
 
-        if (phase == Phase.Crouch || phase == Phase.Launch || phase == Phase.Land)
+        if (pendingLandKick > 0f && poseBlendLeft <= 0f)
+        {
+            Kick(false, pendingLandKick);
+            pendingLandKick = 0f;
+        }
+
+        Pose target = ChoosePose(direction);
+        if (poseBlendLeft > 0f)
+        {
+            float blendIn = 1f - Mathf.Clamp01(poseBlendLeft / PoseCrossTime);
+            target = Pose.Lerp(poseFrom, target, blendIn);
+        }
+
+        BlendAndApply(target, direction, dt);
+
+        if ((phase == Phase.Crouch || phase == Phase.Launch || phase == Phase.Land) && poseBlendLeft <= 0f)
             phaseTime += dt;
         if (phase == Phase.Ground)
             springHold = Mathf.Max(0f, springHold - dt);
-        if (jumpBuffer > 0f)
+        bool impactLocked = phase == Phase.Land && phaseTime < ImpactHold;
+        if (jumpBuffer > 0f && !impactLocked)
             jumpBuffer -= dt;
         if (impactSharpTimer > 0f)
             impactSharpTimer -= dt;
+        if (poseBlendLeft > 0f)
+            poseBlendLeft -= dt;
 
         if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
             GameFlow.LoadTitle();
@@ -250,8 +290,11 @@ public class BlueWitchDemo : MonoBehaviour
             }
 
             airTime += dt;
-            if (position.y <= GroundY && verticalVelocity <= 0f)
+            float soleWorld = position.y + rigOffset + shown.sy * SoleLow(shown);
+            if (soleWorld <= 0f && verticalVelocity <= 0f)
             {
+                bool fromWall = onWall;
+                landImpact = Mathf.Clamp01(Mathf.Abs(verticalVelocity) / ImpactFullSpeed);
                 position.y = GroundY;
                 verticalVelocity = 0f;
                 onWall = false;
@@ -259,7 +302,11 @@ public class BlueWitchDemo : MonoBehaviour
                 phaseTime = 0f;
                 springHold = SpringSettleTime;
                 impactSharpTimer = ImpactSharpTime;
-                Kick(false);
+                snapAnchor = true;
+                if (fromWall)
+                    pendingLandKick = landImpact;
+                else
+                    Kick(false, landImpact);
             }
 
             transform.position = position;
@@ -348,7 +395,7 @@ public class BlueWitchDemo : MonoBehaviour
         if (phase == Phase.Crouch)
         {
             float t = EaseOutCubic(phaseTime / CrouchTime);
-            return Pose.Lerp(IdleRest(), Scale(CrouchPose(), jumpAmplitude), t);
+            return Pose.Lerp(crouchFrom, Scale(CrouchPose(), jumpAmplitude), t);
         }
 
         if (phase == Phase.Launch)
@@ -375,6 +422,8 @@ public class BlueWitchDemo : MonoBehaviour
         if (phase == Phase.Land)
         {
             Pose land = Scale(LandPose(), fallAmplitude);
+            land.sx = Mathf.Lerp(1f, land.sx, landImpact);
+            land.sy = Mathf.Lerp(1f, land.sy, landImpact);
             if (phaseTime < ImpactHold)
                 return land;
 
@@ -402,7 +451,7 @@ public class BlueWitchDemo : MonoBehaviour
         bool recoveringWalk = phase == Phase.Land && phaseTime >= ImpactHold && Mathf.Abs(direction) > 0.01f;
         float clampGoal = jumpPose ? 1f : 0f;
         clampWeight = Mathf.MoveTowards(clampWeight, clampGoal, dt / ClampBlendTime);
-        if (!onWallPose)
+        if (!onWallPose && poseBlendLeft <= 0f)
         {
             Pose limited = target;
             ClampCloth(ref limited);
@@ -411,36 +460,48 @@ public class BlueWitchDemo : MonoBehaviour
             target = Pose.Lerp(target, limited, clampWeight);
         }
 
-        float sharp = impactSharpTimer > 0f ? ImpactSharpness : BoneSharpness;
+        float sharp = impactSharpTimer > 0f && poseBlendLeft <= 0f ? ImpactSharpness : BoneSharpness;
         float blend = 1f - Mathf.Exp(-sharp * dt);
+        Pose previous = shown;
         shown = Pose.Lerp(shown, target, blend);
         float response = Mathf.Max(0f, springStrength);
         // 落地后的摆动大约再持续 0.7 秒。平时的待机和走路用指数平滑，走路步频会把 hair_back 的弹簧放大。
-        bool useSpring = !onWallPose && response > 0f && (phase != Phase.Ground || springHold > 0f);
+        // 贴墙过渡这 0.1 秒里头发跟着姿势走，弹簧等过渡完再接上。
+        bool useSpring = !onWallPose && poseBlendLeft <= 0f && response > 0f && (phase != Phase.Ground || springHold > 0f);
+        float maxStep = JointMaxDegreesPerSecond * dt;
         for (int i = 0; i < SpringCount; i++)
         {
             if (!useSpring)
             {
-                springX[i] = SpringAngle(shown, i);
+                float held = Mathf.MoveTowards(springX[i], SpringAngle(shown, i), maxStep);
+                springX[i] = held;
                 springV[i] = 0f;
+                shown = WithSpring(shown, i, held);
                 continue;
             }
 
             float omega = SpringOmega[i] * response;
             float velocity = springV[i];
-            float angle = springX[i];
+            float previousAngle = springX[i];
+            float angle = previousAngle;
             float goal = SpringAngle(target, i);
             velocity += (omega * omega * (goal - angle) - 2f * SpringZeta[i] * omega * velocity) * dt;
             angle += velocity * dt;
-            float limited = Mathf.Clamp(angle, SpringMin[i], SpringMax[i]);
-            bool outward = (angle > SpringMax[i] && velocity > 0f) || (angle < SpringMin[i] && velocity < 0f);
-            if (outward)
-                velocity = 0f;
-            angle = Mathf.Lerp(angle, limited, clampWeight);
+            angle = Mathf.MoveTowards(previousAngle, angle, maxStep);
+            bool goalInside = goal >= SpringMin[i] && goal <= SpringMax[i];
+            if (goalInside && (angle > SpringMax[i] || angle < SpringMin[i]))
+            {
+                if ((angle > SpringMax[i] && velocity > 0f) || (angle < SpringMin[i] && velocity < 0f))
+                    velocity = 0f;
+                angle = Mathf.Clamp(angle, SpringMin[i], SpringMax[i]);
+            }
+
             springV[i] = velocity;
             springX[i] = angle;
             shown = WithSpring(shown, i, angle);
         }
+
+        CapBody(ref shown, previous, maxStep);
 
         Pose display = shown;
 
@@ -463,21 +524,69 @@ public class BlueWitchDemo : MonoBehaviour
         Bob("head", display.headBob);
         Bob("torso", display.torsoBob);
         ApplyClothScale(display, jumpPose);
-        ApplyRoot(display, direction, blend);
+        ApplyRoot(display, blend);
+        KeepSoleAboveGround(display);
     }
 
-    void ApplyRoot(Pose display, float direction, float blend)
+    void KeepSoleAboveGround(Pose display)
+    {
+        if (phase != Phase.Air || verticalVelocity > 0f || rig == null)
+            return;
+
+        float worldSole = transform.position.y + rigOffset + display.sy * SoleLow(display);
+        if (worldSole >= 0f)
+            return;
+
+        bool fromWall = onWall;
+        landImpact = Mathf.Clamp01(Mathf.Abs(verticalVelocity) / ImpactFullSpeed);
+        Vector3 position = transform.position;
+        position.y = GroundY;
+        transform.position = position;
+        rigOffset = -FeetBelowRoot - display.sy * SoleLow(display);
+        rig.localPosition = new Vector3(0f, rigOffset, 0f);
+        verticalVelocity = 0f;
+        onWall = false;
+        phase = Phase.Land;
+        phaseTime = 0f;
+        springHold = SpringSettleTime;
+        impactSharpTimer = ImpactSharpTime;
+        anchorBlend = 0f;
+        wasPlanted = true;
+        if (fromWall)
+            pendingLandKick = landImpact;
+        else
+            Kick(false, landImpact);
+    }
+
+    void ApplyRoot(Pose display, float blend)
     {
         if (rig == null)
             return;
 
-        bool plant = phase == Phase.Crouch || phase == Phase.Launch || phase == Phase.Land
-            || (phase == Phase.Ground && Mathf.Abs(direction) <= 0.01f);
+        bool plant = phase != Phase.Air;
         float targetY = plant ? -FeetBelowRoot - display.sy * SoleLow(display) : 0f;
-        if (plant)
+        bool snapping = snapAnchor;
+        if (snapping)
+        {
+            snapAnchor = false;
+            anchorBlend = 0f;
             rigOffset = targetY;
-        else
+        }
+        else if (plant && !wasPlanted)
+            anchorBlend = AnchorBlendTime;
+
+        if (!snapping && anchorBlend > 0f)
+        {
+            float step = Mathf.Clamp01(dt / Mathf.Max(anchorBlend, dt));
+            rigOffset = Mathf.Lerp(rigOffset, targetY, step);
+            anchorBlend -= dt;
+        }
+        else if (!snapping && plant)
+            rigOffset = targetY;
+        else if (!snapping)
             rigOffset = Mathf.Lerp(rigOffset, targetY, blend);
+
+        wasPlanted = plant;
         rig.localPosition = new Vector3(0f, rigOffset, 0f);
         rig.localScale = new Vector3(faceSign * display.sx, display.sy, 1f);
     }
@@ -506,12 +615,26 @@ public class BlueWitchDemo : MonoBehaviour
             coat.localScale = new Vector3(coatX, coatY, 1f);
     }
 
-    void Kick(bool takeoff)
+    void Kick(bool takeoff, float impact = 1f)
     {
-        float scale = Mathf.Max(0f, springStrength);
+        float scale = Mathf.Max(0f, springStrength) * Mathf.Clamp01(impact);
         float[] kick = takeoff ? SpringTakeoff : SpringLand;
         for (int i = 0; i < SpringCount; i++)
             springV[i] += kick[i] * scale;
+    }
+
+    static void CapBody(ref Pose pose, Pose from, float maxStep)
+    {
+        pose.torso = Mathf.MoveTowards(from.torso, pose.torso, maxStep);
+        pose.head = Mathf.MoveTowards(from.head, pose.head, maxStep);
+        pose.nearThigh = Mathf.MoveTowards(from.nearThigh, pose.nearThigh, maxStep);
+        pose.farThigh = Mathf.MoveTowards(from.farThigh, pose.farThigh, maxStep);
+        pose.nearShin = Mathf.MoveTowards(from.nearShin, pose.nearShin, maxStep);
+        pose.farShin = Mathf.MoveTowards(from.farShin, pose.farShin, maxStep);
+        pose.nearUpper = Mathf.MoveTowards(from.nearUpper, pose.nearUpper, maxStep);
+        pose.farUpper = Mathf.MoveTowards(from.farUpper, pose.farUpper, maxStep);
+        pose.nearLower = Mathf.MoveTowards(from.nearLower, pose.nearLower, maxStep);
+        pose.farLower = Mathf.MoveTowards(from.farLower, pose.farLower, maxStep);
     }
 
     static void ClampCloth(ref Pose pose)

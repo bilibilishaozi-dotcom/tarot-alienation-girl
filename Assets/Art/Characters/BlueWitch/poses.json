@@ -17,14 +17,15 @@
     "gravity": -26,
     "jumpVelocity": 8.4,
     "apexGravity": "离墙时 gravMul = lerp(0.5, 1, inverseLerp(0, 2, abs(vy)))。贴墙仍用满重力。",
-    "jumpBuffer": 0.1,
+    "jumpBuffer": 0.14,
     "jumpAfterImpactHold": true,
     "airBlend": "u=clamp(vy/jumpVelocity,-1,1)；上升 SmoothStep(0.12,0.65,u) 混向 rise；下落 SmoothStep(0.12,0.85,-u) 混向 fall；中间是 apex。再在 0.12 秒内从 launch 混入。"
   },
   "squash": {
     "strength": "squashStrength，默认 1",
-    "footAnchor": "待机、下蹲、蹬地、落地：rig.y = -2.48 - sy*SoleLow。SoleLow 是两只鞋的鞋跟和鞋尖里最低的一点。鞋跟/鞋尖在膝轴心局部坐标：近侧 (-0.27,-1.47)/(0.43,-1.47)，远侧 (-0.17,-1.47)/(0.58,-1.47)。膝是近侧 (-0.20,-1.25)、远侧 (-0.04,-1.25)，髋高 0.25。贴地时直接写入，不乘 squashStrength。",
-    "airPivot": "空中、贴墙和走路的高度目标是 0。只在进入和离开这些状态时平滑根高度。"
+    "footAnchor": "走路、待机、下蹲、蹬地、落地都用 rig.y = -2.48 - sy*SoleLow，让最低的鞋跟或鞋尖贴地。触地看的是当前姿势的鞋底，不是髋部。落地那一帧把鞋底收到地面上。鞋跟/鞋尖：近侧 (-0.27,-1.47)/(0.43,-1.47)，远侧 (-0.17,-1.47)/(0.58,-1.47)。",
+    "airPivot": "空中和贴墙绕髋部，高度目标是 0。贴墙进入、离开、以及贴墙落到地上时，姿势用 0.1 秒从当前显示姿势交叉到新目标，单关节每 1/60 秒最多转 12 度。",
+    "landingImpact": "落地压扁（sx/sy）和弹簧冲量按触地速度缩放，速度 4 为满，慢速贴墙 1.4 约为 35%。"
   },
   "springs": {
     "strength": "springStrength，默认 1。乘到 ω 和冲量上。0 时改为和四肢一样的指数平滑。",
