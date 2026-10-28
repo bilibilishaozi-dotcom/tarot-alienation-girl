@@ -1,0 +1,492 @@
+{
+ "source": "candidate.png (cut from ChatGPT Image 2026年5月13日 23_30_16.png)",
+ "canvas": [
+  474,
+  869
+ ],
+ "coords": "pixels, origin top-left, y down; pivot_unity_normalized is (0,0)=bottom-left",
+ "layer_order_back_to_front": [
+  "hair_back",
+  "coat_back",
+  "arm_far_upper",
+  "arm_far_lower",
+  "leg_far_shin",
+  "leg_far_thigh",
+  "leg_near_shin",
+  "leg_near_thigh",
+  "shorts",
+  "torso",
+  "coat_front",
+  "head",
+  "hair_front",
+  "hair_front_r",
+  "hat",
+  "arm_near_upper",
+  "arm_near_lower"
+ ],
+ "root_pivot": [
+  278,
+  605
+ ],
+ "parts": {
+  "hair_back": {
+   "file": "hair_back.png",
+   "parent": "head",
+   "order": 0,
+   "offset_in_canvas": [
+    16,
+    165
+   ],
+   "size": [
+    324,
+    431
+   ],
+   "pivot_canvas": [
+    250,
+    230
+   ],
+   "pivot_local": [
+    234,
+    65
+   ],
+   "pivot_unity_normalized": [
+    0.7222,
+    0.8492
+   ],
+   "hidden_filled_px": 46071,
+   "note": "后发（剩余区域全部归这里）"
+  },
+  "coat_back": {
+   "file": "coat_back.png",
+   "parent": "torso",
+   "order": 1,
+   "offset_in_canvas": [
+    318,
+    325
+   ],
+   "size": [
+    73,
+    372
+   ],
+   "pivot_canvas": [
+    330,
+    360
+   ],
+   "pivot_local": [
+    12,
+    35
+   ],
+   "pivot_unity_normalized": [
+    0.1644,
+    0.9059
+   ],
+   "hidden_filled_px": 11560,
+   "note": "外套远侧片（画面右）"
+  },
+  "arm_far_upper": {
+   "file": "arm_far_upper.png",
+   "parent": "torso",
+   "order": 2,
+   "offset_in_canvas": [
+    310,
+    330
+   ],
+   "size": [
+    70,
+    133
+   ],
+   "pivot_canvas": [
+    338,
+    352
+   ],
+   "pivot_local": [
+    28,
+    22
+   ],
+   "pivot_unity_normalized": [
+    0.4,
+    0.8346
+   ],
+   "hidden_filled_px": 3237,
+   "note": "远侧上臂（角色左臂，画面右）"
+  },
+  "arm_far_lower": {
+   "file": "arm_far_lower.png",
+   "parent": "arm_far_upper",
+   "order": 3,
+   "offset_in_canvas": [
+    332,
+    425
+   ],
+   "size": [
+    69,
+    134
+   ],
+   "pivot_canvas": [
+    358,
+    442
+   ],
+   "pivot_local": [
+    26,
+    17
+   ],
+   "pivot_unity_normalized": [
+    0.3768,
+    0.8731
+   ],
+   "hidden_filled_px": 327,
+   "note": "远侧前臂+手"
+  },
+  "leg_far_shin": {
+   "file": "leg_far_shin.png",
+   "parent": "leg_far_thigh",
+   "order": 4,
+   "offset_in_canvas": [
+    264,
+    684
+   ],
+   "size": [
+    81,
+    169
+   ],
+   "pivot_canvas": [
+    286,
+    705
+   ],
+   "pivot_local": [
+    22,
+    21
+   ],
+   "pivot_unity_normalized": [
+    0.2716,
+    0.8757
+   ],
+   "hidden_filled_px": 1164,
+   "note": "远侧小腿+鞋"
+  },
+  "leg_far_thigh": {
+   "file": "leg_far_thigh.png",
+   "parent": "root",
+   "order": 5,
+   "offset_in_canvas": [
+    258,
+    552
+   ],
+   "size": [
+    66,
+    157
+   ],
+   "pivot_canvas": [
+    290,
+    580
+   ],
+   "pivot_local": [
+    32,
+    28
+   ],
+   "pivot_unity_normalized": [
+    0.4848,
+    0.8217
+   ],
+   "hidden_filled_px": 3948,
+   "note": "远侧大腿"
+  },
+  "leg_near_shin": {
+   "file": "leg_near_shin.png",
+   "parent": "leg_near_thigh",
+   "order": 6,
+   "offset_in_canvas": [
+    179,
+    684
+   ],
+   "size": [
+    77,
+    169
+   ],
+   "pivot_canvas": [
+    212,
+    705
+   ],
+   "pivot_local": [
+    33,
+    21
+   ],
+   "pivot_unity_normalized": [
+    0.4286,
+    0.8757
+   ],
+   "hidden_filled_px": 1250,
+   "note": "近侧小腿+鞋"
+  },
+  "leg_near_thigh": {
+   "file": "leg_near_thigh.png",
+   "parent": "root",
+   "order": 7,
+   "offset_in_canvas": [
+    190,
+    552
+   ],
+   "size": [
+    71,
+    162
+   ],
+   "pivot_canvas": [
+    232,
+    580
+   ],
+   "pivot_local": [
+    42,
+    28
+   ],
+   "pivot_unity_normalized": [
+    0.5915,
+    0.8272
+   ],
+   "hidden_filled_px": 5034,
+   "note": "近侧大腿"
+  },
+  "shorts": {
+   "file": "shorts.png",
+   "parent": "torso",
+   "order": 8,
+   "offset_in_canvas": [
+    220,
+    540
+   ],
+   "size": [
+    118,
+    73
+   ],
+   "pivot_canvas": [
+    276,
+    548
+   ],
+   "pivot_local": [
+    56,
+    8
+   ],
+   "pivot_unity_normalized": [
+    0.4746,
+    0.8904
+   ],
+   "hidden_filled_px": 907,
+   "note": "短裤"
+  },
+  "torso": {
+   "file": "torso.png",
+   "parent": "root",
+   "order": 9,
+   "offset_in_canvas": [
+    190,
+    282
+   ],
+   "size": [
+    151,
+    274
+   ],
+   "pivot_canvas": [
+    278,
+    548
+   ],
+   "pivot_local": [
+    88,
+    266
+   ],
+   "pivot_unity_normalized": [
+    0.5828,
+    0.0292
+   ],
+   "hidden_filled_px": 8065,
+   "note": "上身（含领口）"
+  },
+  "coat_front": {
+   "file": "coat_front.png",
+   "parent": "torso",
+   "order": 10,
+   "offset_in_canvas": [
+    99,
+    395
+   ],
+   "size": [
+    139,
+    322
+   ],
+   "pivot_canvas": [
+    222,
+    400
+   ],
+   "pivot_local": [
+    123,
+    5
+   ],
+   "pivot_unity_normalized": [
+    0.8849,
+    0.9845
+   ],
+   "hidden_filled_px": 855,
+   "note": "外套近侧前片+下摆（画面左）"
+  },
+  "head": {
+   "file": "head.png",
+   "parent": "torso",
+   "order": 11,
+   "offset_in_canvas": [
+    205,
+    120
+   ],
+   "size": [
+    134,
+    207
+   ],
+   "pivot_canvas": [
+    285,
+    312
+   ],
+   "pivot_local": [
+    80,
+    192
+   ],
+   "pivot_unity_normalized": [
+    0.597,
+    0.0725
+   ],
+   "hidden_filled_px": 10497,
+   "note": "头和脸（含刘海）"
+  },
+  "hair_front": {
+   "file": "hair_front.png",
+   "parent": "head",
+   "order": 12,
+   "offset_in_canvas": [
+    128,
+    170
+   ],
+   "size": [
+    114,
+    167
+   ],
+   "pivot_canvas": [
+    260,
+    210
+   ],
+   "pivot_local": [
+    132,
+    40
+   ],
+   "pivot_unity_normalized": [
+    1.1579,
+    0.7605
+   ],
+   "hidden_filled_px": 481,
+   "note": "脸侧前发"
+  },
+  "hair_front_r": {
+   "file": "hair_front_r.png",
+   "parent": "head",
+   "order": 13,
+   "offset_in_canvas": [
+    324,
+    229
+   ],
+   "size": [
+    31,
+    107
+   ],
+   "pivot_canvas": [
+    330,
+    240
+   ],
+   "pivot_local": [
+    6,
+    11
+   ],
+   "pivot_unity_normalized": [
+    0.1935,
+    0.8972
+   ],
+   "hidden_filled_px": 11,
+   "note": "右侧发束"
+  },
+  "hat": {
+   "file": "hat.png",
+   "parent": "head",
+   "order": 14,
+   "offset_in_canvas": [
+    31,
+    16
+   ],
+   "size": [
+    427,
+    267
+   ],
+   "pivot_canvas": [
+    280,
+    190
+   ],
+   "pivot_local": [
+    249,
+    174
+   ],
+   "pivot_unity_normalized": [
+    0.5831,
+    0.3483
+   ],
+   "hidden_filled_px": 0,
+   "note": "帽子"
+  },
+  "arm_near_upper": {
+   "file": "arm_near_upper.png",
+   "parent": "torso",
+   "order": 15,
+   "offset_in_canvas": [
+    150,
+    322
+   ],
+   "size": [
+    91,
+    153
+   ],
+   "pivot_canvas": [
+    212,
+    362
+   ],
+   "pivot_local": [
+    62,
+    40
+   ],
+   "pivot_unity_normalized": [
+    0.6813,
+    0.7386
+   ],
+   "hidden_filled_px": 961,
+   "note": "近侧上臂+肩（角色右臂，画面左）"
+  },
+  "arm_near_lower": {
+   "file": "arm_near_lower.png",
+   "parent": "arm_near_upper",
+   "order": 16,
+   "offset_in_canvas": [
+    117,
+    452
+   ],
+   "size": [
+    98,
+    113
+   ],
+   "pivot_canvas": [
+    182,
+    450
+   ],
+   "pivot_local": [
+    65,
+    -2
+   ],
+   "pivot_unity_normalized": [
+    0.6633,
+    1.0177
+   ],
+   "hidden_filled_px": 0,
+   "note": "近侧前臂+手"
+  }
+ }
+}
