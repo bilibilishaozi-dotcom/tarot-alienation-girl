@@ -24,6 +24,13 @@ public class FirstLevel : MonoBehaviour
     private bool echoFoolDone;
     private bool echoChariotDone;
     private bool echoStrengthDone;
+    private bool finaleFoolBroken;
+    private bool finaleLaneClear;
+    private bool finaleEnding;
+    private GameObject finaleGate;
+    private FinaleTarget finaleSeal;
+    private FinaleTarget finaleCore;
+    private BasicEnemy[] finaleLane;
     private BasicEnemy echoDummy;
     private BasicEnemy[] echoLane;
     private BasicEnemy[] echoCluster;
@@ -93,6 +100,7 @@ public class FirstLevel : MonoBehaviour
         Unhook(echoDummy, OnEchoFoolDied);
         UnhookGroup(echoLane, OnEchoLaneDied);
         UnhookGroup(echoCluster, OnEchoClusterDied);
+        UnhookGroup(finaleLane, OnFinaleLaneDied);
     }
 
     private static void Unhook(BasicEnemy enemy, System.Action handler)
@@ -298,10 +306,10 @@ public class FirstLevel : MonoBehaviour
 
     private void BuildEchoRoom(int ground)
     {
-        Solid("Floor", new Vector2(17.5f, -1f), new Vector2(38f, 2f), new Color(0.31f, 0.27f, 0.23f), ground, 0);
+        Solid("Floor", new Vector2(29.25f, -1f), new Vector2(61.5f, 2f), new Color(0.31f, 0.27f, 0.23f), ground, 0);
         Solid("LeftWall", new Vector2(-1.8f, 3f), new Vector2(0.7f, 6f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
-        Solid("RightWall", new Vector2(36.6f, 3f), new Vector2(0.7f, 6f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
-        Sign("HubSign", root, new Vector3(2.4f, 2.3f, 0f), "触碰印记换牌", 260f);
+        Solid("RightWall", new Vector2(60.4f, 3f), new Vector2(0.7f, 6f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
+        Sign("HubSign", root, new Vector3(2.4f, 2.3f, 0f), "左边单牌，右边收束", 280f);
 
         MonsterCardData fool = Resources.Load<MonsterCardData>("Cards/Fool");
         MonsterCardData chariot = Resources.Load<MonsterCardData>("Cards/Chariot");
@@ -315,6 +323,7 @@ public class FirstLevel : MonoBehaviour
         BuildChariotStation(ground);
         echoStrengthMark = PlaceSeal(new Vector3(25.2f, 1.15f, 0f), strength, "力量", new Color(0.86f, 0.28f, 0.18f));
         BuildStrengthStation(ground);
+        BuildFinale(ground, fool, chariot, strength);
         RefreshEchoMarks();
     }
 
@@ -390,11 +399,150 @@ public class FirstLevel : MonoBehaviour
         pot.AddComponent<BreakableProp>().Arm(1);
     }
 
+    private void BuildFinale(int ground, MonsterCardData fool, MonsterCardData chariot, MonsterCardData strength)
+    {
+        PlaceSeal(new Vector3(34.2f, 1.15f, 0f), fool, "换愚者", new Color(0.95f, 0.78f, 0.28f));
+        const float stand = 36.2f;
+        Solid("FinaleRail", new Vector2(37.35f, 0.9f), new Vector2(0.35f, 1.8f), new Color(0.55f, 0.58f, 0.66f), ground, 3);
+        Sign("FinaleFoolHint", root, new Vector3(stand, 2.2f, 0f), "打第一印", 180f);
+        finaleSeal = CreateFinaleTarget("FirstSeal", new Vector3(stand + 2.55f, 1.9f, 0f), new Vector3(0.7f, 1.4f, 1f), new Color(0.95f, 0.78f, 0.28f, 1f), 2, OnFinaleSealBroken);
+        Sign("FirstSealLabel", root, new Vector3(stand + 2.55f, 2.9f, 0f), "第一印", 140f);
+
+        finaleGate = Solid("FinaleGate", new Vector2(40.3f, 1.6f), new Vector2(0.55f, 3.2f), new Color(0.45f, 0.36f, 0.18f), ground, 4);
+        PlaceSeal(new Vector3(42.2f, 1.15f, 0f), chariot, "换战车", new Color(0.45f, 0.78f, 0.95f));
+        Sign("FinaleDashHint", root, new Vector3(44.4f, 2.35f, 0f), "冲到核心", 180f);
+        Solid("FinaleLintel", new Vector2(44.6f, 2.45f), new Vector2(4.2f, 0.35f), new Color(0.22f, 0.2f, 0.24f), ground, 2);
+        finaleLane = new BasicEnemy[3];
+        float[] xs = { 43.4f, 44.6f, 45.8f };
+        for (int i = 0; i < finaleLane.Length; i++)
+        {
+            finaleLane[i] = SpawnEnemy("FinaleLane" + i, xs[i], 2, false, "阻路", new Color(0.35f, 0.62f, 0.78f), "Player", 6);
+            finaleLane[i].transform.position = new Vector3(xs[i], 0.92f, 0f);
+            finaleLane[i].StayOnPlatform(xs[i] - 0.3f, xs[i] + 0.3f, 1 << ground);
+            finaleLane[i].SetPushable();
+            finaleLane[i].Died += OnFinaleLaneDied;
+        }
+
+        PlaceSeal(new Vector3(48.2f, 1.15f, 0f), strength, "换力量", new Color(0.86f, 0.28f, 0.18f));
+        Solid("FinaleLip", new Vector2(50.1f, 0.6f), new Vector2(2.2f, 1.2f), new Color(0.62f, 0.22f, 0.16f), ground, 1);
+        Sign("FinaleSlamHint", root, new Vector3(50.1f, 2.15f, 0f), "砸核心", 140f);
+        finaleCore = CreateFinaleTarget("RiftCore", new Vector3(52.15f, 1.05f, 0f), new Vector3(1.15f, 1.7f, 1f), new Color(0.72f, 0.55f, 0.95f, 1f), 3, OnFinaleCoreBroken);
+        CreateSprite(finaleCore.transform, "CoreHeart", new Vector3(0f, 0.05f, 0f), new Vector3(0.38f, 0.48f, 1f), new Color(1f, 0.9f, 0.7f, 1f), "Player", 8);
+    }
+
+    private FinaleTarget CreateFinaleTarget(string name, Vector3 position, Vector3 scale, Color color, int health, UnityEngine.Events.UnityAction onBroken)
+    {
+        GameObject target = new GameObject(name);
+        target.transform.SetParent(root, false);
+        target.transform.position = position;
+        target.transform.localScale = scale;
+        SpriteRenderer sprite = target.AddComponent<SpriteRenderer>();
+        sprite.sprite = PixelSprite();
+        sprite.color = color;
+        sprite.sortingLayerName = "Player";
+        sprite.sortingOrder = 6;
+        BoxCollider2D box = target.AddComponent<BoxCollider2D>();
+        box.size = Vector2.one;
+        FinaleTarget finale = target.AddComponent<FinaleTarget>();
+        finale.Arm(health, onBroken);
+        return finale;
+    }
+
+    private void OnFinaleSealBroken()
+    {
+        finaleFoolBroken = true;
+        if (finaleGate != null)
+        {
+            Collider2D[] blocking = finaleGate.GetComponentsInChildren<Collider2D>();
+            for (int i = 0; i < blocking.Length; i++)
+                blocking[i].enabled = false;
+            AttackFeedback.Thud(finaleGate.transform.position);
+            StartCoroutine(SinkObject(finaleGate, 3.4f));
+        }
+
+        RefreshObjective();
+    }
+
+    private void OnFinaleLaneDied()
+    {
+        if (!GroupDead(finaleLane))
+            return;
+
+        finaleLaneClear = true;
+        RefreshObjective();
+    }
+
+    private void OnFinaleCoreBroken()
+    {
+        if (finaleEnding || cleared)
+            return;
+
+        finaleEnding = true;
+        StartCoroutine(PlayCoreEcho());
+    }
+
+    private IEnumerator SinkObject(GameObject block, float distance)
+    {
+        if (block == null)
+            yield break;
+
+        Vector3 start = block.transform.position;
+        Vector3 end = start + Vector3.down * distance;
+        float elapsed = 0f;
+        while (elapsed < 0.4f)
+        {
+            elapsed += Time.deltaTime;
+            block.transform.position = Vector3.Lerp(start, end, Mathf.SmoothStep(0f, 1f, elapsed / 0.4f));
+            yield return null;
+        }
+
+        block.SetActive(false);
+    }
+
+    private IEnumerator PlayCoreEcho()
+    {
+        SetObjective("三张牌同时留下了痕迹");
+        Vector3 point = finaleCore != null ? finaleCore.transform.position : new Vector3(52.15f, 1.05f, 0f);
+        yield return ShowEchoBeat(point, new Color(1f, 0.82f, 0.28f, 0.9f), "愚者拉开距离");
+        yield return ShowEchoBeat(point, new Color(0.45f, 0.82f, 1f, 0.9f), "战车冲到核心");
+        yield return ShowEchoBeat(point, new Color(1f, 0.35f, 0.18f, 0.9f), "力量震碎核心");
+        if (finaleCore != null)
+            finaleCore.gameObject.SetActive(false);
+        Complete();
+    }
+
+    private IEnumerator ShowEchoBeat(Vector3 point, Color color, string caption)
+    {
+        GameObject beat = new GameObject("CoreEcho");
+        beat.transform.SetParent(root, false);
+        beat.transform.position = point;
+        beat.transform.localScale = new Vector3(0.4f, 0.4f, 1f);
+        SpriteRenderer sprite = beat.AddComponent<SpriteRenderer>();
+        sprite.sprite = PixelSprite();
+        sprite.color = color;
+        sprite.sortingLayerName = "Player";
+        sprite.sortingOrder = 20;
+        Text label = Sign("EchoCaption", beat.transform, point + Vector3.up * 1.4f, caption, 280f);
+        label.color = color;
+        float elapsed = 0f;
+        while (elapsed < 0.55f)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / 0.55f);
+            beat.transform.localScale = Vector3.Lerp(new Vector3(0.4f, 0.4f, 1f), new Vector3(2.4f, 2.4f, 1f), t);
+            Color faded = color;
+            faded.a = 0.9f * (1f - t);
+            sprite.color = faded;
+            yield return null;
+        }
+
+        Destroy(beat);
+    }
+
     private void OnEchoFoolDied()
     {
         echoFoolDone = true;
         RefreshEchoMarks();
-        TryFinishEcho();
     }
 
     private void OnEchoLaneDied()
@@ -404,7 +552,6 @@ public class FirstLevel : MonoBehaviour
 
         echoChariotDone = true;
         RefreshEchoMarks();
-        TryFinishEcho();
     }
 
     private void OnEchoClusterDied()
@@ -414,7 +561,6 @@ public class FirstLevel : MonoBehaviour
 
         echoStrengthDone = true;
         RefreshEchoMarks();
-        TryFinishEcho();
     }
 
     private static bool GroupDead(BasicEnemy[] group)
@@ -445,14 +591,6 @@ public class FirstLevel : MonoBehaviour
 
         mark.text = done ? "完成" : "未完成";
         mark.color = done ? new Color(1f, 0.86f, 0.35f, 1f) : new Color(0.75f, 0.75f, 0.75f, 1f);
-    }
-
-    private void TryFinishEcho()
-    {
-        if (cleared || !echoFoolDone || !echoChariotDone || !echoStrengthDone)
-            return;
-
-        Complete();
     }
 
     private void BuildReachGate(int ground, MonsterCardData fool)
@@ -842,28 +980,40 @@ public class FirstLevel : MonoBehaviour
 
     private void RefreshChariotObjective()
     {
-        if (cleared || (echoFoolDone && echoChariotDone && echoStrengthDone))
+        if (cleared || finaleEnding)
         {
-            SetObjective("三张牌都试过了");
+            SetObjective("三张牌一起合上了核心");
+            return;
+        }
+
+        float x = player != null ? player.transform.position.x : 0f;
+        if (x > 33f || finaleFoolBroken)
+        {
+            if (!finaleFoolBroken)
+                SetObjective("换上愚者，鼠标左键打过栏杆，打断第一印");
+            else if (!finaleLaneClear)
+                SetObjective("换上战车，左 Shift 冲刺穿过，靠近核心");
+            else
+                SetObjective("换上力量，跳起后鼠标左键，砸碎核心");
             return;
         }
 
         if (loadout == null || loadout.EquippedCard == null)
         {
-            SetObjective("触碰印记换牌。一次只装一张");
+            SetObjective("左边试单牌。往右按印记换牌，收束核心");
             return;
         }
 
         switch (loadout.EquippedCard.effectType)
         {
             case CardEffectType.FoolLunge:
-                SetObjective(echoFoolDone ? "愚者已完成，去换另一张" : "站上栏杆前，鼠标左键打过栏杆");
+                SetObjective(echoFoolDone ? "愚者已完成。往右打第一印" : "站上栏杆前，鼠标左键打过栏杆");
                 return;
             case CardEffectType.ChariotDash:
-                SetObjective(echoChariotDone ? "战车已完成，去换另一张" : "左 Shift 冲刺穿过列兵");
+                SetObjective(echoChariotDone ? "战车已完成。往右冲向核心" : "左 Shift 冲刺穿过列兵");
                 return;
             case CardEffectType.StrengthSlam:
-                SetObjective(echoStrengthDone ? "力量已完成，去换另一张" : "从台上跳起，鼠标左键坠地");
+                SetObjective(echoStrengthDone ? "力量已完成。往右砸碎核心" : "从台上跳起，鼠标左键坠地");
                 return;
         }
 
@@ -1099,7 +1249,13 @@ public class FirstLevel : MonoBehaviour
             CreateChoice(endPanel.transform, "继续试玩当前关卡", new Vector2(0f, -102f), ContinueLevel);
             CreateChoice(endPanel.transform, "选择关卡", new Vector2(0f, -188f), GameFlow.LoadLevelSelect);
             if (foolTrial)
-                CreateChoice(endPanel.transform, "牌之回响", new Vector2(0f, -274f), GameFlow.LoadChariotTrial);
+            {
+                CreateChoice(endPanel.transform, "额外试炼：牌之回响", new Vector2(0f, -274f), GameFlow.LoadChariotTrial, 460f);
+                Text echoNote = CreateUiText(endPanel.transform, "EchoNote", 22, TextAnchor.MiddleCenter, new Color(0.9f, 0.86f, 0.75f, 1f));
+                echoNote.text = "约 1 分钟，切换体验三张牌";
+                echoNote.rectTransform.anchoredPosition = new Vector2(0f, -332f);
+                echoNote.rectTransform.sizeDelta = new Vector2(520f, 36f);
+            }
         }
         endPanel.SetActive(false);
     }
@@ -1166,7 +1322,7 @@ public class FirstLevel : MonoBehaviour
         Complete();
     }
 
-    private void CreateChoice(Transform parent, string label, Vector2 position, UnityEngine.Events.UnityAction onClick)
+    private void CreateChoice(Transform parent, string label, Vector2 position, UnityEngine.Events.UnityAction onClick, float width = 360f)
     {
         GameObject buttonObject = new GameObject(label);
         buttonObject.transform.SetParent(parent, false);
@@ -1178,7 +1334,7 @@ public class FirstLevel : MonoBehaviour
         button.targetGraphic = image;
         button.onClick.AddListener(onClick);
         RectTransform rect = buttonObject.GetComponent<RectTransform>();
-        rect.sizeDelta = new Vector2(360f, 64f);
+        rect.sizeDelta = new Vector2(width, 64f);
         rect.anchoredPosition = position;
         Text text = CreateUiText(buttonObject.transform, "Label", 26, TextAnchor.MiddleCenter, Color.white);
         text.text = label;
@@ -1371,6 +1527,37 @@ public class LevelExit : MonoBehaviour
             return;
 
         used = true;
+    }
+}
+
+public class FinaleTarget : MonoBehaviour, IDamageable
+{
+    private int health = 1;
+    private bool broken;
+    private UnityEngine.Events.UnityAction brokenCallback;
+
+    public void Arm(int amount, UnityEngine.Events.UnityAction onBroken)
+    {
+        health = Mathf.Max(1, amount);
+        brokenCallback = onBroken;
+    }
+
+    public void TakeDamage(int amount, Vector2 hitFrom)
+    {
+        if (broken || amount <= 0)
+            return;
+
+        health -= amount;
+        if (health > 0)
+            return;
+
+        broken = true;
+        Collider2D body = GetComponent<Collider2D>();
+        if (body != null)
+            body.enabled = false;
+        AttackFeedback.Thud(transform.position);
+        if (brokenCallback != null)
+            brokenCallback.Invoke();
     }
 }
 
