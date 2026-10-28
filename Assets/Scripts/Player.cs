@@ -158,7 +158,7 @@ public class Player : MonoBehaviour
         input.Enable();
 
         //当Movement输入发生时,更新moveInput
-        //Movement:方向键   performed:输入正在发生   ctx:输入信息  ReadValue<Vector2>():读取输入值
+        //Movement 绑定的是 WASD。performed 表示这一帧有方向输入。
         input.Player.Movement.performed += ctx => moveInput = ctx.ReadValue<Vector2>() ;
         //canceled代表输入结束  moveInput = Vector2.zero：没有方向输入了
         input.Player.Movement.canceled += ctx => moveInput = Vector2.zero;

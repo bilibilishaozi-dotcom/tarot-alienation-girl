@@ -102,7 +102,7 @@ public class CardPossession : MonoBehaviour
     {
         GameObject token = new GameObject("PossessionCard");
         SpriteRenderer sprite = token.AddComponent<SpriteRenderer>();
-        sprite.sprite = TokenSprite();
+        sprite.sprite = RuntimeSprite.Pixel;
         sprite.color = Tint(card);
         sprite.sortingLayerName = "Player";
         sprite.sortingOrder = 30;
@@ -127,21 +127,4 @@ public class CardPossession : MonoBehaviour
         return image;
     }
 
-    private static Sprite token;
-
-    private static Sprite TokenSprite()
-    {
-        if (token != null)
-            return token;
-
-        Texture2D texture = new Texture2D(4, 4);
-        Color[] pixels = new Color[16];
-        for (int i = 0; i < pixels.Length; i++)
-            pixels[i] = Color.white;
-        texture.SetPixels(pixels);
-        texture.filterMode = FilterMode.Point;
-        texture.Apply();
-        token = Sprite.Create(texture, new Rect(0f, 0f, 4f, 4f), new Vector2(0.5f, 0.5f), 4f);
-        return token;
-    }
 }

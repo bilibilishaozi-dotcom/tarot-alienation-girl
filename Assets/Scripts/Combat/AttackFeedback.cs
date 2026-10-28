@@ -7,7 +7,6 @@ public static class AttackFeedback
     private static AudioClip hitLight;
     private static AudioClip hitHeavy;
     private static AudioClip thud;
-    private static Sprite pixel;
 
     public static void Swing(Bounds bounds, int facing, bool empowered)
     {
@@ -63,7 +62,7 @@ public static class AttackFeedback
         fx.transform.localScale = scale;
         fx.transform.rotation = Quaternion.Euler(0f, 0f, angle);
         SpriteRenderer sprite = fx.AddComponent<SpriteRenderer>();
-        sprite.sprite = PixelSprite();
+        sprite.sprite = RuntimeSprite.Pixel;
         sprite.color = color;
         sprite.sortingLayerName = "Player";
         sprite.sortingOrder = order;
@@ -96,22 +95,6 @@ public static class AttackFeedback
         uint x = (uint)(i * 374761393 + 668265263);
         x = (x ^ (x >> 13)) * 1274126177u;
         return ((x & 65535) / 32767.5f) - 1f;
-    }
-
-    private static Sprite PixelSprite()
-    {
-        if (pixel != null)
-            return pixel;
-
-        Texture2D texture = new Texture2D(4, 4);
-        Color[] pixels = new Color[16];
-        for (int i = 0; i < pixels.Length; i++)
-            pixels[i] = Color.white;
-        texture.SetPixels(pixels);
-        texture.filterMode = FilterMode.Point;
-        texture.Apply();
-        pixel = Sprite.Create(texture, new Rect(0f, 0f, 4f, 4f), new Vector2(0.5f, 0.5f), 4f);
-        return pixel;
     }
 }
 

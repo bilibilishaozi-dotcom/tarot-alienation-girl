@@ -102,7 +102,7 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
         bodyCollider = GetComponent<Collider2D>();
         baseScale = transform.localScale;
         if (spriteRenderer.sprite == null)
-            spriteRenderer.sprite = PixelSprite();
+            spriteRenderer.sprite = RuntimeSprite.Pixel;
         spriteRenderer.color = bodyColor;
 
         Rigidbody2D body = GetComponent<Rigidbody2D>();
@@ -621,7 +621,7 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
         GameObject obj = new GameObject(name);
         obj.transform.SetParent(parent, false);
         SpriteRenderer sprite = obj.AddComponent<SpriteRenderer>();
-        sprite.sprite = PixelSprite();
+        sprite.sprite = RuntimeSprite.Pixel;
         sprite.sortingLayerName = sortingLayer;
         sprite.sortingOrder = sortingOrder;
         sprite.enabled = false;
@@ -681,23 +681,4 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
         Debug.LogWarning(message);
     }
 
-    private static Sprite pixel;
-
-    private static Sprite PixelSprite()
-    {
-        if (pixel != null)
-            return pixel;
-
-        Texture2D texture = new Texture2D(4, 4);
-        texture.hideFlags = HideFlags.HideAndDontSave;
-        Color[] pixels = new Color[16];
-        for (int i = 0; i < pixels.Length; i++)
-            pixels[i] = Color.white;
-        texture.SetPixels(pixels);
-        texture.filterMode = FilterMode.Point;
-        texture.Apply();
-        pixel = Sprite.Create(texture, new Rect(0f, 0f, 4f, 4f), new Vector2(0.5f, 0.5f), 4f);
-        pixel.hideFlags = HideFlags.HideAndDontSave;
-        return pixel;
-    }
 }
