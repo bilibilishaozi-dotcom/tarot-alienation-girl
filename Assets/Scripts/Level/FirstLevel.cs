@@ -20,6 +20,8 @@ public class FirstLevel : MonoBehaviour
     private GameObject basicSeal;
     private bool basicExitOpen;
     private bool foolTrial;
+    private bool chariotTrial;
+    private bool chariotLaneOpen;
     private Text objectiveText;
     private Text bossNameSign;
     private CardSelectUI cardUi;
@@ -44,6 +46,7 @@ public class FirstLevel : MonoBehaviour
     {
         Time.timeScale = 1f;
         foolTrial = GameFlow.ActiveLevelId == LevelCatalog.FoolTrialId;
+        chariotTrial = GameFlow.ActiveLevelId == LevelCatalog.ChariotTrialId;
         player = GetComponent<Player>();
         loadout = GetComponent<PlayerCardLoadout>();
         cardUi = GetComponent<CardSelectUI>();
@@ -127,6 +130,8 @@ public class FirstLevel : MonoBehaviour
 
         if (foolTrial)
             BuildFoolTrial(ground);
+        else if (chariotTrial)
+            BuildChariotTrial(ground);
         else
             BuildBasicCombat(ground);
     }
@@ -134,9 +139,9 @@ public class FirstLevel : MonoBehaviour
     private void BuildBasicCombat(int ground)
     {
         const float floorTop = 0f;
-        Solid("Floor", new Vector2(13f, floorTop - 1f), new Vector2(28.4f, 2f), new Color(0.31f, 0.27f, 0.23f), ground, 0);
+        Solid("Floor", new Vector2(14.9f, floorTop - 1f), new Vector2(32.2f, 2f), new Color(0.31f, 0.27f, 0.23f), ground, 0);
         Solid("LeftWall", new Vector2(-1.7f, 3.2f), new Vector2(0.7f, 6.4f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
-        Solid("RightWall", new Vector2(27.6f, 3.2f), new Vector2(0.7f, 6.4f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
+        Solid("RightWall", new Vector2(31.7f, 3.4f), new Vector2(0.7f, 6.8f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
 
         // 两座薄平台。哨兵只在台面上巡逻，追击和受击也不会走下边缘。
         const float deckTop = 1.7f;
@@ -144,6 +149,8 @@ public class FirstLevel : MonoBehaviour
         float deckCenterY = deckTop - deckThickness * 0.5f;
         Solid("PlatformA", new Vector2(5.8f, deckCenterY), new Vector2(4.8f, deckThickness), new Color(0.46f, 0.38f, 0.29f), ground, 1);
         Solid("PlatformB", new Vector2(12f, deckCenterY), new Vector2(4.8f, deckThickness), new Color(0.46f, 0.38f, 0.29f), ground, 1);
+        Sign("AttackSign", root, new Vector3(5.8f, 2.65f, 0f), "鼠标左键", 180f);
+        Sign("DashSign", root, new Vector3(12f, 2.65f, 0f), "左 Shift 躲开", 220f);
 
         // 低台大约 0.62 高。跳跃攻击的刀光贴近身体，离开低台、面向右侧敌人时按鼠标左键能打到。
         const float lipTop = 0.62f;
@@ -156,11 +163,16 @@ public class FirstLevel : MonoBehaviour
         arena = new BasicEnemy[3];
         arena[0] = SpawnLeashed("SentryA", 5.8f, deckTop + feetLift, "哨兵甲", new Color(0.72f, 0.28f, 0.22f), 4f, 7.6f, ground);
         arena[1] = SpawnLeashed("SentryB", 12f, deckTop + feetLift, "哨兵乙", new Color(0.28f, 0.38f, 0.72f), 10.2f, 13.8f, ground);
+        arena[1].SetAsCharger();
         arena[2] = SpawnLeashed("LowEnemy", 20.6f, plinthTop + feetLift, "低处敌人", new Color(0.62f, 0.28f, 0.78f), 20.25f, 20.95f, ground);
 
-        basicSeal = Solid("ExitSeal", new Vector2(24.2f, 1.7f), new Vector2(0.7f, 3.4f), new Color(0.45f, 0.2f, 0.22f), ground, 3);
-        Sign("ExitLabel", root, new Vector3(24.2f, 3.7f, 0f), "出口", 140f);
-        CreateBasicExit(26f);
+        // 普通跳约 2.46，蹬墙跳在贴墙后再抬约 2.10。柱底 2.40 让人能走过去，台面 3.40 让普通跳和冲刺都上不去。
+        basicSeal = Solid("ExitSeal", new Vector2(22.35f, 1.55f), new Vector2(0.55f, 3.1f), new Color(0.45f, 0.2f, 0.22f), ground, 3);
+        Solid("ClimbPillar", new Vector2(23.7f, 4.25f), new Vector2(0.7f, 3.7f), new Color(0.62f, 0.66f, 0.72f), ground, 2);
+        Solid("HighLedge", new Vector2(27.85f, 1.7f), new Vector2(4.9f, 3.4f), new Color(0.38f, 0.32f, 0.28f), ground, 1);
+        Sign("WallJumpSign", root, new Vector3(24.7f, 1.45f, 0f), "蹬墙跳", 160f);
+        Sign("ExitLabel", root, new Vector3(29.2f, 4.55f, 0f), "出口", 140f);
+        CreateBasicExit(29.2f, 4.7f);
     }
 
     private BasicEnemy SpawnLeashed(string objectName, float x, float y, string displayName, Color color, float minX, float maxX, int ground)
@@ -173,11 +185,11 @@ public class FirstLevel : MonoBehaviour
         return enemy;
     }
 
-    private void CreateBasicExit(float x)
+    private void CreateBasicExit(float x, float y)
     {
         GameObject exit = new GameObject("LevelExit");
         exit.transform.SetParent(root, false);
-        exit.transform.position = new Vector3(x, 1.2f, 0f);
+        exit.transform.position = new Vector3(x, y, 0f);
         BoxCollider2D trigger = exit.AddComponent<BoxCollider2D>();
         trigger.isTrigger = true;
         trigger.size = new Vector2(1.6f, 2.6f);
@@ -195,7 +207,10 @@ public class FirstLevel : MonoBehaviour
                 return;
         }
 
-        OpenBasicExit();
+        if (chariotTrial)
+            Complete();
+        else
+            OpenBasicExit();
     }
 
     private void OpenBasicExit()
@@ -204,16 +219,20 @@ public class FirstLevel : MonoBehaviour
             return;
 
         basicExitOpen = true;
-        if (basicSeal != null)
-        {
-            Collider2D[] blocking = basicSeal.GetComponentsInChildren<Collider2D>();
-            for (int i = 0; i < blocking.Length; i++)
-                blocking[i].enabled = false;
-            AttackFeedback.Thud(basicSeal.transform.position);
-            StartCoroutine(SinkSeal());
-        }
-
+        ReleaseSeal();
         RefreshObjective();
+    }
+
+    private void ReleaseSeal()
+    {
+        if (basicSeal == null)
+            return;
+
+        Collider2D[] blocking = basicSeal.GetComponentsInChildren<Collider2D>();
+        for (int i = 0; i < blocking.Length; i++)
+            blocking[i].enabled = false;
+        AttackFeedback.Thud(basicSeal.transform.position);
+        StartCoroutine(SinkSeal());
     }
 
     private IEnumerator SinkSeal()
@@ -251,6 +270,46 @@ public class FirstLevel : MonoBehaviour
         CreateSprite(root, "CardMat", new Vector3(cardX, 0.16f, 0f), new Vector3(1.5f, 0.1f, 1f), new Color(0.95f, 0.78f, 0.28f, 0.9f), "Ground", 2);
         CreateExit();
         BuildGuideArrow();
+    }
+
+    private void BuildChariotTrial(int ground)
+    {
+        Solid("Floor", new Vector2(9f, -1f), new Vector2(20f, 2f), new Color(0.31f, 0.27f, 0.23f), ground, 0);
+        Solid("LeftWall", new Vector2(-1.5f, 3f), new Vector2(0.7f, 6f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
+        Solid("RightWall", new Vector2(19.2f, 3f), new Vector2(0.7f, 6f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
+
+        MonsterCardData chariot = Resources.Load<MonsterCardData>("Cards/Chariot");
+        if (chariot == null)
+            Debug.LogWarning("没有找到 Resources/Cards/Chariot，战车试炼无法获得战车牌。");
+        CreateCard(new Vector3(4.2f, 1.35f, 0f), chariot);
+
+        basicSeal = Solid("LaneSeal", new Vector2(7.6f, 1.6f), new Vector2(0.55f, 3.2f), new Color(0.25f, 0.45f, 0.62f), ground, 3);
+        Sign("DashThrough", root, new Vector3(12f, 2.55f, 0f), "冲过去", 180f);
+
+        arena = new BasicEnemy[3];
+        arena[0] = SpawnLane("LaneA", 9.6f, "列兵甲", new Color(0.25f, 0.55f, 0.72f), ground);
+        arena[1] = SpawnLane("LaneB", 11f, "列兵乙", new Color(0.2f, 0.42f, 0.68f), ground);
+        arena[2] = SpawnLane("LaneC", 12.4f, "列兵丙", new Color(0.16f, 0.32f, 0.58f), ground);
+    }
+
+    private BasicEnemy SpawnLane(string objectName, float x, string displayName, Color color, int ground)
+    {
+        BasicEnemy enemy = SpawnEnemy(objectName, x, 2, false, displayName, color, "Player", 6);
+        enemy.transform.position = new Vector3(x, 0.92f, 0f);
+        enemy.StayOnPlatform(x - 0.4f, x + 0.4f, 1 << ground);
+        enemy.SetPushable();
+        enemy.Died += OnArenaEnemyDied;
+        return enemy;
+    }
+
+    private void OpenChariotLane()
+    {
+        if (chariotLaneOpen)
+            return;
+
+        chariotLaneOpen = true;
+        ReleaseSeal();
+        RefreshObjective();
     }
 
     private void BuildReachGate(int ground, MonsterCardData fool)
@@ -359,18 +418,22 @@ public class FirstLevel : MonoBehaviour
 
     private void CreateCard(Vector3 position, MonsterCardData card)
     {
-        GameObject pickup = new GameObject("FoolCardPickup");
+        bool chariot = card != null && card.effectType == CardEffectType.ChariotDash;
+        GameObject pickup = new GameObject("CardPickup");
         pickup.transform.SetParent(root, false);
         pickup.transform.position = position;
-        CreateSprite(pickup.transform, "Glow", Vector3.zero, new Vector3(1.55f, 1.85f, 1f), new Color(1f, 0.82f, 0.35f, 0.28f), "Player", 5);
-        CreateSprite(pickup.transform, "Face", Vector3.zero, new Vector3(0.72f, 1.08f, 1f), new Color(0.95f, 0.76f, 0.28f), "Player", 6);
+        Color glow = chariot ? new Color(0.45f, 0.75f, 1f, 0.28f) : new Color(1f, 0.82f, 0.35f, 0.28f);
+        Color face = chariot ? new Color(0.45f, 0.78f, 0.95f) : new Color(0.95f, 0.76f, 0.28f);
+        CreateSprite(pickup.transform, "Glow", Vector3.zero, new Vector3(1.55f, 1.85f, 1f), glow, "Player", 5);
+        CreateSprite(pickup.transform, "Face", Vector3.zero, new Vector3(0.72f, 1.08f, 1f), face, "Player", 6);
         CreateSprite(pickup.transform, "Mark", new Vector3(0f, 0.06f, 0f), new Vector3(0.36f, 0.48f, 1f), new Color(0.42f, 0.16f, 0.58f), "Player", 7);
 
         BoxCollider2D trigger = pickup.AddComponent<BoxCollider2D>();
         trigger.isTrigger = true;
         trigger.size = new Vector2(1.5f, 1.9f);
         pickup.AddComponent<CardPickup>().Arm(card);
-        Sign("CardLabel", pickup.transform, position + Vector3.up * 1.15f, "愚者", 160f);
+        string label = card != null && !string.IsNullOrEmpty(card.displayName) ? card.displayName : "牌";
+        Sign("CardLabel", pickup.transform, position + Vector3.up * 1.15f, label, 160f);
     }
 
     private void CreateExit()
@@ -517,7 +580,7 @@ public class FirstLevel : MonoBehaviour
         barRect.sizeDelta = new Vector2(820f, 96f);
 
         Text title = CreateUiText(bar.transform, "Title", 30, TextAnchor.UpperCenter, new Color(1f, 0.9f, 0.62f));
-        title.text = foolTrial ? "愚者牌试用" : "第一关  基础战斗";
+        title.text = chariotTrial ? "牌之回响  战车" : foolTrial ? "愚者牌试用" : "第一关  基础战斗";
         StretchTop(title.rectTransform, -8f, 40f);
 
         objectiveText = CreateUiText(bar.transform, "Objective", 26, TextAnchor.UpperCenter, Color.white);
@@ -528,6 +591,12 @@ public class FirstLevel : MonoBehaviour
     {
         if (objectiveText == null)
             return;
+
+        if (chariotTrial)
+        {
+            RefreshChariotObjective();
+            return;
+        }
 
         if (!foolTrial)
         {
@@ -588,13 +657,19 @@ public class FirstLevel : MonoBehaviour
 
     private void RefreshBasicObjective()
     {
-        if (basicExitOpen)
+        float x = player != null ? player.transform.position.x : 0f;
+        if (basicExitOpen && x > 26.5f)
         {
             SetObjective("走进出口，进入愚者牌试用");
             return;
         }
 
-        float x = player != null ? player.transform.position.x : 0f;
+        if (basicExitOpen)
+        {
+            SetObjective("贴灰柱按住 A，空格蹬出后松开 A");
+            return;
+        }
+
         if (x < 3f)
         {
             SetObjective("WASD 移动，空格跳跃，左 Shift 冲刺");
@@ -607,13 +682,54 @@ public class FirstLevel : MonoBehaviour
             return;
         }
 
+        if (ArenaAlive(1) && x > 8.4f)
+        {
+            SetObjective("哨兵挥刀前，左 Shift 冲刺躲开");
+            return;
+        }
+
         if (ArenaAlive(0) || ArenaAlive(1))
         {
             SetObjective("跳上平台，鼠标左键攻击哨兵");
             return;
         }
 
-        SetObjective("鼠标左键攻击。三个敌人都倒下后出口开启");
+        SetObjective("三个敌人都倒下后，再去蹬墙跳");
+    }
+
+    private void RefreshChariotObjective()
+    {
+        if (cleared)
+        {
+            SetObjective("战车试炼完成");
+            return;
+        }
+
+        if (loadout != null && loadout.PendingCard != null)
+        {
+            SetObjective("J 或回车装备战车");
+            return;
+        }
+
+        if (!ChariotEquipped)
+        {
+            SetObjective("拾取战车。冲刺会拖出另一具自己");
+            return;
+        }
+
+        if (!chariotLaneOpen)
+        {
+            SetObjective("装备之后，左 Shift 冲刺穿过他们");
+            return;
+        }
+
+        if (ArenaAlive(0) || ArenaAlive(1) || ArenaAlive(2))
+        {
+            SetObjective("左 Shift 冲刺穿过。影子会补上一刀");
+            return;
+        }
+
+        SetObjective("战车试炼完成");
     }
 
     private bool ArenaAlive(int index)
@@ -651,6 +767,14 @@ public class FirstLevel : MonoBehaviour
 
     private void UpdateLesson()
     {
+        if (chariotTrial)
+        {
+            if (!chariotLaneOpen && ChariotEquipped)
+                OpenChariotLane();
+            RefreshObjective();
+            return;
+        }
+
         bool fool = FoolEquipped;
         if (boss != null)
             boss.SetFoolReady(fool);
@@ -810,7 +934,7 @@ public class FirstLevel : MonoBehaviour
         Image endImage = endPanel.AddComponent<Image>();
         endImage.color = new Color(0.07f, 0.05f, 0.09f, 0.94f);
         RectTransform endRect = endPanel.GetComponent<RectTransform>();
-        endRect.sizeDelta = new Vector2(640f, 640f);
+        endRect.sizeDelta = chariotTrial ? new Vector2(640f, 480f) : new Vector2(640f, foolTrial ? 760f : 640f);
         Sprite panelSkin = UiArt.Load(UiArt.Panel);
         if (panelSkin != null)
         {
@@ -819,17 +943,28 @@ public class FirstLevel : MonoBehaviour
         }
 
         Text endTitle = CreateUiText(endPanel.transform, "Title", 40, TextAnchor.UpperCenter, new Color(1f, 0.88f, 0.55f));
-        endTitle.text = "愚者牌试用完成";
+        endTitle.text = chariotTrial ? "战车试炼完成" : "愚者牌试用完成";
         StretchTop(endTitle.rectTransform, -28f, 56f);
 
         Text ending = CreateUiText(endPanel.transform, "Ending", 26, TextAnchor.UpperCenter, new Color(1f, 0.94f, 0.82f));
-        ending.text = ChapterLine;
-        StretchTop(ending.rectTransform, -96f, 100f);
+        ending.text = chariotTrial ? "冲刺拖出了另一具自己。" : ChapterLine;
+        StretchTop(ending.rectTransform, -96f, chariotTrial ? 72f : 100f);
 
-        CreateChoice(endPanel.transform, "重玩本关", new Vector2(0f, 28f), ReplayLevel);
-        CreateChoice(endPanel.transform, "返回标题", new Vector2(0f, -58f), GameFlow.LoadTitle);
-        CreateChoice(endPanel.transform, "继续试玩当前关卡", new Vector2(0f, -144f), ContinueLevel);
-        CreateChoice(endPanel.transform, "选择关卡", new Vector2(0f, -230f), GameFlow.LoadLevelSelect);
+        if (chariotTrial)
+        {
+            CreateChoice(endPanel.transform, "再试一次", new Vector2(0f, 20f), ReplayLevel);
+            CreateChoice(endPanel.transform, "返回标题", new Vector2(0f, -70f), GameFlow.LoadTitle);
+            CreateChoice(endPanel.transform, "选择关卡", new Vector2(0f, -160f), GameFlow.LoadLevelSelect);
+        }
+        else
+        {
+            CreateChoice(endPanel.transform, "重玩本关", new Vector2(0f, 70f), ReplayLevel);
+            CreateChoice(endPanel.transform, "返回标题", new Vector2(0f, -16f), GameFlow.LoadTitle);
+            CreateChoice(endPanel.transform, "继续试玩当前关卡", new Vector2(0f, -102f), ContinueLevel);
+            CreateChoice(endPanel.transform, "选择关卡", new Vector2(0f, -188f), GameFlow.LoadLevelSelect);
+            if (foolTrial)
+                CreateChoice(endPanel.transform, "牌之回响", new Vector2(0f, -274f), GameFlow.LoadChariotTrial);
+        }
         endPanel.SetActive(false);
     }
 
@@ -932,6 +1067,11 @@ public class FirstLevel : MonoBehaviour
         loadout != null &&
         loadout.EquippedCard != null &&
         loadout.EquippedCard.effectType == CardEffectType.FoolLunge;
+
+    private bool ChariotEquipped =>
+        loadout != null &&
+        loadout.EquippedCard != null &&
+        loadout.EquippedCard.effectType == CardEffectType.ChariotDash;
 
     private void DisableLegacyGround()
     {

@@ -78,6 +78,8 @@ public class Player : MonoBehaviour
     public int CurrentAttackDamage => Mathf.Max(1, Mathf.RoundToInt(baseAttackDamage * (cardLoadout != null ? cardLoadout.DamageMultiplier : 1f)));
     public float AttackLungeMultiplier => cardLoadout != null ? cardLoadout.LungeMultiplier : 1f;
     public float AttackReachMultiplier => cardLoadout != null ? cardLoadout.ReachMultiplier : 1f;
+    public bool HasChariot => cardLoadout != null && cardLoadout.IsChariotEquipped;
+    public int ChariotEchoDamage => HasChariot ? Mathf.Max(1, cardLoadout.EquippedCard.echoDamage) : 0;
 
     public float AttackFrontReach(float reachMultiplier)
     {

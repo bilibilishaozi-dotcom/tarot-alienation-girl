@@ -26,6 +26,7 @@ public class PlayerCardLoadout : MonoBehaviour
     public float ReachMultiplier => IsFoolEquipped ? EquippedCard.reachMultiplier : 1f;
 
     private bool IsFoolEquipped => EquippedCard != null && EquippedCard.effectType == CardEffectType.FoolLunge;
+    public bool IsChariotEquipped => EquippedCard != null && EquippedCard.effectType == CardEffectType.ChariotDash;
 
     public void EquipPending()
     {

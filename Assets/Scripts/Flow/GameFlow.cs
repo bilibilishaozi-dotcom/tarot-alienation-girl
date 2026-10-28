@@ -51,6 +51,19 @@ public static class GameFlow
         return ActiveLevelId == LevelCatalog.FoolTrialId;
     }
 
+    public static bool LoadChariotTrial()
+    {
+        LevelSlot slot = LevelCatalog.Find(LevelCatalog.ChariotTrialId);
+        if (slot == null)
+        {
+            Debug.LogWarning("关卡目录里没有可进入的战车试炼。");
+            return false;
+        }
+
+        LoadLevel(slot);
+        return ActiveLevelId == LevelCatalog.ChariotTrialId;
+    }
+
     public static void ReloadActiveScene()
     {
         if (reloadFrame == Time.frameCount)

@@ -163,6 +163,20 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
         chaseSpeed = 1.8f;
     }
 
+    public void SetAsCharger()
+    {
+        noticeRange = 3.6f;
+        chaseSpeed = 2.6f;
+        attackRange = 1.2f;
+        windupDuration = 0.82f;
+    }
+
+    public void SetPushable()
+    {
+        if (rb != null)
+            rb.mass = 0.3f;
+    }
+
     public void StayOnPlatform(float minX, float maxX, LayerMask ground)
     {
         platformLock = true;

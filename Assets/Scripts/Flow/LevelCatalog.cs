@@ -6,6 +6,7 @@ public class LevelCatalog : ScriptableObject
 {
     public const string BasicCombatId = "basic";
     public const string FoolTrialId = "fool";
+    public const string ChariotTrialId = "chariot";
 
     public LevelSlot[] levels;
 
@@ -50,7 +51,8 @@ public class LevelCatalog : ScriptableObject
     private static LevelSlot[] Fallback => new[]
     {
         new LevelSlot { displayName = "第一关  基础战斗", sceneName = "SampleScene", levelId = BasicCombatId, available = true },
-        new LevelSlot { displayName = "愚者牌试用", sceneName = "SampleScene", levelId = FoolTrialId, available = true }
+        new LevelSlot { displayName = "愚者牌试用", sceneName = "SampleScene", levelId = FoolTrialId, available = true },
+        new LevelSlot { displayName = "牌之回响  战车", sceneName = "SampleScene", levelId = ChariotTrialId, available = true }
     };
 }
 

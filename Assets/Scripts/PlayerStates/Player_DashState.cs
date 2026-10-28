@@ -5,6 +5,7 @@ public class Player_DashState : EntityState
 
     private float originalGravtiyScale;
     private int dashDir;
+    private ChariotEcho echo;
     public Player_DashState(Player player, StateMachine stateMachine, string animBoolName) : base(player, stateMachine, animBoolName)
     {
     }
@@ -19,6 +20,8 @@ public class Player_DashState : EntityState
         originalGravtiyScale = rb.gravityScale;
         rb.gravityScale = 0;
         player.BeginDodge();
+        if (player.HasChariot)
+            echo = ChariotEcho.Spawn(player, dashDir);
     }
 
     public override void Update()
@@ -36,6 +39,8 @@ public class Player_DashState : EntityState
         }
 
         player.SetVelocity(player.dashSpeed * dashDir, 0);
+        if (echo != null)
+            echo.Tick(dashDir);
 
         if (stateTimer < 0)
             StopDash();
@@ -47,6 +52,11 @@ public class Player_DashState : EntityState
         player.SetVelocity(0, 0);
         rb.gravityScale = originalGravtiyScale;
         player.EndDodge();
+        if (echo != null)
+        {
+            echo.End();
+            echo = null;
+        }
     }
 
     private void UpdateDashDirection()
