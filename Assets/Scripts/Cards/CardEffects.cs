@@ -148,27 +148,10 @@ public class StrengthClawVisual : MonoBehaviour
         piece.transform.localPosition = localPosition;
         piece.transform.localScale = localScale;
         SpriteRenderer sprite = piece.AddComponent<SpriteRenderer>();
-        sprite.sprite = WhiteSprite();
+        sprite.sprite = RuntimeSprite.Pixel;
         sprite.color = color;
         sprite.sortingLayerName = "Player";
         sprite.sortingOrder = order;
     }
 
-    private static Sprite white;
-
-    private static Sprite WhiteSprite()
-    {
-        if (white != null)
-            return white;
-
-        Texture2D texture = new Texture2D(4, 4);
-        Color[] pixels = new Color[16];
-        for (int i = 0; i < pixels.Length; i++)
-            pixels[i] = Color.white;
-        texture.SetPixels(pixels);
-        texture.filterMode = FilterMode.Point;
-        texture.Apply();
-        white = Sprite.Create(texture, new Rect(0f, 0f, 4f, 4f), new Vector2(0.5f, 0.5f), 4f);
-        return white;
-    }
 }

@@ -54,30 +54,13 @@ public static class StrengthSlam
         wave.transform.position = new Vector3(center.x, center.y, 0f);
         wave.transform.localScale = new Vector3(size.x * facing, size.y, 1f);
         SpriteRenderer sprite = wave.AddComponent<SpriteRenderer>();
-        sprite.sprite = White();
+        sprite.sprite = RuntimeSprite.Pixel;
         sprite.color = new Color(1f, 0.42f, 0.18f, 0.8f);
         sprite.sortingLayerName = "Player";
         sprite.sortingOrder = 12;
         wave.AddComponent<StrengthWaveFade>();
     }
 
-    private static Sprite white;
-
-    private static Sprite White()
-    {
-        if (white != null)
-            return white;
-
-        Texture2D texture = new Texture2D(4, 4);
-        Color[] pixels = new Color[16];
-        for (int i = 0; i < pixels.Length; i++)
-            pixels[i] = Color.white;
-        texture.SetPixels(pixels);
-        texture.filterMode = FilterMode.Point;
-        texture.Apply();
-        white = Sprite.Create(texture, new Rect(0f, 0f, 4f, 4f), new Vector2(0.5f, 0.5f), 4f);
-        return white;
-    }
 }
 
 public class StrengthWaveFade : MonoBehaviour

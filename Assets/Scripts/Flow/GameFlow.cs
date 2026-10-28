@@ -40,28 +40,25 @@ public static class GameFlow
 
     public static bool LoadFoolTrial()
     {
-        LevelSlot slot = LevelCatalog.Find(LevelCatalog.FoolTrialId);
-        if (slot == null)
-        {
-            Debug.LogWarning("关卡目录里没有可进入的愚者牌试用关。");
-            return false;
-        }
-
-        LoadLevel(slot);
-        return ActiveLevelId == LevelCatalog.FoolTrialId;
+        return LoadCatalogLevel(LevelCatalog.FoolTrialId, "关卡目录里没有可进入的愚者牌试用关。");
     }
 
     public static bool LoadChariotTrial()
     {
-        LevelSlot slot = LevelCatalog.Find(LevelCatalog.ChariotTrialId);
+        return LoadCatalogLevel(LevelCatalog.ChariotTrialId, "关卡目录里没有可进入的战车试炼。");
+    }
+
+    private static bool LoadCatalogLevel(string levelId, string missingMessage)
+    {
+        LevelSlot slot = LevelCatalog.Find(levelId);
         if (slot == null)
         {
-            Debug.LogWarning("关卡目录里没有可进入的战车试炼。");
+            Debug.LogWarning(missingMessage);
             return false;
         }
 
         LoadLevel(slot);
-        return ActiveLevelId == LevelCatalog.ChariotTrialId;
+        return ActiveLevelId == levelId;
     }
 
     public static void ReloadActiveScene()

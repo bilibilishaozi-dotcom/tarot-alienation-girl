@@ -1,0 +1,298 @@
+using System.Collections;
+using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.UI;
+
+// 愚者牌试用：拾取、栏杆距离、裂隙守卫和章节结尾。
+public partial class FirstLevel
+{
+    private void BuildFoolTrial(int ground)
+    {
+        Solid("Floor", new Vector2(16.25f, -1f), new Vector2(36.5f, 2f), new Color(0.31f, 0.27f, 0.23f), ground, 0);
+        Solid("LeftWall", new Vector2(-2.35f, 3.75f), new Vector2(0.7f, 7.5f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
+        Solid("RightWall", new Vector2(34.15f, 3f), new Vector2(0.7f, 6f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
+        Solid("Arch", new Vector2(20.4f, 5.5f), new Vector2(0.75f, 3.8f), new Color(0.2f, 0.17f, 0.16f), ground, 1);
+
+        MonsterCardData fool = Resources.Load<MonsterCardData>("Cards/Fool");
+        if (fool == null)
+            Debug.LogWarning("没有找到 Resources/Cards/Fool，愚者牌试用关无法获得愚者牌。");
+        BuildReachGate(ground, fool);
+        CreateCard(new Vector3(cardX, 2.2f, 0f), fool);
+        CreateSprite(root, "CardMat", new Vector3(cardX, 0.16f, 0f), new Vector3(1.5f, 0.1f, 1f), new Color(0.95f, 0.78f, 0.28f, 0.9f), "Ground", 2);
+        CreateExit();
+        BuildGuideArrow();
+    }
+
+    private void BuildReachGate(int ground, MonsterCardData fool)
+    {
+        CapsuleCollider2D body = player.GetComponent<CapsuleCollider2D>();
+        if (body == null)
+            Debug.LogWarning("玩家没有 CapsuleCollider2D，第一关用默认身体尺寸计算攻击距离和 Boss 招式。");
+        float halfBody = body != null ? body.size.x * 0.5f : 0.385f;
+        standCenter = GrateLeft - halfBody - 0.06f;
+        float normalReach = player.AttackFrontReach(1f);
+        float foolReach = fool != null ? fool.reachMultiplier : 2.15f;
+        float normalFront = standCenter + normalReach;
+        float extendedFront = standCenter + player.AttackFrontReach(foolReach);
+        float enemyLeft = Mathf.Lerp(normalFront, extendedFront, 0.38f);
+        // 挥击只覆盖黄线站桩点。突进从这里再向后延伸一段普通攻击距离。
+        float slashMinX = standCenter - 0.08f;
+        float thrustMinX = slashMinX - normalReach;
+        cardX = Mathf.Clamp(thrustMinX - 1.55f, 19.4f, 21.3f);
+
+        GameObject enemyObject = new GameObject("RiftGuardian");
+        enemyObject.transform.SetParent(root, false);
+        enemyObject.transform.localScale = new Vector3(1.35f, 1.62f, 1f);
+        SpriteRenderer enemySprite = enemyObject.AddComponent<SpriteRenderer>();
+        Rigidbody2D enemyBody = enemyObject.AddComponent<Rigidbody2D>();
+        enemyBody.bodyType = RigidbodyType2D.Kinematic;
+        enemyBody.gravityScale = 0f;
+        enemyBody.constraints = RigidbodyConstraints2D.FreezeAll;
+        CapsuleCollider2D capsule = enemyObject.AddComponent<CapsuleCollider2D>();
+        capsule.size = new Vector2(0.8f, 1.5f);
+        capsule.offset = new Vector2(0f, -0.05f);
+        boss = enemyObject.AddComponent<RiftGuardian>();
+        float enemyHalf = capsule.size.x * 0.5f * Mathf.Abs(enemyObject.transform.lossyScale.x);
+        float enemyBottom = capsule.offset.y - capsule.size.y * 0.5f;
+        float enemyCenter = enemyLeft + enemyHalf;
+        enemyObject.transform.position = new Vector3(enemyCenter, 0.04f - enemyObject.transform.localScale.y * enemyBottom, 0f);
+        enemySprite.sortingLayerName = "Ground";
+        enemySprite.sortingOrder = 2;
+        CreateSprite(enemyObject.transform, "Core", new Vector3(0f, 0.2f, 0f), new Vector3(0.34f, 0.42f, 1f), new Color(1f, 0.86f, 0.45f), "Ground", 3);
+        CreateSprite(enemyObject.transform, "Aura", Vector3.zero, new Vector3(1.25f, 1.85f, 1f), new Color(0.9f, 0.24f, 0.18f, 0.33f), "Player", -8);
+        CreateSprite(enemyObject.transform, "HornL", new Vector3(-0.28f, 0.62f, 0f), new Vector3(0.16f, 0.32f, 1f), new Color(0.55f, 0.08f, 0.08f), "Ground", 3);
+        CreateSprite(enemyObject.transform, "HornR", new Vector3(0.28f, 0.62f, 0f), new Vector3(0.16f, 0.32f, 1f), new Color(0.55f, 0.08f, 0.08f), "Ground", 3);
+
+        float playerHeight = body != null ? body.size.y * Mathf.Abs(player.transform.lossyScale.y) : 1.9f;
+        float playerWidth = body != null ? body.size.x * Mathf.Abs(player.transform.lossyScale.x) : 0.77f;
+        boss.Bind(player, 12, "裂隙守卫", slashMinX, GrateLeft, thrustMinX, 0f, FloorTop + playerHeight + 0.22f, playerHeight * 0.4f, Mathf.Max(1.15f, playerWidth * 2.2f));
+        boss.Died += OnBossDefeated;
+
+        float grateWidth = Mathf.Max(2.4f, enemyCenter + enemyHalf + 0.32f - GrateLeft);
+        gate = new GameObject("Grate");
+        gate.layer = ground;
+        gate.transform.SetParent(root, false);
+        gate.transform.position = new Vector3(GrateLeft + grateWidth * 0.5f, GrateHeight * 0.5f, 0f);
+        Rigidbody2D gateBody = gate.AddComponent<Rigidbody2D>();
+        gateBody.bodyType = RigidbodyType2D.Kinematic;
+        gateBody.gravityScale = 0f;
+        gateBody.freezeRotation = true;
+        BuildBars(gate.transform, ground, grateWidth);
+
+        float plateLeft = enemyLeft - player.AttackFrontReach(foolReach);
+        GroundMark("StandPlate", plateLeft, standCenter, 0.1f, 0.16f, new Color(0.95f, 0.72f, 0.22f, 1f), 3);
+        GroundMark("StandLip", standCenter, GrateLeft, 0.16f, 0.1f, new Color(1f, 0.92f, 0.55f, 1f), 4);
+        normalMark = GroundMark("NormalReach", GrateLeft, normalFront, 0.28f, 0.07f, new Color(0.75f, 0.84f, 1f, 0.9f), 3);
+        gapMark = GroundMark("ReachGap", normalFront, enemyLeft, 0.28f, 0.07f, new Color(0.85f, 0.28f, 0.22f, 0.95f), 3);
+        extensionMark = GroundMark("FoolReach", normalFront, extendedFront, 0.4f, 0.11f, new Color(1f, 0.78f, 0.2f, 0.95f), 4);
+        extensionMark.enabled = false;
+
+        bossNameSign = Sign("SentinelLabel", root, new Vector3(enemyCenter, 4.85f, 0f), "裂隙守卫", 240f);
+    }
+
+    private void BuildBars(Transform grate, int ground, float grateWidth)
+    {
+        const float barWidth = 0.24f;
+        int count = 5;
+        float gap = (grateWidth - barWidth * count) / (count - 1);
+        while (gap > 0.48f && count < 8)
+        {
+            count++;
+            gap = (grateWidth - barWidth * count) / (count - 1);
+        }
+
+        for (int i = 0; i < count; i++)
+        {
+            float left = -grateWidth * 0.5f + i * (barWidth + gap);
+            GameObject bar = new GameObject("Bar" + i);
+            bar.layer = ground;
+            bar.transform.SetParent(grate, false);
+            bar.transform.localPosition = new Vector3(left + barWidth * 0.5f, 0f, 0f);
+            bar.transform.localScale = new Vector3(barWidth, GrateHeight, 1f);
+            SpriteRenderer sprite = bar.AddComponent<SpriteRenderer>();
+            sprite.sprite = RuntimeSprite.Pixel;
+            sprite.color = new Color(0.55f, 0.58f, 0.66f, 1f);
+            sprite.sortingLayerName = "Ground";
+            sprite.sortingOrder = 5;
+            BoxCollider2D box = bar.AddComponent<BoxCollider2D>();
+            box.size = Vector2.one;
+        }
+
+        CreateSprite(grate, "Lintel", new Vector3(0f, GrateHeight * 0.5f - 0.18f, 0f), new Vector3(grateWidth, 0.36f, 1f), new Color(0.24f, 0.2f, 0.28f), "Ground", 6);
+    }
+
+    private SpriteRenderer GroundMark(string name, float left, float right, float y, float height, Color color, int sortingOrder)
+    {
+        float width = Mathf.Max(0.08f, right - left);
+        return CreateSprite(root, name, new Vector3((left + right) * 0.5f, y, 0f), new Vector3(width, height, 1f), color, "Ground", sortingOrder);
+    }
+
+    private void CreateCard(Vector3 position, MonsterCardData card)
+    {
+        bool chariot = card != null && card.effectType == CardEffectType.ChariotDash;
+        GameObject pickup = new GameObject("CardPickup");
+        pickup.transform.SetParent(root, false);
+        pickup.transform.position = position;
+        Color glow = chariot ? new Color(0.45f, 0.75f, 1f, 0.28f) : new Color(1f, 0.82f, 0.35f, 0.28f);
+        Color face = chariot ? new Color(0.45f, 0.78f, 0.95f) : new Color(0.95f, 0.76f, 0.28f);
+        CreateSprite(pickup.transform, "Glow", Vector3.zero, new Vector3(1.55f, 1.85f, 1f), glow, "Player", 5);
+        CreateSprite(pickup.transform, "Face", Vector3.zero, new Vector3(0.72f, 1.08f, 1f), face, "Player", 6);
+        CreateSprite(pickup.transform, "Mark", new Vector3(0f, 0.06f, 0f), new Vector3(0.36f, 0.48f, 1f), new Color(0.42f, 0.16f, 0.58f), "Player", 7);
+
+        BoxCollider2D trigger = pickup.AddComponent<BoxCollider2D>();
+        trigger.isTrigger = true;
+        trigger.size = new Vector2(1.5f, 1.9f);
+        pickup.AddComponent<CardPickup>().Arm(card);
+        string label = card != null && !string.IsNullOrEmpty(card.displayName) ? card.displayName : "牌";
+        Sign("CardLabel", pickup.transform, position + Vector3.up * 1.15f, label, 160f);
+    }
+
+    private void CreateExit()
+    {
+        CreateSprite(root, "ExitPole", new Vector3(31.15f, 1.15f, 0f), new Vector3(0.12f, 2.3f, 1f), new Color(0.35f, 0.28f, 0.2f), "Player", 3);
+        CreateSprite(root, "ExitBanner", new Vector3(31.55f, 1.9f, 0f), new Vector3(0.7f, 0.48f, 1f), new Color(0.82f, 0.22f, 0.18f), "Player", 4);
+        Sign("ExitLabel", root, new Vector3(31.3f, 2.7f, 0f), "出口", 140f);
+
+        GameObject exit = new GameObject("LevelExit");
+        exit.transform.SetParent(root, false);
+        exit.transform.position = new Vector3(31.2f, 1.2f, 0f);
+        BoxCollider2D trigger = exit.AddComponent<BoxCollider2D>();
+        trigger.isTrigger = true;
+        trigger.size = new Vector2(1.8f, 2.4f);
+        exit.AddComponent<LevelExit>().Arm(this);
+    }
+
+    private void OpenGate()
+    {
+        if (gateOpen)
+            return;
+
+        gateOpen = true;
+        if (normalMark != null)
+            normalMark.enabled = false;
+        if (gapMark != null)
+            gapMark.enabled = false;
+        if (extensionMark != null)
+            extensionMark.enabled = false;
+        if (guideArrow != null)
+            guideArrow.enabled = false;
+        if (gate != null)
+        {
+            Collider2D[] blocking = gate.GetComponentsInChildren<Collider2D>();
+            for (int i = 0; i < blocking.Length; i++)
+                blocking[i].enabled = false;
+            SpriteRenderer[] bars = gate.GetComponentsInChildren<SpriteRenderer>();
+            for (int i = 0; i < bars.Length; i++)
+                bars[i].color = new Color(0.9f, 0.94f, 1f, 1f);
+            AttackFeedback.Thud(gate.transform.position);
+            StartCoroutine(SinkGate());
+        }
+
+        RefreshObjective();
+    }
+
+    private IEnumerator SinkGate()
+    {
+        Vector3 start = gate.transform.position;
+        Vector3 end = start + Vector3.down * (GrateHeight + 0.4f);
+        float elapsed = 0f;
+        const float duration = 0.85f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
+            gate.transform.position = Vector3.Lerp(start, end, t);
+            yield return null;
+        }
+
+        gate.SetActive(false);
+    }
+
+    private void BuildGuideArrow()
+    {
+        Texture2D texture = new Texture2D(16, 16);
+        texture.filterMode = FilterMode.Point;
+        Color[] pixels = new Color[256];
+        for (int y = 0; y < 16; y++)
+        {
+            for (int x = 0; x < 16; x++)
+            {
+                bool shaft = x >= 1 && x <= 7 && Mathf.Abs(y - 7) <= 1;
+                bool head = x >= 7 && x <= 14 && Mathf.Abs(y - 7) <= (14 - x) * 0.72f;
+                pixels[y * 16 + x] = shaft || head ? Color.white : Color.clear;
+            }
+        }
+
+        texture.SetPixels(pixels);
+        texture.Apply();
+        Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, 16f, 16f), new Vector2(0.5f, 0.5f), 16f);
+
+        GameObject arrow = new GameObject("GuideArrow");
+        arrow.transform.SetParent(root, false);
+        guideArrow = arrow.AddComponent<SpriteRenderer>();
+        guideArrow.sprite = sprite;
+        guideArrow.color = new Color(1f, 0.82f, 0.15f, 1f);
+        guideArrow.sortingLayerName = "Player";
+        guideArrow.sortingOrder = 20;
+        guideArrow.enabled = false;
+    }
+
+    private void UpdateGuideArrow()
+    {
+        if (guideArrow == null || player == null)
+            return;
+
+        const float flagX = 31.2f;
+        float distance = flagX - player.transform.position.x;
+        bool show = gateOpen && !cleared && !endingStarted && Mathf.Abs(distance) > 2.4f;
+        if (!show)
+        {
+            guideArrow.enabled = false;
+            return;
+        }
+
+        float dir = Mathf.Sign(distance);
+        bool blinkOn = Mathf.Repeat(Time.time, 0.5f) < 0.26f;
+        guideArrow.enabled = blinkOn;
+        guideArrow.transform.position = player.transform.position + new Vector3(dir * 1.7f, 1.25f, 0f);
+        guideArrow.transform.localScale = new Vector3(dir * 1.35f, 1.35f, 1f);
+    }
+
+    private void OnBossDefeated()
+    {
+        if (endingStarted || (player != null && player.IsDefeated))
+            return;
+
+        endingStarted = true;
+        busy = true;
+        if (cardUi != null)
+            cardUi.HoldForClear();
+        Time.timeScale = 1f;
+        if (player != null)
+        {
+            player.SetGameplayInputEnabled(false);
+            if (player.rb != null)
+                player.rb.linearVelocity = Vector2.zero;
+        }
+
+        if (boss != null)
+            CreateSprite(root, "RiftAsh", new Vector3(boss.transform.position.x, 0.12f, 0f), new Vector3(1.8f, 0.22f, 1f), new Color(0.16f, 0.05f, 0.08f, 0.95f), "Ground", 2);
+        CreateSprite(root, "RiftCalm", new Vector3(standCenter, 0.2f, 0f), new Vector3(1.8f, 0.12f, 1f), new Color(0.55f, 0.85f, 1f, 0.9f), "Ground", 4);
+        if (bossNameSign != null)
+            bossNameSign.transform.parent.gameObject.SetActive(false);
+
+        OpenGate();
+        StartCoroutine(PlayEnding());
+    }
+
+    private IEnumerator PlayEnding()
+    {
+        SetObjective("裂隙正在关闭");
+        yield return new WaitForSeconds(1.05f);
+        if (fadeText != null)
+            fadeText.text = ChapterLine;
+        yield return Fade(0f, 0.8f, 0.4f);
+        yield return new WaitForSeconds(0.7f);
+        Complete();
+    }
+}
