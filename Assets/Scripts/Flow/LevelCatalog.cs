@@ -52,7 +52,7 @@ public class LevelCatalog : ScriptableObject
     {
         new LevelSlot { displayName = "第一关  基础战斗", sceneName = "SampleScene", levelId = BasicCombatId, available = true },
         new LevelSlot { displayName = "愚者牌试用", sceneName = "SampleScene", levelId = FoolTrialId, available = true },
-        new LevelSlot { displayName = "牌之回响  战车", sceneName = "SampleScene", levelId = ChariotTrialId, available = true }
+        new LevelSlot { displayName = "牌之回响", sceneName = "SampleScene", levelId = ChariotTrialId, available = true }
     };
 }
 

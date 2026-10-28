@@ -23,7 +23,7 @@ MonoBehaviour:
     levelId: fool
     preview: {fileID: 21300000, guid: f1a2b3c4d5e64789a0b1c2d3e4f50619, type: 3}
     available: 1
-  - displayName: "\u724C\u4E4B\u56DE\u54CD  \u6218\u8F66"
+  - displayName: "\u724C\u4E4B\u56DE\u54CD"
     sceneName: SampleScene
     levelId: chariot
     preview: {fileID: 21300000, guid: f1a2b3c4d5e64789a0b1c2d3e4f50619, type: 3}

@@ -211,7 +211,20 @@ public class CombatHud : MonoBehaviour
         }
 
         cardNameText.text = card.displayName;
-        cardIcon.color = new Color(0.78f, 0.58f, 0.22f, 1f);
+        cardIcon.color = CardTint(card.effectType);
+    }
+
+    private static Color CardTint(CardEffectType type)
+    {
+        switch (type)
+        {
+            case CardEffectType.ChariotDash:
+                return new Color(0.35f, 0.72f, 0.9f, 1f);
+            case CardEffectType.StrengthSlam:
+                return new Color(0.86f, 0.28f, 0.18f, 1f);
+            default:
+                return new Color(0.78f, 0.58f, 0.22f, 1f);
+        }
     }
 
     private void ShowPlayerHit(int amount)

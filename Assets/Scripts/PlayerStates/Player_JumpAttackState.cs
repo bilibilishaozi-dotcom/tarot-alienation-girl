@@ -19,7 +19,8 @@ public class Player_JumpAttackState : EntityState
         elapsed = 0f;
         player.basicAttackState.ResetCombo();
 
-        player.SetVelocity(player.jumpAttackVelocity.x * player.AttackLungeMultiplier * player.facingDir, player.jumpAttackVelocity.y);
+        float drop = player.HasLandingSlam ? -15f : player.jumpAttackVelocity.y;
+        player.SetVelocity(player.jumpAttackVelocity.x * player.AttackLungeMultiplier * player.facingDir, drop);
     }
     public override void Update()
     {
@@ -36,6 +37,8 @@ public class Player_JumpAttackState : EntityState
             anim.SetTrigger("jumpAttackTrigger");
             player.SetVelocity(0, rb.linearVelocity.y);
             EndSwing();
+            if (player.HasLandingSlam)
+                player.PlayLandingSlam();
         }
 
         if (triggerCalled && player.groundDetected)
