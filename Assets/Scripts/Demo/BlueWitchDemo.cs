@@ -26,6 +26,17 @@ public class BlueWitchDemo : MonoBehaviour
     [Header("幅度")]
     [SerializeField] float idleAmplitude = 3f; // 待机：摆动和点头乘这个数，速度快慢不变
     [SerializeField] float walkAmplitude = 2f; // 走路：摆动和身体起伏乘这个数；前臂固定弯曲和步频不变
+    [SerializeField] float jumpAmplitude = 1f; // 起跳下蹲和上升姿势乘这个数
+    [SerializeField] float fallAmplitude = 1f; // 下落和落地缓冲乘这个数
+    [SerializeField] float wallAmplitude = 1f; // 贴墙下滑乘这个数。姿态按面向墙的一侧来写，左右翻转后会镜像
+
+    const float Gravity = -26f;
+    const float JumpVelocity = 8.4f;
+    const float AnticipateTime = 0.1f;
+    const float LandTime = 0.16f;
+    const float WallFaceX = 4.4f;
+    const float WallDrop = -1.4f;
+    const float BlendSharpness = 12f;
 
     [Serializable]
     public class PartSlot
@@ -78,6 +89,12 @@ public class BlueWitchDemo : MonoBehaviour
     Transform[] bones;
     Transform ground;
     float walkPhase;
+    float verticalVelocity;
+    float anticipateTimer;
+    float landTimer;
+    bool grounded = true;
+    bool onWall;
+    Pose shown;
 
     void Awake()
     {
@@ -90,25 +107,114 @@ public class BlueWitchDemo : MonoBehaviour
 
     void Update()
     {
+        float dt = Time.deltaTime;
         float direction = ReadDirection();
-        bool walking = Mathf.Abs(direction) > 0.01f;
-        if (walking)
-        {
-            transform.position += Vector3.right * direction * WalkSpeed * Time.deltaTime;
-            Vector3 scale = rig.localScale;
-            scale.x = direction > 0f ? 1f : -1f;
-            rig.localScale = scale;
-            walkPhase += Time.deltaTime * 5.5f;
-            ApplyWalk(Mathf.Sin(walkPhase), Mathf.Cos(walkPhase));
-        }
-        else
-        {
-            walkPhase = 0f;
-            ApplyIdle(Time.time);
-        }
+        bool jumpPressed = Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame;
+        StepMotion(direction, jumpPressed, dt);
+        BlendAndApply(ChoosePose(direction), dt);
 
         if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
             GameFlow.LoadTitle();
+    }
+
+    void StepMotion(float direction, bool jumpPressed, float dt)
+    {
+        if (jumpPressed && grounded && anticipateTimer <= 0f && landTimer <= 0f)
+            anticipateTimer = AnticipateTime;
+
+        if (anticipateTimer > 0f)
+        {
+            anticipateTimer -= dt;
+            verticalVelocity = 0f;
+            grounded = true;
+            onWall = false;
+            HoldHeight(GroundY);
+            if (anticipateTimer <= 0f)
+            {
+                verticalVelocity = JumpVelocity;
+                grounded = false;
+            }
+
+            return;
+        }
+
+        if (!grounded)
+        {
+            bool pressingAway = direction < -0.01f;
+            bool hitWall = transform.position.x >= WallFaceX && !pressingAway;
+            Vector3 position = transform.position;
+            if (hitWall)
+            {
+                position.x = WallFaceX;
+                Face(1f);
+                verticalVelocity += Gravity * dt;
+                if (verticalVelocity < WallDrop)
+                    verticalVelocity = WallDrop;
+                position.y += verticalVelocity * dt;
+                onWall = verticalVelocity <= 0.2f;
+            }
+            else
+            {
+                onWall = false;
+                verticalVelocity += Gravity * dt;
+                position.y += verticalVelocity * dt;
+                if (Mathf.Abs(direction) > 0.01f)
+                {
+                    position.x += direction * WalkSpeed * dt;
+                    if (position.x > WallFaceX)
+                        position.x = WallFaceX;
+                    Face(direction);
+                }
+            }
+
+            if (position.y <= GroundY && verticalVelocity <= 0f)
+            {
+                position.y = GroundY;
+                verticalVelocity = 0f;
+                grounded = true;
+                onWall = false;
+                landTimer = LandTime;
+            }
+
+            transform.position = position;
+            return;
+        }
+
+        if (landTimer > 0f)
+            landTimer -= dt;
+
+        onWall = false;
+        verticalVelocity = 0f;
+        HoldHeight(GroundY);
+        if (Mathf.Abs(direction) > 0.01f)
+        {
+            Vector3 position = transform.position;
+            position.x += direction * WalkSpeed * dt;
+            if (position.x > WallFaceX)
+                position.x = WallFaceX;
+            transform.position = position;
+            Face(direction);
+            walkPhase += dt * 5.5f;
+        }
+    }
+
+    float GroundY => FeetBelowRoot;
+
+    void HoldHeight(float y)
+    {
+        Vector3 position = transform.position;
+        position.y = y;
+        transform.position = position;
+    }
+
+    void Face(float direction)
+    {
+        if (rig == null || Mathf.Abs(direction) < 0.01f)
+            return;
+
+        Vector3 scale = rig.localScale;
+        scale.x = direction > 0f ? 1f : -1f;
+        rig.localScale = scale;
     }
 
     void LateUpdate()
@@ -156,53 +262,288 @@ public class BlueWitchDemo : MonoBehaviour
         }
     }
 
-    void ApplyIdle(float time)
+    Pose ChoosePose(float direction)
     {
-        float idle = idleAmplitude;
-        SetAngle("torso", Mathf.Sin(time * 1.3f) * 0.35f * idle);
-        SetAngle("head", Mathf.Sin(time * 1.2f) * IdleHead * idle);
-        SetAngle("hat", Mathf.Sin(time * 1.1f) * 0.45f * idle);
-        SetAngle("hair_back", Mathf.Sin(time * 1.15f) * IdleHair * idle);
-        SetAngle("hair_front", Mathf.Sin(time * 1.15f + 0.4f) * 1.1f * idle);
-        SetAngle("hair_front_r", Mathf.Sin(time * 1.4f) * 1.8f * idle);
-        SetAngle("coat_front", Mathf.Sin(time * 0.95f) * IdleCoat * idle);
-        SetAngle("coat_back", Mathf.Sin(time * 0.95f + 0.8f) * 0.8f * idle);
-        SetAngle("arm_near_upper", Mathf.Sin(time * 0.8f) * 0.8f * idle);
-        SetAngle("arm_far_upper", Mathf.Sin(time * 0.8f + 0.5f) * 0.6f * idle);
-        SetAngle("arm_near_lower", 1.5f);
-        SetAngle("arm_far_lower", 1.2f);
-        SetAngle("leg_near_thigh", 0f);
-        SetAngle("leg_far_thigh", 0f);
-        SetAngle("leg_near_shin", 0f);
-        SetAngle("leg_far_shin", 0f);
-        Bob("head", Mathf.Sin(time * 1.2f) * 0.012f * idle);
-        Bob("torso", 0f);
+        if (anticipateTimer > 0f)
+            return Scale(CrouchPose(), jumpAmplitude);
+        if (landTimer > 0f && grounded)
+            return Scale(LandingPose(), fallAmplitude);
+        if (!grounded && onWall)
+            return Scale(WallPose(), wallAmplitude);
+        if (!grounded && verticalVelocity > 0f)
+            return Scale(RisePose(), jumpAmplitude);
+        if (!grounded)
+            return Scale(FallPose(), fallAmplitude);
+        if (Mathf.Abs(direction) > 0.01f)
+            return WalkPose(Mathf.Sin(walkPhase), Mathf.Cos(walkPhase));
+        return IdlePose(Time.time);
     }
 
-    void ApplyWalk(float swing, float step)
+    void BlendAndApply(Pose target, float dt)
+    {
+        float blend = 1f - Mathf.Exp(-BlendSharpness * dt);
+        shown = Pose.Lerp(shown, target, blend);
+        SetAngle("torso", shown.torso);
+        SetAngle("head", shown.head);
+        SetAngle("hat", shown.hat);
+        SetAngle("hair_back", shown.hairBack);
+        SetAngle("hair_front", shown.hairFront);
+        SetAngle("hair_front_r", shown.hairFrontR);
+        SetAngle("coat_front", shown.coatFront);
+        SetAngle("coat_back", shown.coatBack);
+        SetAngle("leg_near_thigh", shown.nearThigh);
+        SetAngle("leg_far_thigh", shown.farThigh);
+        SetAngle("leg_near_shin", shown.nearShin);
+        SetAngle("leg_far_shin", shown.farShin);
+        SetAngle("arm_near_upper", shown.nearUpper);
+        SetAngle("arm_far_upper", shown.farUpper);
+        SetAngle("arm_near_lower", shown.nearLower);
+        SetAngle("arm_far_lower", shown.farLower);
+        Bob("head", shown.headBob);
+        Bob("torso", shown.torsoBob);
+    }
+
+    // 正角度是逆时针。面向右时，近侧大腿正角度会把腿留在外套后面；近侧上臂不要超过大约 60 度。
+    static Pose Scale(Pose pose, float amplitude)
+    {
+        pose.torso *= amplitude;
+        pose.head *= amplitude;
+        pose.hat *= amplitude;
+        pose.hairBack *= amplitude;
+        pose.hairFront *= amplitude;
+        pose.hairFrontR *= amplitude;
+        pose.coatFront *= amplitude;
+        pose.coatBack *= amplitude;
+        pose.nearThigh *= amplitude;
+        pose.farThigh *= amplitude;
+        pose.nearShin *= amplitude;
+        pose.farShin *= amplitude;
+        pose.nearUpper *= amplitude;
+        pose.farUpper *= amplitude;
+        pose.nearLower *= amplitude;
+        pose.farLower *= amplitude;
+        pose.torsoBob *= amplitude;
+        pose.headBob *= amplitude;
+        return pose;
+    }
+
+    Pose IdlePose(float time)
+    {
+        float idle = idleAmplitude;
+        Pose pose = new Pose();
+        pose.torso = Mathf.Sin(time * 1.3f) * 0.35f * idle;
+        pose.head = Mathf.Sin(time * 1.2f) * IdleHead * idle;
+        pose.hat = Mathf.Sin(time * 1.1f) * 0.45f * idle;
+        pose.hairBack = Mathf.Sin(time * 1.15f) * IdleHair * idle;
+        pose.hairFront = Mathf.Sin(time * 1.15f + 0.4f) * 1.1f * idle;
+        pose.hairFrontR = Mathf.Sin(time * 1.4f) * 1.8f * idle;
+        pose.coatFront = Mathf.Sin(time * 0.95f) * IdleCoat * idle;
+        pose.coatBack = Mathf.Sin(time * 0.95f + 0.8f) * 0.8f * idle;
+        pose.nearUpper = Mathf.Sin(time * 0.8f) * 0.8f * idle;
+        pose.farUpper = Mathf.Sin(time * 0.8f + 0.5f) * 0.6f * idle;
+        pose.nearLower = 1.5f;
+        pose.farLower = 1.2f;
+        pose.headBob = Mathf.Sin(time * 1.2f) * 0.012f * idle;
+        return pose;
+    }
+
+    Pose WalkPose(float swing, float step)
     {
         float time = Time.time;
         float walk = walkAmplitude;
-        SetAngle("torso", swing * 0.8f * walk);
-        SetAngle("head", -swing * 0.5f * walk);
-        SetAngle("hat", Mathf.Sin(time * 2f) * 0.4f * walk);
-        SetAngle("hair_back", (swing * 1.2f + Mathf.Sin(time * 2f) * 0.6f) * walk);
-        SetAngle("hair_front", swing * 0.8f * walk);
-        SetAngle("hair_front_r", swing * 1.4f * walk);
-        SetAngle("coat_front", swing * 1.3f * walk);
-        SetAngle("coat_back", -swing * 0.9f * walk);
+        Pose pose = new Pose();
+        pose.torso = swing * 0.8f * walk;
+        pose.head = -swing * 0.5f * walk;
+        pose.hat = Mathf.Sin(time * 2f) * 0.4f * walk;
+        pose.hairBack = (swing * 1.2f + Mathf.Sin(time * 2f) * 0.6f) * walk;
+        pose.hairFront = swing * 0.8f * walk;
+        pose.hairFrontR = swing * 1.4f * walk;
+        pose.coatFront = swing * 1.3f * walk;
+        pose.coatBack = -swing * 0.9f * walk;
+        pose.nearThigh = swing * WalkThigh * walk;
+        pose.farThigh = -swing * WalkThigh * walk;
+        pose.nearShin = Mathf.Max(0f, -swing) * WalkShin * walk;
+        pose.farShin = Mathf.Max(0f, swing) * WalkShin * walk;
+        pose.nearUpper = -swing * WalkArm * walk;
+        pose.farUpper = swing * WalkArm * walk;
+        pose.nearLower = 2f + Mathf.Max(0f, -swing) * WalkForearm * walk;
+        pose.farLower = 2f + Mathf.Max(0f, swing) * WalkForearm * walk;
+        pose.torsoBob = Mathf.Abs(step) * 0.015f * walk;
+        return pose;
+    }
 
-        SetAngle("leg_near_thigh", swing * WalkThigh * walk);
-        SetAngle("leg_far_thigh", -swing * WalkThigh * walk);
-        SetAngle("leg_near_shin", Mathf.Max(0f, -swing) * WalkShin * walk);
-        SetAngle("leg_far_shin", Mathf.Max(0f, swing) * WalkShin * walk);
+    // 起跳前的短下蹲。近侧腿往后收，让外套继续盖住髋部。
+    static Pose CrouchPose()
+    {
+        return new Pose
+        {
+            torso = 10f,
+            head = 8f,
+            hat = 3f,
+            hairBack = 5f,
+            hairFront = 3f,
+            hairFrontR = 4f,
+            coatFront = 7f,
+            coatBack = 4f,
+            nearThigh = 18f,
+            farThigh = -20f,
+            nearShin = -26f,
+            farShin = 28f,
+            nearUpper = 22f,
+            farUpper = 16f,
+            nearLower = 6f,
+            farLower = 4f,
+            torsoBob = -0.05f,
+            headBob = -0.008f
+        };
+    }
 
-        SetAngle("arm_near_upper", -swing * WalkArm * walk);
-        SetAngle("arm_far_upper", swing * WalkArm * walk);
-        SetAngle("arm_near_lower", 2f + Mathf.Max(0f, -swing) * WalkForearm * walk);
-        SetAngle("arm_far_lower", 2f + Mathf.Max(0f, swing) * WalkForearm * walk);
-        Bob("torso", Mathf.Abs(step) * 0.015f * walk);
-        Bob("head", 0f);
+    // 上升：膝弯收起，手臂向后抬，头发和外套还垂着。
+    static Pose RisePose()
+    {
+        return new Pose
+        {
+            torso = -8f,
+            head = -14f,
+            hat = -6f,
+            hairBack = 12f,
+            hairFront = 7f,
+            hairFrontR = 9f,
+            coatFront = 11f,
+            coatBack = 8f,
+            nearThigh = 22f,
+            farThigh = -34f,
+            nearShin = -30f,
+            farShin = 38f,
+            nearUpper = 38f,
+            farUpper = 46f,
+            nearLower = -16f,
+            farLower = -12f,
+            torsoBob = 0.012f,
+            headBob = 0.008f
+        };
+    }
+
+    // 下落：腿向下伸，手臂张开保持平衡，头发和外套向上扬。
+    static Pose FallPose()
+    {
+        return new Pose
+        {
+            torso = 6f,
+            head = 10f,
+            hat = 5f,
+            hairBack = 30f,
+            hairFront = 16f,
+            hairFrontR = 20f,
+            coatFront = 22f,
+            coatBack = 16f,
+            nearThigh = 12f,
+            farThigh = -8f,
+            nearShin = -8f,
+            farShin = 6f,
+            nearUpper = 50f,
+            farUpper = -42f,
+            nearLower = -8f,
+            farLower = 14f,
+            headBob = 0.01f
+        };
+    }
+
+    // 落地的短缓冲：膝弯，上身下沉。
+    static Pose LandingPose()
+    {
+        return new Pose
+        {
+            torso = 14f,
+            head = 12f,
+            hat = 4f,
+            hairBack = 8f,
+            hairFront = 4f,
+            hairFrontR = 6f,
+            coatFront = 9f,
+            coatBack = 5f,
+            nearThigh = 16f,
+            farThigh = -22f,
+            nearShin = -32f,
+            farShin = 36f,
+            nearUpper = 14f,
+            farUpper = 10f,
+            nearLower = 4f,
+            farLower = 2f,
+            torsoBob = -0.07f,
+            headBob = -0.015f
+        };
+    }
+
+    // 贴墙：身体靠向墙，近侧手伸向墙，腿弯着。角度写在面向墙的局部空间里。
+    static Pose WallPose()
+    {
+        return new Pose
+        {
+            torso = -16f,
+            head = -6f,
+            hat = -2f,
+            hairBack = 18f,
+            hairFront = 9f,
+            hairFrontR = 12f,
+            coatFront = 12f,
+            coatBack = 10f,
+            nearThigh = 14f,
+            farThigh = -26f,
+            nearShin = -22f,
+            farShin = 40f,
+            nearUpper = -50f,
+            farUpper = -18f,
+            nearLower = -28f,
+            farLower = 6f,
+            torsoBob = -0.01f
+        };
+    }
+
+    struct Pose
+    {
+        public float torso;
+        public float head;
+        public float hat;
+        public float hairBack;
+        public float hairFront;
+        public float hairFrontR;
+        public float coatFront;
+        public float coatBack;
+        public float nearThigh;
+        public float farThigh;
+        public float nearShin;
+        public float farShin;
+        public float nearUpper;
+        public float farUpper;
+        public float nearLower;
+        public float farLower;
+        public float torsoBob;
+        public float headBob;
+
+        public static Pose Lerp(Pose from, Pose to, float t)
+        {
+            Pose pose = new Pose();
+            pose.torso = Mathf.Lerp(from.torso, to.torso, t);
+            pose.head = Mathf.Lerp(from.head, to.head, t);
+            pose.hat = Mathf.Lerp(from.hat, to.hat, t);
+            pose.hairBack = Mathf.Lerp(from.hairBack, to.hairBack, t);
+            pose.hairFront = Mathf.Lerp(from.hairFront, to.hairFront, t);
+            pose.hairFrontR = Mathf.Lerp(from.hairFrontR, to.hairFrontR, t);
+            pose.coatFront = Mathf.Lerp(from.coatFront, to.coatFront, t);
+            pose.coatBack = Mathf.Lerp(from.coatBack, to.coatBack, t);
+            pose.nearThigh = Mathf.Lerp(from.nearThigh, to.nearThigh, t);
+            pose.farThigh = Mathf.Lerp(from.farThigh, to.farThigh, t);
+            pose.nearShin = Mathf.Lerp(from.nearShin, to.nearShin, t);
+            pose.farShin = Mathf.Lerp(from.farShin, to.farShin, t);
+            pose.nearUpper = Mathf.Lerp(from.nearUpper, to.nearUpper, t);
+            pose.farUpper = Mathf.Lerp(from.farUpper, to.farUpper, t);
+            pose.nearLower = Mathf.Lerp(from.nearLower, to.nearLower, t);
+            pose.farLower = Mathf.Lerp(from.farLower, to.farLower, t);
+            pose.torsoBob = Mathf.Lerp(from.torsoBob, to.torsoBob, t);
+            pose.headBob = Mathf.Lerp(from.headBob, to.headBob, t);
+            return pose;
+        }
     }
 
     void SetAngle(string id, float degrees)
@@ -286,6 +627,14 @@ public class BlueWitchDemo : MonoBehaviour
         sprite.sprite = RuntimeSprite.Pixel;
         sprite.color = new Color(0.16f, 0.2f, 0.18f, 1f);
         sprite.sortingOrder = -10;
+
+        GameObject wall = new GameObject("Wall");
+        wall.transform.position = new Vector3(WallFaceX + 0.28f, 3.2f, 0f);
+        wall.transform.localScale = new Vector3(0.55f, 6.6f, 1f);
+        SpriteRenderer wallSprite = wall.AddComponent<SpriteRenderer>();
+        wallSprite.sprite = RuntimeSprite.Pixel;
+        wallSprite.color = new Color(0.23f, 0.28f, 0.34f, 1f);
+        wallSprite.sortingOrder = -5;
     }
 
     void BuildHint()
@@ -300,7 +649,7 @@ public class BlueWitchDemo : MonoBehaviour
         label.fontSize = 28;
         label.alignment = TextAnchor.UpperLeft;
         label.color = new Color(1f, 0.94f, 0.82f, 1f);
-        label.text = "A / D 或方向键走路，松开待机。Esc 回标题。";
+        label.text = "A / D 走路，空格跳。跳起来靠上右边的墙会贴墙滑下。Esc 回标题。";
         RectTransform rect = label.rectTransform;
         rect.anchorMin = new Vector2(0f, 1f);
         rect.anchorMax = new Vector2(0f, 1f);
