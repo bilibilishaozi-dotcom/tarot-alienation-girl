@@ -12,9 +12,6 @@ public class BlueWitchDemo : MonoBehaviour
     const float PixelsPerUnit = 100f;
     // candidate.png 高 869。髋部根点在 y=605（从上往下），脚底大约再往下 248 像素。
     const float FeetBelowRoot = 248f / PixelsPerUnit;
-    // 大腿：髋 (232,580) 到膝 (212,705)。小腿：膝到鞋子底边 y=853。
-    const float ThighLength = 1.2658894f;
-    const float ShinLength = 1.48f;
     const float WalkSpeed = 1.15f;
 
     // 下面的角度是 1 倍时的基础幅度。近侧大腿被外套挡住，肩膀和后片是补出来的，转大了会露缝。
@@ -36,20 +33,23 @@ public class BlueWitchDemo : MonoBehaviour
     [Header("二次运动")]
     [Tooltip("头发、帽子、衣摆的弹簧刚度和起跳、落地冲量。0 时这几块与四肢一样做指数平滑。")]
     [SerializeField] float springStrength = 1f;
-    [Tooltip("根节点压扁拉伸、屈膝下沉，以及跳跃时头发和前摆的派生缩放。")]
+    [Tooltip("根节点压扁拉伸，以及跳跃时头发和前摆的派生缩放。鞋底贴地不乘这个数。")]
     [SerializeField] float squashStrength = 1f;
 
     const float Gravity = -26f;
     const float JumpVelocity = 8.4f;
-    const float ApexBand = 1.5f;
-    const float ApexGravityMul = 0.5f;
-    const float CrouchTime = 0.09f;
-    const float LaunchTime = 0.05f;
+    const float CrouchTime = 0.12f;
+    const float LaunchTime = 0.07f;
     const float LandTime = 0.22f;
     const float ImpactHold = 0.04f;
     const float BoneSharpness = 30f;
+    const float ImpactSharpness = 40f;
+    const float ImpactSharpTime = 0.04f;
     const float AirBlendIn = 0.12f;
     const float SpringSettleTime = 0.7f;
+    const float JumpBufferTime = 0.1f;
+    const float AnticipationMove = 0.5f;
+    const float ClampBlendTime = 0.1f;
     const float MaxDeltaTime = 1f / 30f;
     const float WallFaceX = 4.4f; // 髋部根点碰到墙的位置，不是身体外缘
     const float WallDrop = -1.4f;
@@ -59,6 +59,8 @@ public class BlueWitchDemo : MonoBehaviour
     static readonly float[] SpringZeta = { 0.35f, 0.45f, 0.38f, 0.5f, 0.4f, 0.45f };
     static readonly float[] SpringTakeoff = { 70f, 40f, 60f, 60f, 60f, -30f };
     static readonly float[] SpringLand = { 120f, 60f, 90f, 50f, 90f, -40f };
+    static readonly float[] SpringMin = { -8f, -12f, -15f, -8f, -5f, -8f };
+    static readonly float[] SpringMax = { 8f, 10f, 15f, 8f, 6f, 3f };
     const int SpringCount = 6;
 
     enum Phase
@@ -127,6 +129,9 @@ public class BlueWitchDemo : MonoBehaviour
     float faceSign = 1f;
     float rigOffset;
     float springHold;
+    float jumpBuffer;
+    float impactSharpTimer;
+    float clampWeight;
     float[] springX;
     float[] springV;
     Phase phase = Phase.Ground;
@@ -150,10 +155,14 @@ public class BlueWitchDemo : MonoBehaviour
         float dt = Mathf.Min(Time.deltaTime, MaxDeltaTime);
         float direction = ReadDirection();
         bool jumpPressed = Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame;
-        if (jumpPressed && phase == Phase.Ground)
+        if (jumpPressed)
+            jumpBuffer = JumpBufferTime;
+        bool canJump = phase == Phase.Ground || (phase == Phase.Land && phaseTime >= ImpactHold);
+        if (jumpBuffer > 0f && canJump)
         {
             phase = Phase.Crouch;
             phaseTime = 0f;
+            jumpBuffer = 0f;
         }
 
         if (phase == Phase.Crouch && phaseTime >= CrouchTime)
@@ -181,6 +190,10 @@ public class BlueWitchDemo : MonoBehaviour
             phaseTime += dt;
         if (phase == Phase.Ground)
             springHold = Mathf.Max(0f, springHold - dt);
+        if (jumpBuffer > 0f)
+            jumpBuffer -= dt;
+        if (impactSharpTimer > 0f)
+            impactSharpTimer -= dt;
 
         if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
             GameFlow.LoadTitle();
@@ -193,6 +206,16 @@ public class BlueWitchDemo : MonoBehaviour
             verticalVelocity = 0f;
             onWall = false;
             HoldHeight(GroundY);
+            if (Mathf.Abs(direction) > 0.01f)
+            {
+                Vector3 position = transform.position;
+                position.x += direction * WalkSpeed * AnticipationMove * dt;
+                if (position.x > WallFaceX)
+                    position.x = WallFaceX;
+                transform.position = position;
+                Face(direction);
+            }
+
             return;
         }
 
@@ -214,10 +237,8 @@ public class BlueWitchDemo : MonoBehaviour
             else
             {
                 onWall = false;
-                float gravity = Gravity;
-                if (Mathf.Abs(verticalVelocity) < ApexBand)
-                    gravity *= ApexGravityMul;
-                verticalVelocity += gravity * dt;
+                float gravMul = Mathf.Lerp(0.5f, 1f, Mathf.InverseLerp(0f, 2f, Mathf.Abs(verticalVelocity)));
+                verticalVelocity += Gravity * gravMul * dt;
                 position.y += verticalVelocity * dt;
                 if (Mathf.Abs(direction) > 0.01f)
                 {
@@ -237,6 +258,7 @@ public class BlueWitchDemo : MonoBehaviour
                 phase = Phase.Land;
                 phaseTime = 0f;
                 springHold = SpringSettleTime;
+                impactSharpTimer = ImpactSharpTime;
                 Kick(false);
             }
 
@@ -374,9 +396,24 @@ public class BlueWitchDemo : MonoBehaviour
         target.sx = Mathf.Lerp(1f, target.sx, squash);
         target.sy = Mathf.Lerp(1f, target.sy, squash);
 
-        float blend = 1f - Mathf.Exp(-BoneSharpness * dt);
-        shown = Pose.Lerp(shown, target, blend);
         bool onWallPose = phase == Phase.Air && onWall;
+        bool jumpPose = phase == Phase.Crouch || phase == Phase.Launch || phase == Phase.Land
+            || (phase == Phase.Air && !onWall);
+        bool recoveringWalk = phase == Phase.Land && phaseTime >= ImpactHold && Mathf.Abs(direction) > 0.01f;
+        float clampGoal = jumpPose ? 1f : 0f;
+        clampWeight = Mathf.MoveTowards(clampWeight, clampGoal, dt / ClampBlendTime);
+        if (!onWallPose)
+        {
+            Pose limited = target;
+            ClampCloth(ref limited);
+            if (jumpPose && !recoveringWalk)
+                ClampBody(ref limited);
+            target = Pose.Lerp(target, limited, clampWeight);
+        }
+
+        float sharp = impactSharpTimer > 0f ? ImpactSharpness : BoneSharpness;
+        float blend = 1f - Mathf.Exp(-sharp * dt);
+        shown = Pose.Lerp(shown, target, blend);
         float response = Mathf.Max(0f, springStrength);
         // 落地后的摆动大约再持续 0.7 秒。平时的待机和走路用指数平滑，走路步频会把 hair_back 的弹簧放大。
         bool useSpring = !onWallPose && response > 0f && (phase != Phase.Ground || springHold > 0f);
@@ -395,19 +432,17 @@ public class BlueWitchDemo : MonoBehaviour
             float goal = SpringAngle(target, i);
             velocity += (omega * omega * (goal - angle) - 2f * SpringZeta[i] * omega * velocity) * dt;
             angle += velocity * dt;
+            float limited = Mathf.Clamp(angle, SpringMin[i], SpringMax[i]);
+            bool outward = (angle > SpringMax[i] && velocity > 0f) || (angle < SpringMin[i] && velocity < 0f);
+            if (outward)
+                velocity = 0f;
+            angle = Mathf.Lerp(angle, limited, clampWeight);
             springV[i] = velocity;
             springX[i] = angle;
             shown = WithSpring(shown, i, angle);
         }
 
-        bool jumpPose = phase == Phase.Crouch || phase == Phase.Launch || phase == Phase.Land
-            || (phase == Phase.Air && !onWall);
-        bool recoveringWalk = phase == Phase.Land && phaseTime >= ImpactHold && Mathf.Abs(direction) > 0.01f;
         Pose display = shown;
-        if (!onWallPose)
-            ClampCloth(ref display);
-        if (jumpPose && !recoveringWalk)
-            ClampBody(ref display);
 
         SetAngle("torso", display.torso);
         SetAngle("head", display.head);
@@ -428,21 +463,21 @@ public class BlueWitchDemo : MonoBehaviour
         Bob("head", display.headBob);
         Bob("torso", display.torsoBob);
         ApplyClothScale(display, jumpPose);
-        ApplyRoot(display, direction, squash, blend);
+        ApplyRoot(display, direction, blend);
     }
 
-    void ApplyRoot(Pose display, float direction, float squash, float blend)
+    void ApplyRoot(Pose display, float direction, float blend)
     {
         if (rig == null)
             return;
 
-        bool recoveringWalk = phase == Phase.Land && phaseTime >= ImpactHold && Mathf.Abs(direction) > 0.01f;
-        bool plant = phase == Phase.Crouch || phase == Phase.Launch
-            || (phase == Phase.Land && !recoveringWalk)
+        bool plant = phase == Phase.Crouch || phase == Phase.Launch || phase == Phase.Land
             || (phase == Phase.Ground && Mathf.Abs(direction) <= 0.01f);
-        float drop = plant ? LegDrop(display) * squash : 0f;
-        float targetY = plant ? FeetBelowRoot * (display.sy - 1f) - drop : 0f;
-        rigOffset = Mathf.Lerp(rigOffset, targetY, blend);
+        float targetY = plant ? -FeetBelowRoot - display.sy * SoleLow(display) : 0f;
+        if (plant)
+            rigOffset = targetY;
+        else
+            rigOffset = Mathf.Lerp(rigOffset, targetY, blend);
         rig.localPosition = new Vector3(0f, rigOffset, 0f);
         rig.localScale = new Vector3(faceSign * display.sx, display.sy, 1f);
     }
@@ -531,16 +566,23 @@ public class BlueWitchDemo : MonoBehaviour
         return pose;
     }
 
-    static float LegDrop(Pose pose)
+    static float RotY(float x, float y, float degrees)
     {
-        return Mathf.Min(LegReach(pose.nearThigh, pose.nearShin), LegReach(pose.farThigh, pose.farShin));
+        float radians = degrees * Mathf.Deg2Rad;
+        return x * Mathf.Sin(radians) + y * Mathf.Cos(radians);
     }
 
-    static float LegReach(float thighDegrees, float shinDegrees)
+    // 鞋跟、鞋尖相对膝轴心。髋高 0.25，膝的局部坐标和骨骼一致。
+    // 贴图最底一行和这两个点同高，左右各窄 1 像素。
+    static float SoleLow(Pose pose)
     {
-        float thigh = thighDegrees * Mathf.Deg2Rad;
-        float knee = (thighDegrees + shinDegrees) * Mathf.Deg2Rad;
-        return ThighLength * (1f - Mathf.Cos(thigh)) + ShinLength * (1f - Mathf.Cos(knee));
+        const float hipY = 0.25f;
+        float low = float.MaxValue;
+        low = Mathf.Min(low, hipY + RotY(-0.20f, -1.25f, pose.nearThigh) + RotY(-0.27f, -1.47f, pose.nearThigh + pose.nearShin));
+        low = Mathf.Min(low, hipY + RotY(-0.20f, -1.25f, pose.nearThigh) + RotY(0.43f, -1.47f, pose.nearThigh + pose.nearShin));
+        low = Mathf.Min(low, hipY + RotY(-0.04f, -1.25f, pose.farThigh) + RotY(-0.17f, -1.47f, pose.farThigh + pose.farShin));
+        low = Mathf.Min(low, hipY + RotY(-0.04f, -1.25f, pose.farThigh) + RotY(0.58f, -1.47f, pose.farThigh + pose.farShin));
+        return low;
     }
 
     static float EaseOutCubic(float t)
@@ -635,8 +677,8 @@ public class BlueWitchDemo : MonoBehaviour
         pose.coatBack = -swing * 0.9f * walk;
         pose.nearThigh = swing * WalkThigh * walk;
         pose.farThigh = -swing * WalkThigh * walk;
-        pose.nearShin = Mathf.Max(0f, -swing) * WalkShin * walk;
-        pose.farShin = Mathf.Max(0f, swing) * WalkShin * walk;
+        pose.nearShin = -Mathf.Max(0f, -swing) * WalkShin * walk;
+        pose.farShin = -Mathf.Max(0f, swing) * WalkShin * walk;
         pose.nearUpper = -swing * WalkArm * walk;
         pose.farUpper = swing * WalkArm * walk;
         pose.nearLower = 2f + Mathf.Max(0f, -swing) * WalkForearm * walk;
@@ -659,16 +701,16 @@ public class BlueWitchDemo : MonoBehaviour
             hairFrontR = -4f,
             coatFront = -3f,
             coatBack = -3f,
-            nearThigh = 28f,
-            nearShin = -46f,
-            farThigh = 22f,
-            farShin = -40f,
+            nearThigh = 36f,
+            nearShin = -40f,
+            farThigh = 26f,
+            farShin = -30f,
             nearUpper = -18f,
             nearLower = 10f,
             farUpper = -8f,
             farLower = 12f,
             sx = 1.04f,
-            sy = 0.95f
+            sy = 0.94f
         };
     }
 
@@ -688,9 +730,9 @@ public class BlueWitchDemo : MonoBehaviour
             nearShin = -8f,
             farThigh = -14f,
             farShin = -6f,
-            nearUpper = 34f,
+            nearUpper = 28f,
             nearLower = 20f,
-            farUpper = 22f,
+            farUpper = 16f,
             farLower = 16f,
             sx = 0.95f,
             sy = 1.07f
@@ -784,16 +826,16 @@ public class BlueWitchDemo : MonoBehaviour
             hairFrontR = -7f,
             coatFront = -4f,
             coatBack = -4f,
-            nearThigh = 34f,
-            nearShin = -55f,
+            nearThigh = 36f,
+            nearShin = -42f,
             farThigh = 26f,
-            farShin = -50f,
+            farShin = -32f,
             nearUpper = 26f,
             nearLower = 20f,
             farUpper = 14f,
             farLower = 14f,
-            sx = 1.06f,
-            sy = 0.91f
+            sx = 1.05f,
+            sy = 0.92f
         };
     }
 

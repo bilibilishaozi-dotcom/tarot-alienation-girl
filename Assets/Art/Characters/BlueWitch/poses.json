@@ -2,26 +2,29 @@
   "note": "蓝色魔女跳跃的目标角度。单位是度，正角度为 Unity 局部 Z 的逆时针。数值是 1 倍。jumpAmplitude 乘下蹲、蹬地、上升；fallAmplitude 乘下落和落地；顶点姿势保持 1 倍。sx/sy 不乘这两项，由检视面板的 squashStrength 拉向 1。待机正弦和走路不在这张表里。",
   "sign": "面向右：torso 正=后仰、负=前倾；thigh 正=膝向前上、负=腿向后；shin 正=反膝、负=正常屈膝；upper arm 正=向前、负=向后；lower arm 正=正常屈肘、负=反肘；hair_back 正=扫进身体、负=发尾后扬；hat 正=帽尖后下、负=帽尖上翘；coat_front 正=衣摆扫进腿、负=向外扬；coat_back 正=露出窄条。左右翻转只改根节点 scale.x。",
   "timing": {
-    "crouch": 0.09,
-    "crouchEase": "easeOut 1-(1-t)^3，从静态待机到下蹲",
-    "launch": 0.05,
+    "crouch": 0.12,
+    "crouchEase": "easeOut 1-(1-t)^3，从静态待机到下蹲。这段和蹬地仍保留约一半水平速度",
+    "launch": 0.07,
     "launchEase": "easeIn t^2，从下蹲到蹬地。结束时 vy=JumpVelocity，并给头发帽子衣摆加上起跳冲量",
     "airBlendIn": 0.12,
     "land": 0.22,
     "impactHold": 0.04,
     "landEase": "前 0.04 秒保持落地姿势，之后 easeOut 回到静态待机。按住方向时后半段改为走向走路姿势",
     "boneSharpness": 30,
+    "impactSharpness": 40,
+    "impactSharpTime": 0.04,
     "dtMax": 0.033333,
     "gravity": -26,
     "jumpVelocity": 8.4,
-    "apexBand": 1.5,
-    "apexGravityMul": 0.5,
+    "apexGravity": "离墙时 gravMul = lerp(0.5, 1, inverseLerp(0, 2, abs(vy)))。贴墙仍用满重力。",
+    "jumpBuffer": 0.1,
+    "jumpAfterImpactHold": true,
     "airBlend": "u=clamp(vy/jumpVelocity,-1,1)；上升 SmoothStep(0.12,0.65,u) 混向 rise；下落 SmoothStep(0.12,0.85,-u) 混向 fall；中间是 apex。再在 0.12 秒内从 launch 混入。"
   },
   "squash": {
     "strength": "squashStrength，默认 1",
-    "footAnchor": "着地的待机、下蹲、蹬地、落地：rig.y = 2.48*(sy-1) - drop。drop 是两条腿缩短量的较小值，再乘 squashStrength。大腿长 1.2658894，小腿长 1.48。",
-    "airPivot": "空中和贴墙、走路的高度目标是 0，绕髋部缩放。rig.y 再用 sharpness 30 平滑。"
+    "footAnchor": "待机、下蹲、蹬地、落地：rig.y = -2.48 - sy*SoleLow。SoleLow 是两只鞋的鞋跟和鞋尖里最低的一点。鞋跟/鞋尖在膝轴心局部坐标：近侧 (-0.27,-1.47)/(0.43,-1.47)，远侧 (-0.17,-1.47)/(0.58,-1.47)。膝是近侧 (-0.20,-1.25)、远侧 (-0.04,-1.25)，髋高 0.25。贴地时直接写入，不乘 squashStrength。",
+    "airPivot": "空中、贴墙和走路的高度目标是 0。只在进入和离开这些状态时平滑根高度。"
   },
   "springs": {
     "strength": "springStrength，默认 1。乘到 ω 和冲量上。0 时改为和四肢一样的指数平滑。",
@@ -57,7 +60,7 @@
     "leg_near_shin": [-55, 2],
     "leg_far_thigh": [-16, 26],
     "leg_far_shin": [-50, 2],
-    "when": "头发、帽子、衣摆在除贴墙外的所有状态限幅。躯干、头和四肢只在跳跃姿势限幅。落地后半段如果正在走向走路姿势，四肢不限幅，避免走路的正小腿和远侧上臂被切掉。贴墙不限幅。"
+    "when": "限幅加在目标姿势上，再用约 0.1 秒的权重混入，避免贴墙进出时显示角度一帧跳变。弹簧碰到限幅就清掉继续向外的速度。springStrength 为 0 时速度清零。贴墙目标不限幅。走路小腿用负角度。"
   },
   "wallNote": "贴墙姿势这次没改。arm_near_upper = -50 符号可疑：面向右时上臂负角度是向后摆，手会离开右侧的墙；arm_near_lower = -28 是反肘。WallFaceX = 4.4 对齐的是髋部根点，不是身体外缘。",
   "poses": {
@@ -92,16 +95,16 @@
       "hair_front_r": -4,
       "coat_front": -3,
       "coat_back": -3,
-      "leg_near_thigh": 28,
-      "leg_near_shin": -46,
-      "leg_far_thigh": 22,
-      "leg_far_shin": -40,
+      "leg_near_thigh": 36,
+      "leg_near_shin": -40,
+      "leg_far_thigh": 26,
+      "leg_far_shin": -30,
       "arm_near_upper": -18,
       "arm_near_lower": 10,
       "arm_far_upper": -8,
       "arm_far_lower": 12,
       "sx": 1.04,
-      "sy": 0.95
+      "sy": 0.94
     },
     "launch": {
       "multiplier": "jumpAmplitude",
@@ -117,9 +120,9 @@
       "leg_near_shin": -8,
       "leg_far_thigh": -14,
       "leg_far_shin": -6,
-      "arm_near_upper": 34,
+      "arm_near_upper": 28,
       "arm_near_lower": 20,
-      "arm_far_upper": 22,
+      "arm_far_upper": 16,
       "arm_far_lower": 16,
       "sx": 0.95,
       "sy": 1.07
@@ -197,16 +200,16 @@
       "hair_front_r": -7,
       "coat_front": -4,
       "coat_back": -4,
-      "leg_near_thigh": 34,
-      "leg_near_shin": -55,
+      "leg_near_thigh": 36,
+      "leg_near_shin": -42,
       "leg_far_thigh": 26,
-      "leg_far_shin": -50,
+      "leg_far_shin": -32,
       "arm_near_upper": 26,
       "arm_near_lower": 20,
       "arm_far_upper": 14,
       "arm_far_lower": 14,
-      "sx": 1.06,
-      "sy": 0.91
+      "sx": 1.05,
+      "sy": 0.92
     },
     "wallSlide": {
       "multiplier": "wallAmplitude",
