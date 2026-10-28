@@ -12,6 +12,9 @@ public class BlueWitchDemo : MonoBehaviour
     const float PixelsPerUnit = 100f;
     // candidate.png 高 869。髋部根点在 y=605（从上往下），脚底大约再往下 248 像素。
     const float FeetBelowRoot = 248f / PixelsPerUnit;
+    // 大腿：髋 (232,580) 到膝 (212,705)。小腿：膝到鞋子底边 y=853。
+    const float ThighLength = 1.2658894f;
+    const float ShinLength = 1.48f;
     const float WalkSpeed = 1.15f;
 
     // 下面的角度是 1 倍时的基础幅度。近侧大腿被外套挡住，肩膀和后片是补出来的，转大了会露缝。
@@ -26,17 +29,46 @@ public class BlueWitchDemo : MonoBehaviour
     [Header("幅度")]
     [SerializeField] float idleAmplitude = 3f; // 待机：摆动和点头乘这个数，速度快慢不变
     [SerializeField] float walkAmplitude = 2f; // 走路：摆动和身体起伏乘这个数；前臂固定弯曲和步频不变
-    [SerializeField] float jumpAmplitude = 1f; // 起跳下蹲和上升姿势乘这个数
-    [SerializeField] float fallAmplitude = 1f; // 下落和落地缓冲乘这个数
+    [SerializeField] float jumpAmplitude = 1f; // 下蹲、蹬地、上升的关节角度乘这个数
+    [SerializeField] float fallAmplitude = 1f; // 下落和落地的关节角度乘这个数
     [SerializeField] float wallAmplitude = 1f; // 贴墙下滑乘这个数。姿态按面向墙的一侧来写，左右翻转后会镜像
+
+    [Header("二次运动")]
+    [Tooltip("头发、帽子、衣摆的弹簧刚度和起跳、落地冲量。0 时这几块与四肢一样做指数平滑。")]
+    [SerializeField] float springStrength = 1f;
+    [Tooltip("根节点压扁拉伸、屈膝下沉，以及跳跃时头发和前摆的派生缩放。")]
+    [SerializeField] float squashStrength = 1f;
 
     const float Gravity = -26f;
     const float JumpVelocity = 8.4f;
-    const float AnticipateTime = 0.1f;
-    const float LandTime = 0.16f;
-    const float WallFaceX = 4.4f;
+    const float ApexBand = 1.5f;
+    const float ApexGravityMul = 0.5f;
+    const float CrouchTime = 0.09f;
+    const float LaunchTime = 0.05f;
+    const float LandTime = 0.22f;
+    const float ImpactHold = 0.04f;
+    const float BoneSharpness = 30f;
+    const float AirBlendIn = 0.12f;
+    const float SpringSettleTime = 0.7f;
+    const float MaxDeltaTime = 1f / 30f;
+    const float WallFaceX = 4.4f; // 髋部根点碰到墙的位置，不是身体外缘
     const float WallDrop = -1.4f;
-    const float BlendSharpness = 12f;
+
+    // 弹簧顺序：hair_back, hair_front, hair_front_r, hat, coat_front, coat_back。
+    static readonly float[] SpringOmega = { 11f, 16f, 13f, 18f, 12f, 14f };
+    static readonly float[] SpringZeta = { 0.35f, 0.45f, 0.38f, 0.5f, 0.4f, 0.45f };
+    static readonly float[] SpringTakeoff = { 70f, 40f, 60f, 60f, 60f, -30f };
+    static readonly float[] SpringLand = { 120f, 60f, 90f, 50f, 90f, -40f };
+    const int SpringCount = 6;
+
+    enum Phase
+    {
+        Ground,
+        Crouch,
+        Launch,
+        Air,
+        Land
+    }
 
     [Serializable]
     public class PartSlot
@@ -90,15 +122,23 @@ public class BlueWitchDemo : MonoBehaviour
     Transform ground;
     float walkPhase;
     float verticalVelocity;
-    float anticipateTimer;
-    float landTimer;
-    bool grounded = true;
+    float phaseTime;
+    float airTime;
+    float faceSign = 1f;
+    float rigOffset;
+    float springHold;
+    float[] springX;
+    float[] springV;
+    Phase phase = Phase.Ground;
     bool onWall;
     Pose shown;
 
     void Awake()
     {
         Time.timeScale = 1f;
+        shown = IdleRest();
+        springX = new float[SpringCount];
+        springV = new float[SpringCount];
         BuildRig();
         transform.position = new Vector3(0f, FeetBelowRoot, 0f);
         BuildGround();
@@ -107,38 +147,56 @@ public class BlueWitchDemo : MonoBehaviour
 
     void Update()
     {
-        float dt = Time.deltaTime;
+        float dt = Mathf.Min(Time.deltaTime, MaxDeltaTime);
         float direction = ReadDirection();
         bool jumpPressed = Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame;
-        StepMotion(direction, jumpPressed, dt);
-        BlendAndApply(ChoosePose(direction), dt);
+        if (jumpPressed && phase == Phase.Ground)
+        {
+            phase = Phase.Crouch;
+            phaseTime = 0f;
+        }
+
+        if (phase == Phase.Crouch && phaseTime >= CrouchTime)
+        {
+            phase = Phase.Launch;
+            phaseTime -= CrouchTime;
+        }
+
+        if (phase == Phase.Launch && phaseTime >= LaunchTime)
+        {
+            phase = Phase.Air;
+            phaseTime = 0f;
+            airTime = 0f;
+            verticalVelocity = JumpVelocity;
+            Kick(true);
+        }
+
+        if (phase == Phase.Land && phaseTime >= LandTime)
+            phase = Phase.Ground;
+
+        StepMotion(direction, dt);
+        BlendAndApply(ChoosePose(direction), direction, dt);
+
+        if (phase == Phase.Crouch || phase == Phase.Launch || phase == Phase.Land)
+            phaseTime += dt;
+        if (phase == Phase.Ground)
+            springHold = Mathf.Max(0f, springHold - dt);
 
         if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
             GameFlow.LoadTitle();
     }
 
-    void StepMotion(float direction, bool jumpPressed, float dt)
+    void StepMotion(float direction, float dt)
     {
-        if (jumpPressed && grounded && anticipateTimer <= 0f && landTimer <= 0f)
-            anticipateTimer = AnticipateTime;
-
-        if (anticipateTimer > 0f)
+        if (phase == Phase.Crouch || phase == Phase.Launch)
         {
-            anticipateTimer -= dt;
             verticalVelocity = 0f;
-            grounded = true;
             onWall = false;
             HoldHeight(GroundY);
-            if (anticipateTimer <= 0f)
-            {
-                verticalVelocity = JumpVelocity;
-                grounded = false;
-            }
-
             return;
         }
 
-        if (!grounded)
+        if (phase == Phase.Air)
         {
             bool pressingAway = direction < -0.01f;
             bool hitWall = transform.position.x >= WallFaceX && !pressingAway;
@@ -156,7 +214,10 @@ public class BlueWitchDemo : MonoBehaviour
             else
             {
                 onWall = false;
-                verticalVelocity += Gravity * dt;
+                float gravity = Gravity;
+                if (Mathf.Abs(verticalVelocity) < ApexBand)
+                    gravity *= ApexGravityMul;
+                verticalVelocity += gravity * dt;
                 position.y += verticalVelocity * dt;
                 if (Mathf.Abs(direction) > 0.01f)
                 {
@@ -167,21 +228,21 @@ public class BlueWitchDemo : MonoBehaviour
                 }
             }
 
+            airTime += dt;
             if (position.y <= GroundY && verticalVelocity <= 0f)
             {
                 position.y = GroundY;
                 verticalVelocity = 0f;
-                grounded = true;
                 onWall = false;
-                landTimer = LandTime;
+                phase = Phase.Land;
+                phaseTime = 0f;
+                springHold = SpringSettleTime;
+                Kick(false);
             }
 
             transform.position = position;
             return;
         }
-
-        if (landTimer > 0f)
-            landTimer -= dt;
 
         onWall = false;
         verticalVelocity = 0f;
@@ -209,12 +270,10 @@ public class BlueWitchDemo : MonoBehaviour
 
     void Face(float direction)
     {
-        if (rig == null || Mathf.Abs(direction) < 0.01f)
+        if (Mathf.Abs(direction) < 0.01f)
             return;
 
-        Vector3 scale = rig.localScale;
-        scale.x = direction > 0f ? 1f : -1f;
-        rig.localScale = scale;
+        faceSign = direction > 0f ? 1f : -1f;
     }
 
     void LateUpdate()
@@ -264,46 +323,247 @@ public class BlueWitchDemo : MonoBehaviour
 
     Pose ChoosePose(float direction)
     {
-        if (anticipateTimer > 0f)
-            return Scale(CrouchPose(), jumpAmplitude);
-        if (landTimer > 0f && grounded)
-            return Scale(LandingPose(), fallAmplitude);
-        if (!grounded && onWall)
+        if (phase == Phase.Crouch)
+        {
+            float t = EaseOutCubic(phaseTime / CrouchTime);
+            return Pose.Lerp(IdleRest(), Scale(CrouchPose(), jumpAmplitude), t);
+        }
+
+        if (phase == Phase.Launch)
+        {
+            float t = EaseInQuad(phaseTime / LaunchTime);
+            return Pose.Lerp(Scale(CrouchPose(), jumpAmplitude), Scale(LaunchPose(), jumpAmplitude), t);
+        }
+
+        if (phase == Phase.Air && onWall)
             return Scale(WallPose(), wallAmplitude);
-        if (!grounded && verticalVelocity > 0f)
-            return Scale(RisePose(), jumpAmplitude);
-        if (!grounded)
-            return Scale(FallPose(), fallAmplitude);
+
+        if (phase == Phase.Air)
+        {
+            float u = Mathf.Clamp(verticalVelocity / JumpVelocity, -1f, 1f);
+            float riseWeight = SmoothRange(0.12f, 0.65f, u);
+            float fallWeight = SmoothRange(0.12f, 0.85f, -u);
+            Pose air = u >= 0f
+                ? Pose.Lerp(ApexPose(), Scale(RisePose(), jumpAmplitude), riseWeight)
+                : Pose.Lerp(ApexPose(), Scale(FallPose(), fallAmplitude), fallWeight);
+            float intoAir = SmoothRange(0f, 1f, airTime / AirBlendIn);
+            return Pose.Lerp(Scale(LaunchPose(), jumpAmplitude), air, intoAir);
+        }
+
+        if (phase == Phase.Land)
+        {
+            Pose land = Scale(LandPose(), fallAmplitude);
+            if (phaseTime < ImpactHold)
+                return land;
+
+            float t = EaseOutCubic((phaseTime - ImpactHold) / (LandTime - ImpactHold));
+            Pose recover = Mathf.Abs(direction) > 0.01f
+                ? WalkPose(Mathf.Sin(walkPhase), Mathf.Cos(walkPhase))
+                : IdleRest();
+            return Pose.Lerp(land, recover, t);
+        }
+
         if (Mathf.Abs(direction) > 0.01f)
             return WalkPose(Mathf.Sin(walkPhase), Mathf.Cos(walkPhase));
         return IdlePose(Time.time);
     }
 
-    void BlendAndApply(Pose target, float dt)
+    void BlendAndApply(Pose target, float direction, float dt)
     {
-        float blend = 1f - Mathf.Exp(-BlendSharpness * dt);
+        float squash = Mathf.Max(0f, squashStrength);
+        target.sx = Mathf.Lerp(1f, target.sx, squash);
+        target.sy = Mathf.Lerp(1f, target.sy, squash);
+
+        float blend = 1f - Mathf.Exp(-BoneSharpness * dt);
         shown = Pose.Lerp(shown, target, blend);
-        SetAngle("torso", shown.torso);
-        SetAngle("head", shown.head);
-        SetAngle("hat", shown.hat);
-        SetAngle("hair_back", shown.hairBack);
-        SetAngle("hair_front", shown.hairFront);
-        SetAngle("hair_front_r", shown.hairFrontR);
-        SetAngle("coat_front", shown.coatFront);
-        SetAngle("coat_back", shown.coatBack);
-        SetAngle("leg_near_thigh", shown.nearThigh);
-        SetAngle("leg_far_thigh", shown.farThigh);
-        SetAngle("leg_near_shin", shown.nearShin);
-        SetAngle("leg_far_shin", shown.farShin);
-        SetAngle("arm_near_upper", shown.nearUpper);
-        SetAngle("arm_far_upper", shown.farUpper);
-        SetAngle("arm_near_lower", shown.nearLower);
-        SetAngle("arm_far_lower", shown.farLower);
-        Bob("head", shown.headBob);
-        Bob("torso", shown.torsoBob);
+        bool onWallPose = phase == Phase.Air && onWall;
+        float response = Mathf.Max(0f, springStrength);
+        // 落地后的摆动大约再持续 0.7 秒。平时的待机和走路用指数平滑，走路步频会把 hair_back 的弹簧放大。
+        bool useSpring = !onWallPose && response > 0f && (phase != Phase.Ground || springHold > 0f);
+        for (int i = 0; i < SpringCount; i++)
+        {
+            if (!useSpring)
+            {
+                springX[i] = SpringAngle(shown, i);
+                springV[i] = 0f;
+                continue;
+            }
+
+            float omega = SpringOmega[i] * response;
+            float velocity = springV[i];
+            float angle = springX[i];
+            float goal = SpringAngle(target, i);
+            velocity += (omega * omega * (goal - angle) - 2f * SpringZeta[i] * omega * velocity) * dt;
+            angle += velocity * dt;
+            springV[i] = velocity;
+            springX[i] = angle;
+            shown = WithSpring(shown, i, angle);
+        }
+
+        bool jumpPose = phase == Phase.Crouch || phase == Phase.Launch || phase == Phase.Land
+            || (phase == Phase.Air && !onWall);
+        bool recoveringWalk = phase == Phase.Land && phaseTime >= ImpactHold && Mathf.Abs(direction) > 0.01f;
+        Pose display = shown;
+        if (!onWallPose)
+            ClampCloth(ref display);
+        if (jumpPose && !recoveringWalk)
+            ClampBody(ref display);
+
+        SetAngle("torso", display.torso);
+        SetAngle("head", display.head);
+        SetAngle("hat", display.hat);
+        SetAngle("hair_back", display.hairBack);
+        SetAngle("hair_front", display.hairFront);
+        SetAngle("hair_front_r", display.hairFrontR);
+        SetAngle("coat_front", display.coatFront);
+        SetAngle("coat_back", display.coatBack);
+        SetAngle("leg_near_thigh", display.nearThigh);
+        SetAngle("leg_far_thigh", display.farThigh);
+        SetAngle("leg_near_shin", display.nearShin);
+        SetAngle("leg_far_shin", display.farShin);
+        SetAngle("arm_near_upper", display.nearUpper);
+        SetAngle("arm_far_upper", display.farUpper);
+        SetAngle("arm_near_lower", display.nearLower);
+        SetAngle("arm_far_lower", display.farLower);
+        Bob("head", display.headBob);
+        Bob("torso", display.torsoBob);
+        ApplyClothScale(display, jumpPose);
+        ApplyRoot(display, direction, squash, blend);
     }
 
-    // 正角度是逆时针。面向右时，近侧大腿正角度会把腿留在外套后面；近侧上臂不要超过大约 60 度。
+    void ApplyRoot(Pose display, float direction, float squash, float blend)
+    {
+        if (rig == null)
+            return;
+
+        bool recoveringWalk = phase == Phase.Land && phaseTime >= ImpactHold && Mathf.Abs(direction) > 0.01f;
+        bool plant = phase == Phase.Crouch || phase == Phase.Launch
+            || (phase == Phase.Land && !recoveringWalk)
+            || (phase == Phase.Ground && Mathf.Abs(direction) <= 0.01f);
+        float drop = plant ? LegDrop(display) * squash : 0f;
+        float targetY = plant ? FeetBelowRoot * (display.sy - 1f) - drop : 0f;
+        rigOffset = Mathf.Lerp(rigOffset, targetY, blend);
+        rig.localPosition = new Vector3(0f, rigOffset, 0f);
+        rig.localScale = new Vector3(faceSign * display.sx, display.sy, 1f);
+    }
+
+    void ApplyClothScale(Pose display, bool jumpPose)
+    {
+        Transform hair = FindBone("hair_back");
+        Transform coat = FindBone("coat_front");
+        float squash = Mathf.Max(0f, squashStrength);
+        float hairY = 1f;
+        float coatX = 1f;
+        float coatY = 1f;
+        if (jumpPose)
+        {
+            hairY = Mathf.Clamp(1f + 0.0125f * display.hairBack, 0.90f, 1.04f);
+            coatY = Mathf.Clamp(1f + 0.012f * display.coatFront, 0.94f, 1.03f);
+            coatX = Mathf.Clamp(1f - 0.012f * display.coatFront, 0.97f, 1.06f);
+        }
+
+        hairY = Mathf.Lerp(1f, hairY, squash);
+        coatY = Mathf.Lerp(1f, coatY, squash);
+        coatX = Mathf.Lerp(1f, coatX, squash);
+        if (hair != null)
+            hair.localScale = new Vector3(1f, hairY, 1f);
+        if (coat != null)
+            coat.localScale = new Vector3(coatX, coatY, 1f);
+    }
+
+    void Kick(bool takeoff)
+    {
+        float scale = Mathf.Max(0f, springStrength);
+        float[] kick = takeoff ? SpringTakeoff : SpringLand;
+        for (int i = 0; i < SpringCount; i++)
+            springV[i] += kick[i] * scale;
+    }
+
+    static void ClampCloth(ref Pose pose)
+    {
+        pose.hairBack = Mathf.Clamp(pose.hairBack, -8f, 8f);
+        pose.hairFront = Mathf.Clamp(pose.hairFront, -12f, 10f);
+        pose.hairFrontR = Mathf.Clamp(pose.hairFrontR, -15f, 15f);
+        pose.hat = Mathf.Clamp(pose.hat, -8f, 8f);
+        pose.coatFront = Mathf.Clamp(pose.coatFront, -5f, 6f);
+        pose.coatBack = Mathf.Clamp(pose.coatBack, -8f, 3f);
+    }
+
+    static void ClampBody(ref Pose pose)
+    {
+        pose.torso = Mathf.Clamp(pose.torso, -12f, 8f);
+        pose.head = Mathf.Clamp(pose.head, -8f, 8f);
+        pose.nearUpper = Mathf.Clamp(pose.nearUpper, -20f, 45f);
+        pose.farUpper = Mathf.Clamp(pose.farUpper, -8f, 25f);
+        pose.nearLower = Mathf.Clamp(pose.nearLower, 0f, 40f);
+        pose.farLower = Mathf.Clamp(pose.farLower, 0f, 40f);
+        pose.nearThigh = Mathf.Clamp(pose.nearThigh, -15f, 36f);
+        pose.nearShin = Mathf.Clamp(pose.nearShin, -55f, 2f);
+        pose.farThigh = Mathf.Clamp(pose.farThigh, -16f, 26f);
+        pose.farShin = Mathf.Clamp(pose.farShin, -50f, 2f);
+    }
+
+    static float SpringAngle(Pose pose, int index)
+    {
+        switch (index)
+        {
+            case 0: return pose.hairBack;
+            case 1: return pose.hairFront;
+            case 2: return pose.hairFrontR;
+            case 3: return pose.hat;
+            case 4: return pose.coatFront;
+            default: return pose.coatBack;
+        }
+    }
+
+    static Pose WithSpring(Pose pose, int index, float value)
+    {
+        switch (index)
+        {
+            case 0: pose.hairBack = value; break;
+            case 1: pose.hairFront = value; break;
+            case 2: pose.hairFrontR = value; break;
+            case 3: pose.hat = value; break;
+            case 4: pose.coatFront = value; break;
+            default: pose.coatBack = value; break;
+        }
+
+        return pose;
+    }
+
+    static float LegDrop(Pose pose)
+    {
+        return Mathf.Min(LegReach(pose.nearThigh, pose.nearShin), LegReach(pose.farThigh, pose.farShin));
+    }
+
+    static float LegReach(float thighDegrees, float shinDegrees)
+    {
+        float thigh = thighDegrees * Mathf.Deg2Rad;
+        float knee = (thighDegrees + shinDegrees) * Mathf.Deg2Rad;
+        return ThighLength * (1f - Mathf.Cos(thigh)) + ShinLength * (1f - Mathf.Cos(knee));
+    }
+
+    static float EaseOutCubic(float t)
+    {
+        t = Mathf.Clamp01(t);
+        float remain = 1f - t;
+        return 1f - remain * remain * remain;
+    }
+
+    static float EaseInQuad(float t)
+    {
+        t = Mathf.Clamp01(t);
+        return t * t;
+    }
+
+    static float SmoothRange(float edge0, float edge1, float value)
+    {
+        float t = Mathf.Clamp01((value - edge0) / (edge1 - edge0));
+        return t * t * (3f - 2f * t);
+    }
+
+    // 面向右，局部 Z 正角度是逆时针。躯干正值后仰、负值前倾。
+    // 小腿正值是反膝，前臂负值是反肘。头发正值扫进身体，前摆正值扫进腿。
     static Pose Scale(Pose pose, float amplitude)
     {
         pose.torso *= amplitude;
@@ -327,6 +587,17 @@ public class BlueWitchDemo : MonoBehaviour
         return pose;
     }
 
+    static Pose IdleRest()
+    {
+        return new Pose
+        {
+            nearLower = 1.5f,
+            farLower = 1.2f,
+            sx = 1f,
+            sy = 1f
+        };
+    }
+
     Pose IdlePose(float time)
     {
         float idle = idleAmplitude;
@@ -344,6 +615,8 @@ public class BlueWitchDemo : MonoBehaviour
         pose.nearLower = 1.5f;
         pose.farLower = 1.2f;
         pose.headBob = Mathf.Sin(time * 1.2f) * 0.012f * idle;
+        pose.sx = 1f;
+        pose.sy = 1f;
         return pose;
     }
 
@@ -369,113 +642,162 @@ public class BlueWitchDemo : MonoBehaviour
         pose.nearLower = 2f + Mathf.Max(0f, -swing) * WalkForearm * walk;
         pose.farLower = 2f + Mathf.Max(0f, swing) * WalkForearm * walk;
         pose.torsoBob = Mathf.Abs(step) * 0.015f * walk;
+        pose.sx = 1f;
+        pose.sy = 1f;
         return pose;
     }
 
-    // 起跳前的短下蹲。近侧腿往后收，让外套继续盖住髋部。
     static Pose CrouchPose()
     {
         return new Pose
         {
-            torso = 10f,
-            head = 8f,
-            hat = 3f,
-            hairBack = 5f,
-            hairFront = 3f,
-            hairFrontR = 4f,
-            coatFront = 7f,
-            coatBack = 4f,
-            nearThigh = 18f,
-            farThigh = -20f,
-            nearShin = -26f,
-            farShin = 28f,
-            nearUpper = 22f,
-            farUpper = 16f,
-            nearLower = 6f,
-            farLower = 4f,
-            torsoBob = -0.05f,
-            headBob = -0.008f
+            torso = -10f,
+            head = 6f,
+            hat = -3f,
+            hairBack = -4f,
+            hairFront = -3f,
+            hairFrontR = -4f,
+            coatFront = -3f,
+            coatBack = -3f,
+            nearThigh = 28f,
+            nearShin = -46f,
+            farThigh = 22f,
+            farShin = -40f,
+            nearUpper = -18f,
+            nearLower = 10f,
+            farUpper = -8f,
+            farLower = 12f,
+            sx = 1.04f,
+            sy = 0.95f
         };
     }
 
-    // 上升：膝弯收起，手臂向后抬，头发和外套还垂着。
+    static Pose LaunchPose()
+    {
+        return new Pose
+        {
+            torso = -7f,
+            head = -2f,
+            hat = 5f,
+            hairBack = 6f,
+            hairFront = 4f,
+            hairFrontR = 5f,
+            coatFront = 5f,
+            coatBack = -4f,
+            nearThigh = 10f,
+            nearShin = -8f,
+            farThigh = -14f,
+            farShin = -6f,
+            nearUpper = 34f,
+            nearLower = 20f,
+            farUpper = 22f,
+            farLower = 16f,
+            sx = 0.95f,
+            sy = 1.07f
+        };
+    }
+
     static Pose RisePose()
     {
         return new Pose
         {
-            torso = -8f,
-            head = -14f,
-            hat = -6f,
-            hairBack = 12f,
-            hairFront = 7f,
-            hairFrontR = 9f,
-            coatFront = 11f,
-            coatBack = 8f,
-            nearThigh = 22f,
-            farThigh = -34f,
-            nearShin = -30f,
-            farShin = 38f,
-            nearUpper = 38f,
-            farUpper = 46f,
-            nearLower = -16f,
-            farLower = -12f,
-            torsoBob = 0.012f,
-            headBob = 0.008f
+            torso = -4f,
+            head = 2f,
+            hat = 5f,
+            hairBack = 5f,
+            hairFront = 3f,
+            hairFrontR = 4f,
+            coatFront = 4f,
+            coatBack = -3f,
+            nearThigh = 34f,
+            nearShin = -52f,
+            farThigh = -10f,
+            farShin = -30f,
+            nearUpper = 20f,
+            nearLower = 26f,
+            farUpper = 10f,
+            farLower = 20f,
+            sx = 0.98f,
+            sy = 1.03f
         };
     }
 
-    // 下落：腿向下伸，手臂张开保持平衡，头发和外套向上扬。
+    static Pose ApexPose()
+    {
+        return new Pose
+        {
+            torso = 0f,
+            head = 3f,
+            hat = -3f,
+            hairBack = -4f,
+            hairFront = -5f,
+            hairFrontR = -7f,
+            coatFront = -3f,
+            coatBack = 1f,
+            nearThigh = 36f,
+            nearShin = -55f,
+            farThigh = 24f,
+            farShin = -48f,
+            nearUpper = 36f,
+            nearLower = 18f,
+            farUpper = -8f,
+            farLower = 22f,
+            sx = 1f,
+            sy = 1f
+        };
+    }
+
     static Pose FallPose()
     {
         return new Pose
         {
-            torso = 6f,
-            head = 10f,
-            hat = 5f,
-            hairBack = 30f,
-            hairFront = 16f,
-            hairFrontR = 20f,
-            coatFront = 22f,
-            coatBack = 16f,
-            nearThigh = 12f,
-            farThigh = -8f,
-            nearShin = -8f,
-            farShin = 6f,
-            nearUpper = 50f,
-            farUpper = -42f,
-            nearLower = -8f,
-            farLower = 14f,
-            headBob = 0.01f
+            torso = 2f,
+            head = -5f,
+            hat = -7f,
+            hairBack = -6f,
+            hairFront = -9f,
+            hairFrontR = -13f,
+            coatFront = -3f,
+            coatBack = 2f,
+            nearThigh = 16f,
+            nearShin = -20f,
+            farThigh = 4f,
+            farShin = -12f,
+            nearUpper = 18f,
+            nearLower = 32f,
+            farUpper = -8f,
+            farLower = 30f,
+            sx = 0.98f,
+            sy = 1.03f
         };
     }
 
-    // 落地的短缓冲：膝弯，上身下沉。
-    static Pose LandingPose()
+    static Pose LandPose()
     {
         return new Pose
         {
-            torso = 14f,
-            head = 12f,
-            hat = 4f,
-            hairBack = 8f,
-            hairFront = 4f,
-            hairFrontR = 6f,
-            coatFront = 9f,
-            coatBack = 5f,
-            nearThigh = 16f,
-            farThigh = -22f,
-            nearShin = -32f,
-            farShin = 36f,
-            nearUpper = 14f,
-            farUpper = 10f,
-            nearLower = 4f,
-            farLower = 2f,
-            torsoBob = -0.07f,
-            headBob = -0.015f
+            torso = -12f,
+            head = 7f,
+            hat = -4f,
+            hairBack = -6f,
+            hairFront = -5f,
+            hairFrontR = -7f,
+            coatFront = -4f,
+            coatBack = -4f,
+            nearThigh = 34f,
+            nearShin = -55f,
+            farThigh = 26f,
+            farShin = -50f,
+            nearUpper = 26f,
+            nearLower = 20f,
+            farUpper = 14f,
+            farLower = 14f,
+            sx = 1.06f,
+            sy = 0.91f
         };
     }
 
-    // 贴墙：身体靠向墙，近侧手伸向墙，腿弯着。角度写在面向墙的局部空间里。
+    // 贴墙角度这次不动。近侧上臂 -50 是向后摆，手会离开右侧的墙；近侧前臂 -28 是反肘。
     static Pose WallPose()
     {
         return new Pose
@@ -496,7 +818,9 @@ public class BlueWitchDemo : MonoBehaviour
             farUpper = -18f,
             nearLower = -28f,
             farLower = 6f,
-            torsoBob = -0.01f
+            torsoBob = -0.01f,
+            sx = 1f,
+            sy = 1f
         };
     }
 
@@ -520,6 +844,8 @@ public class BlueWitchDemo : MonoBehaviour
         public float farLower;
         public float torsoBob;
         public float headBob;
+        public float sx;
+        public float sy;
 
         public static Pose Lerp(Pose from, Pose to, float t)
         {
@@ -542,6 +868,8 @@ public class BlueWitchDemo : MonoBehaviour
             pose.farLower = Mathf.Lerp(from.farLower, to.farLower, t);
             pose.torsoBob = Mathf.Lerp(from.torsoBob, to.torsoBob, t);
             pose.headBob = Mathf.Lerp(from.headBob, to.headBob, t);
+            pose.sx = Mathf.Lerp(from.sx, to.sx, t);
+            pose.sy = Mathf.Lerp(from.sy, to.sy, t);
             return pose;
         }
     }
