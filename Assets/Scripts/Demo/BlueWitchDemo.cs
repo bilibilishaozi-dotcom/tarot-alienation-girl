@@ -14,7 +14,7 @@ public class BlueWitchDemo : MonoBehaviour
     const float FeetBelowRoot = 248f / PixelsPerUnit;
     const float WalkSpeed = 1.15f;
 
-    // 幅度故意很小。近侧大腿被外套挡住，肩膀和后片是补出来的，转大了会露缝。
+    // 下面的角度是 1 倍时的基础幅度。近侧大腿被外套挡住，肩膀和后片是补出来的，转大了会露缝。
     const float IdleHair = 1.5f;
     const float IdleCoat = 1.1f;
     const float IdleHead = 0.6f;
@@ -22,6 +22,10 @@ public class BlueWitchDemo : MonoBehaviour
     const float WalkShin = 9f;
     const float WalkArm = 6f;
     const float WalkForearm = 4f;
+
+    [Header("幅度")]
+    [SerializeField] float idleAmplitude = 3f; // 待机：摆动和点头乘这个数，速度快慢不变
+    [SerializeField] float walkAmplitude = 2f; // 走路：摆动和身体起伏乘这个数；前臂固定弯曲和步频不变
 
     [Serializable]
     public class PartSlot
@@ -154,48 +158,50 @@ public class BlueWitchDemo : MonoBehaviour
 
     void ApplyIdle(float time)
     {
-        SetAngle("torso", Mathf.Sin(time * 1.3f) * 0.35f);
-        SetAngle("head", Mathf.Sin(time * 1.2f) * IdleHead);
-        SetAngle("hat", Mathf.Sin(time * 1.1f) * 0.45f);
-        SetAngle("hair_back", Mathf.Sin(time * 1.15f) * IdleHair);
-        SetAngle("hair_front", Mathf.Sin(time * 1.15f + 0.4f) * 1.1f);
-        SetAngle("hair_front_r", Mathf.Sin(time * 1.4f) * 1.8f);
-        SetAngle("coat_front", Mathf.Sin(time * 0.95f) * IdleCoat);
-        SetAngle("coat_back", Mathf.Sin(time * 0.95f + 0.8f) * 0.8f);
-        SetAngle("arm_near_upper", Mathf.Sin(time * 0.8f) * 0.8f);
-        SetAngle("arm_far_upper", Mathf.Sin(time * 0.8f + 0.5f) * 0.6f);
+        float idle = idleAmplitude;
+        SetAngle("torso", Mathf.Sin(time * 1.3f) * 0.35f * idle);
+        SetAngle("head", Mathf.Sin(time * 1.2f) * IdleHead * idle);
+        SetAngle("hat", Mathf.Sin(time * 1.1f) * 0.45f * idle);
+        SetAngle("hair_back", Mathf.Sin(time * 1.15f) * IdleHair * idle);
+        SetAngle("hair_front", Mathf.Sin(time * 1.15f + 0.4f) * 1.1f * idle);
+        SetAngle("hair_front_r", Mathf.Sin(time * 1.4f) * 1.8f * idle);
+        SetAngle("coat_front", Mathf.Sin(time * 0.95f) * IdleCoat * idle);
+        SetAngle("coat_back", Mathf.Sin(time * 0.95f + 0.8f) * 0.8f * idle);
+        SetAngle("arm_near_upper", Mathf.Sin(time * 0.8f) * 0.8f * idle);
+        SetAngle("arm_far_upper", Mathf.Sin(time * 0.8f + 0.5f) * 0.6f * idle);
         SetAngle("arm_near_lower", 1.5f);
         SetAngle("arm_far_lower", 1.2f);
         SetAngle("leg_near_thigh", 0f);
         SetAngle("leg_far_thigh", 0f);
         SetAngle("leg_near_shin", 0f);
         SetAngle("leg_far_shin", 0f);
-        Bob("head", Mathf.Sin(time * 1.2f) * 0.012f);
+        Bob("head", Mathf.Sin(time * 1.2f) * 0.012f * idle);
         Bob("torso", 0f);
     }
 
     void ApplyWalk(float swing, float step)
     {
         float time = Time.time;
-        SetAngle("torso", swing * 0.8f);
-        SetAngle("head", -swing * 0.5f);
-        SetAngle("hat", Mathf.Sin(time * 2f) * 0.4f);
-        SetAngle("hair_back", swing * 1.2f + Mathf.Sin(time * 2f) * 0.6f);
-        SetAngle("hair_front", swing * 0.8f);
-        SetAngle("hair_front_r", swing * 1.4f);
-        SetAngle("coat_front", swing * 1.3f);
-        SetAngle("coat_back", -swing * 0.9f);
+        float walk = walkAmplitude;
+        SetAngle("torso", swing * 0.8f * walk);
+        SetAngle("head", -swing * 0.5f * walk);
+        SetAngle("hat", Mathf.Sin(time * 2f) * 0.4f * walk);
+        SetAngle("hair_back", (swing * 1.2f + Mathf.Sin(time * 2f) * 0.6f) * walk);
+        SetAngle("hair_front", swing * 0.8f * walk);
+        SetAngle("hair_front_r", swing * 1.4f * walk);
+        SetAngle("coat_front", swing * 1.3f * walk);
+        SetAngle("coat_back", -swing * 0.9f * walk);
 
-        SetAngle("leg_near_thigh", swing * WalkThigh);
-        SetAngle("leg_far_thigh", -swing * WalkThigh);
-        SetAngle("leg_near_shin", Mathf.Max(0f, -swing) * WalkShin);
-        SetAngle("leg_far_shin", Mathf.Max(0f, swing) * WalkShin);
+        SetAngle("leg_near_thigh", swing * WalkThigh * walk);
+        SetAngle("leg_far_thigh", -swing * WalkThigh * walk);
+        SetAngle("leg_near_shin", Mathf.Max(0f, -swing) * WalkShin * walk);
+        SetAngle("leg_far_shin", Mathf.Max(0f, swing) * WalkShin * walk);
 
-        SetAngle("arm_near_upper", -swing * WalkArm);
-        SetAngle("arm_far_upper", swing * WalkArm);
-        SetAngle("arm_near_lower", 2f + Mathf.Max(0f, -swing) * WalkForearm);
-        SetAngle("arm_far_lower", 2f + Mathf.Max(0f, swing) * WalkForearm);
-        Bob("torso", Mathf.Abs(step) * 0.015f);
+        SetAngle("arm_near_upper", -swing * WalkArm * walk);
+        SetAngle("arm_far_upper", swing * WalkArm * walk);
+        SetAngle("arm_near_lower", 2f + Mathf.Max(0f, -swing) * WalkForearm * walk);
+        SetAngle("arm_far_lower", 2f + Mathf.Max(0f, swing) * WalkForearm * walk);
+        Bob("torso", Mathf.Abs(step) * 0.015f * walk);
         Bob("head", 0f);
     }
 
