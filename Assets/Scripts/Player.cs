@@ -331,6 +331,7 @@ public class Player : MonoBehaviour
     {
         IsDodging = true;
         hitStunTimer = 0f;
+        SetDodgeThroughEnemies(true);
     }
 
     // 一键回血（演示/试玩用）。H 键触发，见 Update。
@@ -346,6 +347,31 @@ public class Player : MonoBehaviour
     public void EndDodge()
     {
         IsDodging = false;
+        SetDodgeThroughEnemies(false);
+    }
+
+    // 冲刺穿过怪物身体：冲刺期间临时关掉玩家与所有敌人的物理碰撞，结束再恢复。
+    // 敌人如果在冲刺途中死亡，它的 collider 被销毁，IgnoreCollision 记录也随之消失。
+    private void SetDodgeThroughEnemies(bool ignore)
+    {
+        if (bodyCollider == null)
+            return;
+
+        BasicEnemy[] enemies = FindObjectsByType<BasicEnemy>(FindObjectsSortMode.None);
+        for (int i = 0; i < enemies.Length; i++)
+        {
+            Collider2D other = enemies[i] != null ? enemies[i].GetComponent<Collider2D>() : null;
+            if (other != null)
+                Physics2D.IgnoreCollision(bodyCollider, other, ignore);
+        }
+
+        RiftGuardian[] bosses = FindObjectsByType<RiftGuardian>(FindObjectsSortMode.None);
+        for (int i = 0; i < bosses.Length; i++)
+        {
+            Collider2D other = bosses[i] != null ? bosses[i].GetComponent<Collider2D>() : null;
+            if (other != null)
+                Physics2D.IgnoreCollision(bodyCollider, other, ignore);
+        }
     }
 
     public void TakeDamage(int amount, Vector2 hitFrom)
