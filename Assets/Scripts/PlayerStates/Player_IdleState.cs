@@ -19,10 +19,15 @@ public class Player_IdleState : Player_GroundedState
     {
         base.Update();
 
-        if (player.moveInput.x == player.facingDir && player.wallDetected)
+        // 父类可能已经切走（下落、跳跃、攻击），这时不要再往下切。
+        if (!stateMachine.IsActive(this))
             return;
 
-        if (player.moveInput.x != 0) 
+        // 顶着墙站着时不要再切 move（否则 push 会一直抖）
+        if (player.wallDetected && Mathf.Sign(player.moveInput.x) == player.facingDir && Mathf.Abs(player.moveInput.x) > 0.01f)
+            return;
+
+        if (player.moveInput.x != 0)
             stateMachine.ChangeState(player.moveState);
     }
 }

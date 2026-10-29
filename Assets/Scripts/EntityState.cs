@@ -68,7 +68,9 @@ public abstract class EntityState
 
     private bool CanDash()
     {
-        if(player.wallDetected)
+        // 只在真正贴着墙滑的时候禁掉冲刺；站在墙边（12cm 内）不该禁，
+        // 否则“贴着墙往前跑 + 冲刺躲开”这种正常操作会被吃掉。
+        if (stateMachine.currentState == player.wallSlideState)
             return false;
         if (stateMachine.currentState == player.dashState)
             return false;

@@ -114,9 +114,22 @@ public class Player : MonoBehaviour
     // 脚下是否有实体（含敌人/箱子），用于「踩在怪物头上也算落地」
     public bool supportDetected { get; private set; }
 
-    // 「现在能不能贴墙」= 真的贴着墙，且玩家没有按离墙方向。
+    // 「现在能不能贴墙」= 真的贴着墙 + 不在脱墙冷却里 + 没有按离墙方向。
     // 状态机里判断贴墙请用这个，不要直接用 wallDetected。
-    public bool wallLatched => wallDetected && wallReleaseTimer <= 0f;
+    public bool wallLatched
+    {
+        get
+        {
+            if (!wallDetected || wallReleaseTimer > 0f)
+                return false;
+
+            // 正往墙的反方向推的时候，任何情况下都不算贴住。
+            if (Mathf.Abs(moveInput.x) > 0.01f && Mathf.Sign(moveInput.x) != facingDir)
+                return false;
+
+            return true;
+        }
+    }
 
     public void ReleaseWall(float duration = 0.25f)
     {
