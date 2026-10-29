@@ -237,7 +237,7 @@ public class FirstLevel : MonoBehaviour
         // ② 骷髅兵：发现玩家就追过来挥刀；这一关先锁在平台 B 上，不往下跳。
         //    （以后的大关卡想让它跳下来追，只要不调用 StayOnPlatform 就行。）
         arena[1] = SpawnArenaEnemy("Skeleton", 14.6f, deckTop + feetLift, 3, "骷髅兵",
-            new Color(0.88f, 0.86f, 0.78f), new Vector3(0.85f, 1.15f, 1f), ground);
+            new Color(0.88f, 0.86f, 0.78f), new Vector3(1f, 1f, 1f), ground);
 
         // 碰撞盒按美术躯干重设（0.9 x 1.7，中心偏上 0.35），底边压到 deckTop = 轴心 2.2
         CapsuleCollider2D skeletonBody = arena[1].GetComponent<CapsuleCollider2D>();
@@ -258,8 +258,8 @@ public class FirstLevel : MonoBehaviour
         Transform ribcage = arena[1].transform.Find("Ribcage");
         if (ribcage != null)
             ribcage.gameObject.SetActive(false);
-        // 1.55 是骨架自身高度，父物体还有 1.15 的纵向缩放 → 实际约 1.78
-        SkeletonRig.Attach(arena[1].transform, arena[1], 1.55f);
+        // 1.75 是骨架自身高度；父物体现在是 1:1 缩放，不会被压窄
+        SkeletonRig.Attach(arena[1].transform, arena[1], 1.75f);
         arena[1].SetHudLift(2.0f);
 
         // ③ 石甲虫：甲壳很硬，横向普通攻击只会被弹开，只有从上方砸下来的下落攻击能破甲。

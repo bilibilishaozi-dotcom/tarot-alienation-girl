@@ -38,7 +38,8 @@ public class SkeletonRig : MonoBehaviour
         new PartDef("skull", "torso", 6, 744, 192, 158, 117, 46, 113),
         new PartDef("arm_sword", "torso", 7, 788, 318, 145, 383, 7, 12),
         new PartDef("sword", "arm_sword", 8, 925, 543, 349, 203, 20, 17),
-        new PartDef("shield_arm", "torso", -1, 0, 0, 0, 0, 0, 0),
+        // 虚拟肩关节：没有贴图，只提供盾牌的旋转轴心（画布坐标 620,350）
+        new PartDef("shield_arm", "torso", -1, 620, 350, 0, 0, 0, 0),
         new PartDef("shield", "shield_arm", 9, 421, 369, 211, 295, 91, 143)
     };
 
@@ -107,20 +108,17 @@ public class SkeletonRig : MonoBehaviour
                 {
                     if (Parts[j].Id != def.Parent)
                         continue;
-                    if (Parts[j].Order >= 0)
-                    {
-                        parentJointX = Parts[j].JointX;
-                        parentJointY = Parts[j].JointY;
-                    }
+
+                    parentJointX = Parts[j].JointX;
+                    parentJointY = Parts[j].JointY;
                     break;
                 }
             }
 
-            // shield_arm 是虚拟关节：轴心固定在肩部
-            float jointX = def.Order < 0 ? 620f : def.JointX;
-            float jointY = def.Order < 0 ? 350f : def.JointY;
-
-            bone.localPosition = new Vector3((jointX - parentJointX) / PPU, -(jointY - parentJointY) / PPU, 0f);
+            bone.localPosition = new Vector3(
+                (def.JointX - parentJointX) / PPU,
+                -(def.JointY - parentJointY) / PPU,
+                0f);
 
             if (def.Order < 0)
                 continue;
