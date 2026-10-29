@@ -25,13 +25,32 @@ public class PlayerCardLoadout : MonoBehaviour
         CardReward.Granted += OnCardGranted;
     }
 
+    private void Start()
+    {
+        // 从「牌之回响」选牌进 Boss 关时，把三张牌都放进背包，装上选中的那张。
+        if (string.IsNullOrEmpty(GameFlow.SelectedCardPath))
+            return;
+
+        string[] all = { "Cards/Fool", "Cards/Chariot", "Cards/Strength" };
+        for (int i = 0; i < all.Length; i++)
+        {
+            MonsterCardData owned = Resources.Load<MonsterCardData>(all[i]);
+            if (owned != null)
+                Remember(owned);
+        }
+
+        MonsterCardData chosen = Resources.Load<MonsterCardData>(GameFlow.SelectedCardPath);
+        if (chosen != null)
+            Equip(chosen, false);
+    }
+
     private void OnDisable()
     {
         CardReward.Granted -= OnCardGranted;
         DetachActive();
     }
 
-    public void Equip(MonsterCardData card)
+    public void Equip(MonsterCardData card, bool playEffect = true)
     {
         if (card == null)
             return;
@@ -56,7 +75,8 @@ public class PlayerCardLoadout : MonoBehaviour
         if (active != null && player != null)
             active.Attach(player, card);
         Changed?.Invoke();
-        CardPossession.Play(player, card);
+        if (playEffect)
+            CardPossession.Play(player, card);
     }
 
     public void EquipPending()

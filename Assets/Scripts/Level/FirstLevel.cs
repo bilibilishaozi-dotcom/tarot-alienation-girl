@@ -9,7 +9,10 @@ public class FirstLevel : MonoBehaviour
     private const float GrateLeft = 24.2f;
     private const float GrateHeight = 3.8f;
 
+    // 愚者试用结束：这一章的收尾，愚者牌到手。
     private const string ChapterLine = "裂隙暂时合上了。\n她收好愚者牌，往更深处走去。";
+    // 终局结束：不再提「收好愚者牌」，这是整段演示的收尾。
+    private const string FinaleLine = "裂隙彻底闭合了。\n三张塔罗牌在她手里安静下来。";
 
     private Player player;
     private PlayerCardLoadout loadout;
@@ -21,6 +24,8 @@ public class FirstLevel : MonoBehaviour
     private bool basicExitOpen;
     private bool foolTrial;
     private bool chariotTrial;
+    private bool bossLevel;
+    private bool bossChoiceOpen;
     private bool echoFoolDone;
     private bool echoChariotDone;
     private bool echoStrengthDone;
@@ -62,6 +67,7 @@ public class FirstLevel : MonoBehaviour
         Time.timeScale = 1f;
         foolTrial = GameFlow.ActiveLevelId == LevelCatalog.FoolTrialId;
         chariotTrial = GameFlow.ActiveLevelId == LevelCatalog.ChariotTrialId;
+        bossLevel = GameFlow.ActiveLevelId == LevelCatalog.BossId;
         player = GetComponent<Player>();
         loadout = GetComponent<PlayerCardLoadout>();
         cardUi = GetComponent<CardSelectUI>();
@@ -123,7 +129,8 @@ public class FirstLevel : MonoBehaviour
         if (Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame && !IsCardOpen)
             ReloadLevel();
 
-        if (cleared && endPanel != null && endPanel.activeSelf && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+        // 终局的结算面板不允许用 Esc 关掉：那是演示的终点，只能选按钮。
+        if (!bossLevel && cleared && endPanel != null && endPanel.activeSelf && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
             ContinueLevel();
 
         if (player != null && !busy && !player.IsDefeated)
@@ -163,7 +170,9 @@ public class FirstLevel : MonoBehaviour
         if (ground < 0)
             ground = 6;
 
-        if (foolTrial)
+        if (bossLevel)
+            BuildBossArena(ground);
+        else if (foolTrial)
             BuildFoolTrial(ground);
         else if (chariotTrial)
             BuildEchoRoom(ground);
@@ -174,40 +183,38 @@ public class FirstLevel : MonoBehaviour
     private void BuildBasicCombat(int ground)
     {
         const float floorTop = 0f;
-        Solid("Floor", new Vector2(14.9f, floorTop - 1f), new Vector2(32.2f, 2f), new Color(0.31f, 0.27f, 0.23f), ground, 0);
+        // 三个教学段之间留出明显的空档，跑动时能看清一段一段的节奏。
+        Solid("Floor", new Vector2(17.9f, floorTop - 1f), new Vector2(38.2f, 2f), new Color(0.31f, 0.27f, 0.23f), ground, 0);
         Solid("LeftWall", new Vector2(-1.7f, 3.2f), new Vector2(0.7f, 6.4f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
-        Solid("RightWall", new Vector2(31.7f, 3.4f), new Vector2(0.7f, 6.8f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
+        Solid("RightWall", new Vector2(37.2f, 3.4f), new Vector2(0.7f, 6.8f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
 
         // 两座薄平台。哨兵只在台面上巡逻，追击和受击也不会走下边缘。
         const float deckTop = 1.7f;
         const float deckThickness = 0.4f;
         float deckCenterY = deckTop - deckThickness * 0.5f;
-        Solid("PlatformA", new Vector2(5.8f, deckCenterY), new Vector2(4.8f, deckThickness), new Color(0.46f, 0.38f, 0.29f), ground, 1);
-        Solid("PlatformB", new Vector2(12f, deckCenterY), new Vector2(4.8f, deckThickness), new Color(0.46f, 0.38f, 0.29f), ground, 1);
-        Sign("AttackSign", root, new Vector3(5.8f, 2.65f, 0f), "鼠标左键", 180f);
-        Sign("DashSign", root, new Vector3(12f, 2.65f, 0f), "左 Shift 躲开", 220f);
+        Solid("PlatformA", new Vector2(6.3f, deckCenterY), new Vector2(4.8f, deckThickness), new Color(0.46f, 0.38f, 0.29f), ground, 1);
+        Solid("PlatformB", new Vector2(14.6f, deckCenterY), new Vector2(4.8f, deckThickness), new Color(0.46f, 0.38f, 0.29f), ground, 1);
 
         // 低台大约 0.62 高。跳跃攻击的刀光贴近身体，离开低台、面向右侧敌人时按鼠标左键能打到。
         const float lipTop = 0.62f;
-        Solid("LowLip", new Vector2(17.4f, lipTop * 0.5f), new Vector2(3.6f, lipTop), new Color(0.43f, 0.36f, 0.28f), ground, 1);
+        Solid("LowLip", new Vector2(21.6f, lipTop * 0.5f), new Vector2(3.6f, lipTop), new Color(0.43f, 0.36f, 0.28f), ground, 1);
         const float plinthTop = 0.28f;
-        Solid("EnemyPlinth", new Vector2(20.6f, plinthTop * 0.5f), new Vector2(1.8f, plinthTop), new Color(0.34f, 0.28f, 0.24f), ground, 1);
-        Sign("AirSign", root, new Vector3(18.2f, 1.55f, 0f), "空中攻击", 180f);
+        Solid("EnemyPlinth", new Vector2(25.6f, plinthTop * 0.5f), new Vector2(1.8f, plinthTop), new Color(0.34f, 0.28f, 0.24f), ground, 1);
 
         float feetLift = 0.92f;
         arena = new BasicEnemy[3];
-        arena[0] = SpawnLeashed("SentryA", 5.8f, deckTop + feetLift, "哨兵甲", new Color(0.72f, 0.28f, 0.22f), 4f, 7.6f, ground);
-        arena[1] = SpawnLeashed("SentryB", 12f, deckTop + feetLift, "哨兵乙", new Color(0.28f, 0.38f, 0.72f), 10.2f, 13.8f, ground);
+        arena[0] = SpawnLeashed("SentryA", 6.3f, deckTop + feetLift, "哨兵甲", new Color(0.72f, 0.28f, 0.22f), 4.4f, 8.2f, ground);
+        arena[1] = SpawnLeashed("SentryB", 14.6f, deckTop + feetLift, "哨兵乙", new Color(0.28f, 0.38f, 0.72f), 12.8f, 16.4f, ground);
         arena[1].SetAsCharger();
-        arena[2] = SpawnLeashed("LowEnemy", 20.6f, plinthTop + feetLift, "低处敌人", new Color(0.62f, 0.28f, 0.78f), 20.25f, 20.95f, ground);
+        arena[2] = SpawnLeashed("LowEnemy", 25.6f, plinthTop + feetLift, "低处敌人", new Color(0.62f, 0.28f, 0.78f), 24.95f, 26.45f, ground);
 
         // 普通跳约 2.46，蹬墙跳在贴墙后再抬约 2.10。柱底 2.40 让人能走过去，台面 3.40 让普通跳和冲刺都上不去。
-        basicSeal = Solid("ExitSeal", new Vector2(22.35f, 1.55f), new Vector2(0.55f, 3.1f), new Color(0.45f, 0.2f, 0.22f), ground, 3);
-        Solid("ClimbPillar", new Vector2(23.7f, 4.25f), new Vector2(0.7f, 3.7f), new Color(0.62f, 0.66f, 0.72f), ground, 2);
-        Solid("HighLedge", new Vector2(27.85f, 1.7f), new Vector2(4.9f, 3.4f), new Color(0.38f, 0.32f, 0.28f), ground, 1);
-        Sign("WallJumpSign", root, new Vector3(24.7f, 1.45f, 0f), "蹬墙跳", 160f);
-        Sign("ExitLabel", root, new Vector3(29.2f, 4.55f, 0f), "出口", 140f);
-        CreateBasicExit(29.2f, 4.7f);
+        basicSeal = Solid("ExitSeal", new Vector2(27.8f, 1.55f), new Vector2(0.55f, 3.1f), new Color(0.45f, 0.2f, 0.22f), ground, 3);
+        Solid("ClimbPillar", new Vector2(29f, 4.25f), new Vector2(0.7f, 3.7f), new Color(0.62f, 0.66f, 0.72f), ground, 2);
+        Solid("HighLedge", new Vector2(33.1f, 1.7f), new Vector2(5f, 3.4f), new Color(0.38f, 0.32f, 0.28f), ground, 1);
+        Sign("WallJumpSign", root, new Vector3(29.95f, 1.45f, 0f), "蹬墙跳", 160f);
+        Sign("ExitLabel", root, new Vector3(34.6f, 4.55f, 0f), "出口", 140f);
+        CreateBasicExit(34.6f, 4.7f);
     }
 
     private BasicEnemy SpawnLeashed(string objectName, float x, float y, string displayName, Color color, float minX, float maxX, int ground)
@@ -218,6 +225,64 @@ public class FirstLevel : MonoBehaviour
         enemy.StayOnPlatform(minX, maxX, 1 << ground);
         enemy.Died += OnArenaEnemyDied;
         return enemy;
+    }
+
+    // 终局：一间封闭的 Boss 房。进来之前已经在「牌之回响」里选好了要带的牌。
+    private void BuildBossArena(int ground)
+    {
+        Solid("Floor", new Vector2(14f, -1f), new Vector2(30.4f, 2f), new Color(0.26f, 0.21f, 0.2f), ground, 0);
+        Solid("LeftWall", new Vector2(-1.5f, 3.6f), new Vector2(0.8f, 7.2f), new Color(0.18f, 0.15f, 0.16f), ground, 0);
+        Solid("RightWall", new Vector2(29.5f, 3.6f), new Vector2(0.8f, 7.2f), new Color(0.18f, 0.15f, 0.16f), ground, 0);
+
+        // 三层台子：给蹬墙跳、空中攻击和躲预兆留出空间
+        Solid("LedgeA", new Vector2(8.5f, 1.6f), new Vector2(4.4f, 0.4f), new Color(0.42f, 0.34f, 0.32f), ground, 1);
+        Solid("LedgeB", new Vector2(18.5f, 2.6f), new Vector2(4f, 0.4f), new Color(0.42f, 0.34f, 0.32f), ground, 1);
+        Solid("LedgeC", new Vector2(13.5f, 4.2f), new Vector2(3f, 0.4f), new Color(0.34f, 0.27f, 0.26f), ground, 1);
+
+        // 场中央的暗红地板，提示这是 Boss 房
+        CreateSprite(root, "ArenaMark", new Vector3(20.5f, 0.02f, 0f), new Vector3(12f, 0.05f, 1f), new Color(0.55f, 0.16f, 0.18f, 0.75f), "Ground", 3);
+
+        CreateBoss(24.5f, 16);
+        bossNameSign = Sign("BossLabel", root, new Vector3(24.5f, 4.9f, 0f), "裂隙守卫", 240f);
+    }
+
+    // 复用愚者试用那套裂隙守卫，参数按玩家当前的攻击距离反算，普通攻击也够得到。
+    private void CreateBoss(float x, int health)
+    {
+        CapsuleCollider2D body = player.GetComponent<CapsuleCollider2D>();
+        float playerHeight = body != null ? body.size.y * Mathf.Abs(player.transform.lossyScale.y) : 1.9f;
+        float playerWidth = body != null ? body.size.x * Mathf.Abs(player.transform.lossyScale.x) : 0.77f;
+        float normalReach = player.AttackFrontReach(1f);
+        float stand = x - 1.7f;
+        standCenter = stand;
+        float slashMin = stand - 0.08f;
+
+        GameObject enemyObject = new GameObject("RiftGuardian");
+        enemyObject.transform.SetParent(root, false);
+        enemyObject.transform.localScale = new Vector3(1.35f, 1.62f, 1f);
+        SpriteRenderer enemySprite = enemyObject.AddComponent<SpriteRenderer>();
+        Rigidbody2D enemyBody = enemyObject.AddComponent<Rigidbody2D>();
+        enemyBody.bodyType = RigidbodyType2D.Kinematic;
+        enemyBody.gravityScale = 0f;
+        enemyBody.constraints = RigidbodyConstraints2D.FreezeAll;
+        CapsuleCollider2D capsule = enemyObject.AddComponent<CapsuleCollider2D>();
+        capsule.size = new Vector2(0.8f, 1.5f);
+        capsule.offset = new Vector2(0f, -0.05f);
+        boss = enemyObject.AddComponent<RiftGuardian>();
+
+        float enemyHalf = capsule.size.x * 0.5f * Mathf.Abs(enemyObject.transform.lossyScale.x);
+        float enemyBottom = capsule.offset.y - capsule.size.y * 0.5f;
+        enemyObject.transform.position = new Vector3(x + enemyHalf, 0.04f - enemyObject.transform.localScale.y * enemyBottom, 0f);
+        enemySprite.sortingLayerName = "Ground";
+        enemySprite.sortingOrder = 2;
+        CreateSprite(enemyObject.transform, "Core", new Vector3(0f, 0.2f, 0f), new Vector3(0.34f, 0.42f, 1f), new Color(1f, 0.86f, 0.45f), "Ground", 3);
+        CreateSprite(enemyObject.transform, "Aura", Vector3.zero, new Vector3(1.25f, 1.85f, 1f), new Color(0.9f, 0.24f, 0.18f, 0.33f), "Player", -8);
+        CreateSprite(enemyObject.transform, "HornL", new Vector3(-0.28f, 0.62f, 0f), new Vector3(0.16f, 0.32f, 1f), new Color(0.55f, 0.08f, 0.08f), "Ground", 3);
+        CreateSprite(enemyObject.transform, "HornR", new Vector3(0.28f, 0.62f, 0f), new Vector3(0.16f, 0.32f, 1f), new Color(0.55f, 0.08f, 0.08f), "Ground", 3);
+
+        boss.Bind(player, health, "裂隙守卫", slashMin, stand + normalReach, slashMin - normalReach, 0f,
+            playerHeight + 0.22f, playerHeight * 0.4f, Mathf.Max(1.15f, playerWidth * 2.2f));
+        boss.Died += OnBossDefeated;
     }
 
     private void CreateBasicExit(float x, float y)
@@ -508,7 +573,94 @@ public class FirstLevel : MonoBehaviour
         yield return ShowEchoBeat(point, new Color(1f, 0.35f, 0.18f, 0.9f), "力量震碎核心");
         if (finaleCore != null)
             finaleCore.gameObject.SetActive(false);
-        Complete();
+        ShowBossCardChoice();
+    }
+
+    // 三牌收束之后：先选一张带进 Boss 关的牌，选完直接加载最终关。
+    private void ShowBossCardChoice()
+    {
+        if (bossChoiceOpen || cleared)
+            return;
+
+        bossChoiceOpen = true;
+        SetObjective("选一张牌，带着它走进裂隙深处");
+        Time.timeScale = 0f;
+        if (player != null)
+            player.SetGameplayInputEnabled(false);
+        if (cardUi != null)
+            cardUi.HoldForClear();
+
+        MenuKit.EnsureEventSystem();
+
+        GameObject canvasObject = new GameObject("BossCardChoice");
+        Canvas canvas = canvasObject.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 140;
+        CanvasScaler scaler = canvasObject.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        canvasObject.AddComponent<GraphicRaycaster>();
+        Image dim = canvasObject.AddComponent<Image>();
+        dim.color = new Color(0.05f, 0.04f, 0.07f, 0.94f);
+        dim.rectTransform.anchorMin = Vector2.zero;
+        dim.rectTransform.anchorMax = Vector2.one;
+        dim.rectTransform.offsetMin = Vector2.zero;
+        dim.rectTransform.offsetMax = Vector2.zero;
+
+        Text title = CreateUiText(canvasObject.transform, "Title", 46, TextAnchor.MiddleCenter, new Color(1f, 0.88f, 0.55f));
+        title.text = "选一张牌，走进裂隙深处";
+        PlaceCenter(title.rectTransform, new Vector2(0f, 330f), new Vector2(1100f, 64f));
+
+        Text hint = CreateUiText(canvasObject.transform, "Hint", 24, TextAnchor.MiddleCenter, new Color(0.85f, 0.82f, 0.75f));
+        hint.text = "三张牌都会带进 Boss 战，这里选的是开场装备的那张。";
+        PlaceCenter(hint.rectTransform, new Vector2(0f, 268f), new Vector2(1100f, 40f));
+
+        string[] paths = { "Cards/Fool", "Cards/Chariot", "Cards/Strength" };
+        float[] xs = { -560f, 0f, 560f };
+        Color[] tints =
+        {
+            new Color(0.95f, 0.78f, 0.28f),
+            new Color(0.45f, 0.78f, 0.95f),
+            new Color(0.86f, 0.28f, 0.18f)
+        };
+
+        for (int i = 0; i < paths.Length; i++)
+        {
+            string path = paths[i];
+            MonsterCardData card = Resources.Load<MonsterCardData>(path);
+            string cardName = card != null && !string.IsNullOrEmpty(card.displayName) ? card.displayName : "牌";
+            string cardDesc = card != null ? card.description : "";
+            float x = xs[i];
+
+            Image frame = CreateUiImage(canvasObject.transform, "Card" + i, new Color(0.12f, 0.1f, 0.15f, 0.96f));
+            PlaceCenter(frame.rectTransform, new Vector2(x, -60f), new Vector2(460f, 380f));
+
+            Image stripe = CreateUiImage(frame.transform, "Stripe", tints[i]);
+            stripe.rectTransform.anchorMin = new Vector2(0f, 1f);
+            stripe.rectTransform.anchorMax = new Vector2(1f, 1f);
+            stripe.rectTransform.pivot = new Vector2(0.5f, 1f);
+            stripe.rectTransform.anchoredPosition = Vector2.zero;
+            stripe.rectTransform.sizeDelta = new Vector2(0f, 6f);
+
+            Text nameText = CreateUiText(frame.transform, "Name", 38, TextAnchor.MiddleCenter, tints[i]);
+            nameText.text = cardName;
+            PlaceCenter(nameText.rectTransform, new Vector2(0f, 110f), new Vector2(420f, 60f));
+
+            Text descText = CreateUiText(frame.transform, "Desc", 22, TextAnchor.UpperCenter, new Color(0.9f, 0.88f, 0.84f));
+            descText.text = cardDesc;
+            PlaceCenter(descText.rectTransform, new Vector2(0f, 10f), new Vector2(400f, 140f));
+
+            CreateChoice(frame.transform, "带这张", new Vector2(0f, -150f), () => GameFlow.EnterBossWithCard(path), 300f);
+        }
+    }
+
+    private static void PlaceCenter(RectTransform rect, Vector2 position, Vector2 size)
+    {
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = position;
+        rect.sizeDelta = size;
     }
 
     private IEnumerator ShowEchoBeat(Vector3 point, Color color, string caption)
@@ -879,6 +1031,12 @@ public class FirstLevel : MonoBehaviour
             return;
         }
 
+        if (bossLevel)
+        {
+            RefreshBossObjective();
+            return;
+        }
+
         if (!foolTrial)
         {
             RefreshBasicObjective();
@@ -936,10 +1094,32 @@ public class FirstLevel : MonoBehaviour
         SetObjective("往前拾取愚者");
     }
 
+    private void RefreshBossObjective()
+    {
+        if (cleared)
+        {
+            SetObjective("裂隙闭合了");
+            return;
+        }
+
+        if (boss != null && !boss.IsDead)
+        {
+            if (boss.HasAttacked)
+                SetObjective("");
+            else if (boss.IsTelegraphing)
+                SetObjective("看地面预兆再躲开");
+            else
+                SetObjective("击破裂隙守卫");
+            return;
+        }
+
+        SetObjective("守卫倒下了");
+    }
+
     private void RefreshBasicObjective()
     {
         float x = player != null ? player.transform.position.x : 0f;
-        if (basicExitOpen && x > 26.5f)
+        if (basicExitOpen && x > 31.2f)
         {
             SetObjective("走进出口，进入愚者牌试用");
             return;
@@ -947,7 +1127,7 @@ public class FirstLevel : MonoBehaviour
 
         if (basicExitOpen)
         {
-            SetObjective("贴灰柱按住 A，空格蹬出后松开 A");
+            SetObjective("贴着柱子按住 A 往下滑，空格蹬墙，越过缺口后松开 A");
             return;
         }
 
@@ -957,13 +1137,13 @@ public class FirstLevel : MonoBehaviour
             return;
         }
 
-        if (ArenaAlive(2) && x > 14.6f)
+        if (ArenaAlive(2) && x > 19f)
         {
             SetObjective("跳起后马上按鼠标左键，或离开低台时按");
             return;
         }
 
-        if (ArenaAlive(1) && x > 8.4f)
+        if (ArenaAlive(1) && x > 9.5f)
         {
             SetObjective("哨兵挥刀前，左 Shift 冲刺躲开");
             return;
@@ -1055,6 +1235,14 @@ public class FirstLevel : MonoBehaviour
 
     private void UpdateLesson()
     {
+        if (bossLevel)
+        {
+            if (boss != null)
+                boss.SetFoolReady(FoolEquipped);
+            RefreshObjective();
+            return;
+        }
+
         if (chariotTrial)
         {
             RefreshObjective();
@@ -1220,7 +1408,7 @@ public class FirstLevel : MonoBehaviour
         Image endImage = endPanel.AddComponent<Image>();
         endImage.color = new Color(0.07f, 0.05f, 0.09f, 0.94f);
         RectTransform endRect = endPanel.GetComponent<RectTransform>();
-        endRect.sizeDelta = chariotTrial ? new Vector2(640f, 480f) : new Vector2(640f, foolTrial ? 760f : 640f);
+        endRect.sizeDelta = new Vector2(640f, 560f);
         Sprite panelSkin = UiArt.Load(UiArt.Panel);
         if (panelSkin != null)
         {
@@ -1229,33 +1417,39 @@ public class FirstLevel : MonoBehaviour
         }
 
         Text endTitle = CreateUiText(endPanel.transform, "Title", 40, TextAnchor.UpperCenter, new Color(1f, 0.88f, 0.55f));
-        endTitle.text = chariotTrial ? "牌之回响完成" : "愚者牌试用完成";
+        endTitle.text = bossLevel ? "裂隙闭合"
+            : chariotTrial ? "牌之回响完成"
+            : foolTrial ? "愚者牌试用完成"
+            : "第一关 完成";
         StretchTop(endTitle.rectTransform, -28f, 56f);
 
         Text ending = CreateUiText(endPanel.transform, "Ending", 26, TextAnchor.UpperCenter, new Color(1f, 0.94f, 0.82f));
-        ending.text = chariotTrial ? "三张牌都在她身上留下了不同的动作。" : ChapterLine;
-        StretchTop(ending.rectTransform, -96f, chariotTrial ? 72f : 100f);
+        ending.text = bossLevel ? FinaleLine
+            : chariotTrial ? "三张牌都在她身上留下了不同的动作。"
+            : foolTrial ? ChapterLine
+            : "哨兵清完了，栏杆后面的路开了。";
+        StretchTop(ending.rectTransform, -96f, 110f);
 
-        if (chariotTrial)
+        if (bossLevel)
         {
-            CreateChoice(endPanel.transform, "再试一次", new Vector2(0f, 20f), ReplayLevel);
+            // 演示的终点：只留「再来一次 / 回标题 / 选关」，不再有「继续」。
+            CreateChoice(endPanel.transform, "再战一次", new Vector2(0f, 20f), ReplayLevel);
             CreateChoice(endPanel.transform, "返回标题", new Vector2(0f, -70f), GameFlow.LoadTitle);
             CreateChoice(endPanel.transform, "选择关卡", new Vector2(0f, -160f), GameFlow.LoadLevelSelect);
         }
         else
         {
-            CreateChoice(endPanel.transform, "重玩本关", new Vector2(0f, 70f), ReplayLevel);
-            CreateChoice(endPanel.transform, "返回标题", new Vector2(0f, -16f), GameFlow.LoadTitle);
-            CreateChoice(endPanel.transform, "继续试玩当前关卡", new Vector2(0f, -102f), ContinueLevel);
-            CreateChoice(endPanel.transform, "选择关卡", new Vector2(0f, -188f), GameFlow.LoadLevelSelect);
-            if (foolTrial)
-            {
-                CreateChoice(endPanel.transform, "额外试炼：牌之回响", new Vector2(0f, -274f), GameFlow.LoadChariotTrial, 460f);
-                Text echoNote = CreateUiText(endPanel.transform, "EchoNote", 22, TextAnchor.MiddleCenter, new Color(0.9f, 0.86f, 0.75f, 1f));
-                echoNote.text = "约 1 分钟，切换体验三张牌";
-                echoNote.rectTransform.anchoredPosition = new Vector2(0f, -332f);
-                echoNote.rectTransform.sizeDelta = new Vector2(520f, 36f);
-            }
+            // 主线顺序：第一关 → 愚者牌试用 → 牌之回响 → 终局
+            if (chariotTrial)
+                CreateChoice(endPanel.transform, "再试一次", new Vector2(0f, 70f), ReplayLevel);
+            else if (foolTrial)
+                CreateChoice(endPanel.transform, "继续：牌之回响", new Vector2(0f, 70f), () => GameFlow.LoadChariotTrial(), 420f);
+            else
+                CreateChoice(endPanel.transform, "继续：愚者牌试用", new Vector2(0f, 70f), () => GameFlow.LoadFoolTrial(), 420f);
+
+            CreateChoice(endPanel.transform, "重玩本关", new Vector2(0f, -16f), ReplayLevel);
+            CreateChoice(endPanel.transform, "选择关卡", new Vector2(0f, -102f), GameFlow.LoadLevelSelect);
+            CreateChoice(endPanel.transform, "返回标题", new Vector2(0f, -188f), GameFlow.LoadTitle);
         }
         endPanel.SetActive(false);
     }
@@ -1316,7 +1510,7 @@ public class FirstLevel : MonoBehaviour
         SetObjective("裂隙正在关闭");
         yield return new WaitForSeconds(1.05f);
         if (fadeText != null)
-            fadeText.text = ChapterLine;
+            fadeText.text = bossLevel ? FinaleLine : ChapterLine;
         yield return Fade(0f, 0.8f, 0.4f);
         yield return new WaitForSeconds(0.7f);
         Complete();
@@ -1346,13 +1540,10 @@ public class FirstLevel : MonoBehaviour
         if (!foolTrial && !basicExitOpen)
             return false;
 
-        if (foolTrial)
-        {
-            Complete();
-            return true;
-        }
-
-        return GameFlow.LoadFoolTrial();
+        // 每一关的出口都回到结算面板，由面板上的「继续」推进到下一关，
+        // 不再从第一关直接硬切到愚者试用。
+        Complete();
+        return true;
     }
 
     private bool FoolEquipped =>

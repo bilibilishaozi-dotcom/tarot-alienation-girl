@@ -30,6 +30,10 @@ public static class GameFlow
         }
 
         ActiveLevelId = string.IsNullOrEmpty(slot.levelId) ? LevelCatalog.BasicCombatId : slot.levelId;
+        // 选牌只在「进 Boss 关」这一次生效；重开 Boss 关（ReloadActiveScene）时保留，
+        // 去别的关卡则清掉，免得下一关莫名其妙带着上一关选的牌。
+        if (ActiveLevelId != LevelCatalog.BossId)
+            SelectedCardPath = null;
         Load(slot.sceneName);
     }
 
@@ -62,6 +66,29 @@ public static class GameFlow
 
         LoadLevel(slot);
         return ActiveLevelId == LevelCatalog.ChariotTrialId;
+    }
+
+    // 进 Boss 关前在「牌之回响」里选的那张牌（Resources 路径）。
+    // 跨场景保留，由 PlayerCardLoadout 在新的场景里读出来装上。
+    public static string SelectedCardPath { get; private set; }
+
+    public static bool LoadBossLevel()
+    {
+        LevelSlot slot = LevelCatalog.Find(LevelCatalog.BossId);
+        if (slot == null)
+        {
+            Debug.LogWarning("关卡目录里没有可进入的 Boss 关。");
+            return false;
+        }
+
+        LoadLevel(slot);
+        return ActiveLevelId == LevelCatalog.BossId;
+    }
+
+    public static void EnterBossWithCard(string cardResourcePath)
+    {
+        SelectedCardPath = cardResourcePath;
+        LoadBossLevel();
     }
 
     public static void ReloadActiveScene()

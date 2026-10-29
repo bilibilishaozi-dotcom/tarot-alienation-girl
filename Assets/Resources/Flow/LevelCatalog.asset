@@ -28,3 +28,8 @@ MonoBehaviour:
     levelId: chariot
     preview: {fileID: 21300000, guid: f1a2b3c4d5e64789a0b1c2d3e4f50619, type: 3}
     available: 1
+  - displayName: "\u7EC8\u5C40  \u88C2\u9699\u6DF1\u5904"
+    sceneName: SampleScene
+    levelId: boss
+    preview: {fileID: 21300000, guid: f1a2b3c4d5e64789a0b1c2d3e4f50619, type: 3}
+    available: 1
