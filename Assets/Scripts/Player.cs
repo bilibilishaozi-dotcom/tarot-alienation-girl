@@ -64,6 +64,9 @@ public class Player : MonoBehaviour
     private float invulnerableTimer;
     private const float WallDetachGrace = 0.08f;
     private float wallDetachTimer;
+    // 玩家主动按离墙方向后的冷却：这段时间内不再判定为「贴在墙上」，
+    // 否则按反方向时会被贴墙状态反复抓回去，看起来就是“离开不了”。
+    private float wallReleaseTimer;
     public bool IsDodging { get; private set; }
 
     [Header("Health")]
@@ -110,6 +113,15 @@ public class Player : MonoBehaviour
     public bool wallDetected { get; private set; }
     // 脚下是否有实体（含敌人/箱子），用于「踩在怪物头上也算落地」
     public bool supportDetected { get; private set; }
+
+    // 「现在能不能贴墙」= 真的贴着墙，且玩家没有按离墙方向。
+    // 状态机里判断贴墙请用这个，不要直接用 wallDetected。
+    public bool wallLatched => wallDetected && wallReleaseTimer <= 0f;
+
+    public void ReleaseWall(float duration = 0.25f)
+    {
+        wallReleaseTimer = Mathf.Max(wallReleaseTimer, duration);
+    }
 
 
 
@@ -440,6 +452,9 @@ public class Player : MonoBehaviour
         }
 
         UpdateSupport();
+
+        if (wallReleaseTimer > 0f)
+            wallReleaseTimer -= Time.deltaTime;
     }
 
     // 脚下有没有「能站住的东西」：地面、敌人脑袋、箱子都算。

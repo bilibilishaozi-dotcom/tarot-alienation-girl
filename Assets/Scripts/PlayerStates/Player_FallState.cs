@@ -20,7 +20,7 @@ public class Player_FallState : Player_AiredState
             return;
         }
 
-        if (player.wallDetected)
+        if (player.wallLatched)
             stateMachine.ChangeState(player.wallSlideState);
     }
 }

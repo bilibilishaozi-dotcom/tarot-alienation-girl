@@ -11,6 +11,8 @@ public class Player_WallJumpState : EntityState
     {
         base.Enter();
         stateTimer = 0.12f;
+        // 蹬出去之后短时间内别再被同一面墙吸回去
+        player.ReleaseWall(0.3f);
         player.SetVelocity(player.wallJumpForce.x * -player.facingDir, player.wallJumpForce.y);
     }
 
@@ -26,7 +28,7 @@ public class Player_WallJumpState : EntityState
             return;
         }
 
-        if (stateTimer < 0f && player.wallDetected)
+        if (stateTimer < 0f && player.wallLatched)
             stateMachine.ChangeState(player.wallSlideState);
     }
 }

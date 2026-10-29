@@ -211,10 +211,12 @@ public class FirstLevel : MonoBehaviour
         arena[0].StayOnPlatform(4.4f, 8.2f, 1 << ground);
         CreateSprite(arena[0].transform, "SporeCap", new Vector3(0f, 0.45f, 0f), new Vector3(0.85f, 0.32f, 1f), new Color(0.26f, 0.5f, 0.18f), "Player", 7);
 
-        // ② 骷髅兵：发现玩家就跳下平台追过来，抬手挥刀。
+        // ② 骷髅兵：发现玩家就追过来挥刀；这一关先锁在平台 B 上，不往下跳。
+        //    （以后的大关卡想让它跳下来追，只要不调用 StayOnPlatform 就行。）
         arena[1] = SpawnArenaEnemy("Skeleton", 14.6f, deckTop + feetLift, 3, "骷髅兵",
             new Color(0.88f, 0.86f, 0.78f), new Vector3(0.85f, 1.15f, 1f), ground);
         arena[1].SetAsSkeleton();
+        arena[1].StayOnPlatform(12.4f, 16.8f, 1 << ground);
         CreateSprite(arena[1].transform, "Ribcage", new Vector3(0f, 0.02f, 0f), new Vector3(0.5f, 0.55f, 1f), new Color(0.66f, 0.64f, 0.56f), "Player", 7);
 
         // ③ 石甲虫：甲壳很硬，横向普通攻击只会被弹开，只有从上方砸下来的下落攻击能破甲。
