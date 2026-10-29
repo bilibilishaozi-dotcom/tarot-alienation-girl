@@ -184,9 +184,9 @@ public class FirstLevel : MonoBehaviour
     {
         const float floorTop = 0f;
         // 三个教学段之间留出明显的空档，跑动时能看清一段一段的节奏。
-        Solid("Floor", new Vector2(17.9f, floorTop - 1f), new Vector2(38.2f, 2f), new Color(0.31f, 0.27f, 0.23f), ground, 0);
+        Solid("Floor", new Vector2(18.8f, floorTop - 1f), new Vector2(40f, 2f), new Color(0.31f, 0.27f, 0.23f), ground, 0);
         Solid("LeftWall", new Vector2(-1.7f, 3.2f), new Vector2(0.7f, 6.4f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
-        Solid("RightWall", new Vector2(37.2f, 3.4f), new Vector2(0.7f, 6.8f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
+        Solid("RightWall", new Vector2(39f, 3.4f), new Vector2(0.7f, 6.8f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
 
         // 两座薄平台。哨兵只在台面上巡逻，追击和受击也不会走下边缘。
         const float deckTop = 1.7f;
@@ -203,18 +203,35 @@ public class FirstLevel : MonoBehaviour
 
         float feetLift = 0.92f;
         arena = new BasicEnemy[3];
-        arena[0] = SpawnLeashed("SentryA", 6.3f, deckTop + feetLift, "哨兵甲", new Color(0.72f, 0.28f, 0.22f), 4.4f, 8.2f, ground);
-        arena[1] = SpawnLeashed("SentryB", 14.6f, deckTop + feetLift, "哨兵乙", new Color(0.28f, 0.38f, 0.72f), 12.8f, 16.4f, ground);
-        arena[1].SetAsCharger();
-        arena[2] = SpawnLeashed("LowEnemy", 25.6f, plinthTop + feetLift, "低处敌人", new Color(0.62f, 0.28f, 0.78f), 24.95f, 26.45f, ground);
+
+        // ① 孢子怪：守在平台 A，玩家靠近就鼓起来，约 1.1 秒后原地大范围喷发。
+        arena[0] = SpawnArenaEnemy("Spore", 6.3f, deckTop + feetLift, 3, "孢子怪",
+            new Color(0.42f, 0.7f, 0.3f), new Vector3(1.15f, 1f, 1f), ground);
+        arena[0].SetAsSpore();
+        arena[0].StayOnPlatform(4.4f, 8.2f, 1 << ground);
+        CreateSprite(arena[0].transform, "SporeCap", new Vector3(0f, 0.45f, 0f), new Vector3(0.85f, 0.32f, 1f), new Color(0.26f, 0.5f, 0.18f), "Player", 7);
+
+        // ② 骷髅兵：发现玩家就跳下平台追过来，抬手挥刀。
+        arena[1] = SpawnArenaEnemy("Skeleton", 14.6f, deckTop + feetLift, 3, "骷髅兵",
+            new Color(0.88f, 0.86f, 0.78f), new Vector3(0.85f, 1.15f, 1f), ground);
+        arena[1].SetAsSkeleton();
+        CreateSprite(arena[1].transform, "Ribcage", new Vector3(0f, 0.02f, 0f), new Vector3(0.5f, 0.55f, 1f), new Color(0.66f, 0.64f, 0.56f), "Player", 7);
+
+        // ③ 石甲虫：甲壳很硬，横向普通攻击只会被弹开，只有从上方砸下来的下落攻击能破甲。
+        arena[2] = SpawnArenaEnemy("Armored", 25.6f, plinthTop + feetLift, 3, "石甲虫",
+            new Color(0.4f, 0.42f, 0.48f), new Vector3(1.25f, 0.9f, 1f), ground);
+        arena[2].SetAsArmored();
+        arena[2].StayOnPlatform(24.95f, 26.45f, 1 << ground);
+        CreateSprite(arena[2].transform, "Shell", new Vector3(0f, 0.38f, 0f), new Vector3(1.15f, 0.34f, 1f), new Color(0.58f, 0.63f, 0.72f), "Player", 7);
 
         // 普通跳约 2.46，蹬墙跳在贴墙后再抬约 2.10。柱底 2.40 让人能走过去，台面 3.40 让普通跳和冲刺都上不去。
+        // 柱子右侧到高台左侧留 2.85 的空档，必须靠左右蹬墙才能上去。
         basicSeal = Solid("ExitSeal", new Vector2(27.8f, 1.55f), new Vector2(0.55f, 3.1f), new Color(0.45f, 0.2f, 0.22f), ground, 3);
         Solid("ClimbPillar", new Vector2(29f, 4.25f), new Vector2(0.7f, 3.7f), new Color(0.62f, 0.66f, 0.72f), ground, 2);
-        Solid("HighLedge", new Vector2(33.1f, 1.7f), new Vector2(5f, 3.4f), new Color(0.38f, 0.32f, 0.28f), ground, 1);
-        Sign("WallJumpSign", root, new Vector3(29.95f, 1.45f, 0f), "蹬墙跳", 160f);
-        Sign("ExitLabel", root, new Vector3(34.6f, 4.55f, 0f), "出口", 140f);
-        CreateBasicExit(34.6f, 4.7f);
+        Solid("HighLedge", new Vector2(35.4f, 1.7f), new Vector2(6.4f, 3.4f), new Color(0.38f, 0.32f, 0.28f), ground, 1);
+        Sign("WallJumpSign", root, new Vector3(30.8f, 1.45f, 0f), "蹬墙跳", 160f);
+        Sign("ExitLabel", root, new Vector3(36.4f, 4.55f, 0f), "出口", 140f);
+        CreateBasicExit(36.4f, 4.7f);
     }
 
     private BasicEnemy SpawnLeashed(string objectName, float x, float y, string displayName, Color color, float minX, float maxX, int ground)
@@ -283,6 +300,17 @@ public class FirstLevel : MonoBehaviour
         boss.Bind(player, health, "裂隙守卫", slashMin, stand + normalReach, slashMin - normalReach, 0f,
             playerHeight + 0.22f, playerHeight * 0.4f, Mathf.Max(1.15f, playerWidth * 2.2f));
         boss.Died += OnBossDefeated;
+    }
+
+    // 第一关的小怪：统一的生成方式，具体种类和外观由调用方设置。
+    private BasicEnemy SpawnArenaEnemy(string objectName, float x, float y, int health, string displayName, Color color, Vector3 scale, int ground)
+    {
+        BasicEnemy enemy = SpawnEnemy(objectName, x, health, false, displayName, color, "Player", 6);
+        enemy.transform.position = new Vector3(x, y, 0f);
+        enemy.SetVisualScale(scale);
+        enemy.SetBodyColor(color);
+        enemy.Died += OnArenaEnemyDied;
+        return enemy;
     }
 
     private void CreateBasicExit(float x, float y)
@@ -1119,7 +1147,7 @@ public class FirstLevel : MonoBehaviour
     private void RefreshBasicObjective()
     {
         float x = player != null ? player.transform.position.x : 0f;
-        if (basicExitOpen && x > 31.2f)
+        if (basicExitOpen && x > 33f)
         {
             SetObjective("走进出口，进入愚者牌试用");
             return;
@@ -1139,19 +1167,19 @@ public class FirstLevel : MonoBehaviour
 
         if (ArenaAlive(2) && x > 19f)
         {
-            SetObjective("跳起后马上按鼠标左键，或离开低台时按");
+            SetObjective("石甲虫的甲壳砍不动：跳起来从上方砸下去（下落攻击）");
             return;
         }
 
         if (ArenaAlive(1) && x > 9.5f)
         {
-            SetObjective("哨兵挥刀前，左 Shift 冲刺躲开");
+            SetObjective("骷髅兵会主动冲过来，等它抬手时冲刺躲开");
             return;
         }
 
-        if (ArenaAlive(0) || ArenaAlive(1))
+        if (ArenaAlive(0) && x > 3f)
         {
-            SetObjective("跳上平台，鼠标左键攻击哨兵");
+            SetObjective("孢子怪会先鼓起来再喷发，看到鼓包就往后退");
             return;
         }
 

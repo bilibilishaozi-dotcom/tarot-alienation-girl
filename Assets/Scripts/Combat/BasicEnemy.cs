@@ -77,6 +77,12 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
     public static event Action<BasicEnemy> Spawned;
     public static event Action<BasicEnemy> Removed;
 
+    // 敌人种类：靠这几个标记区分，共用同一套 巡逻/追击/蓄力/出手 状态机。
+    private bool spore;      // 孢子怪：不追人，靠近后原地蓄力，然后大范围喷发
+    private bool armored;    // 石甲虫：横向普通攻击会被甲壳弹开，只有从上方砸下来才吃伤害
+    private Color windupColor = new Color(1f, 0.72f, 0.2f, 1f);
+
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -171,6 +177,56 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
         windupDuration = 0.82f;
     }
 
+    // 孢子怪：不追人，玩家靠近就鼓起来，一段时间后原地大范围喷发；喷发前有明显预兆。
+    public void SetAsSpore()
+    {
+        spore = true;
+        noticeRange = 2.9f;
+        patrolDistance = 0f;
+        moveSpeed = 0f;
+        chaseSpeed = 0f;
+        attackRange = 2.3f;
+        windupDuration = 1.15f;
+        strikeDuration = 0.2f;
+        recoverDuration = 1.5f;
+        windupColor = new Color(0.62f, 1f, 0.45f, 1f);
+        UseBurstHitbox();
+    }
+
+    // 骷髅兵：发现玩家就自己跑过来，抬手比普通怪快一点。
+    public void SetAsSkeleton()
+    {
+        noticeRange = 9f;
+        chaseSpeed = 3.2f;
+        moveSpeed = 2.4f;
+        attackRange = 1.5f;
+        windupDuration = 0.5f;
+        recoverDuration = 0.55f;
+        windupColor = new Color(0.95f, 0.95f, 1f, 1f);
+    }
+
+    // 石甲虫：甲壳很硬，横向的普通攻击打不动，只有从上方砸下来才能破甲。
+    public void SetAsArmored()
+    {
+        armored = true;
+        noticeRange = 4f;
+        chaseSpeed = 1.2f;
+        attackRange = 1.3f;
+    }
+
+    // 攻击盒改成以自身为中心的大范围，用于孢子喷发。
+    private void UseBurstHitbox()
+    {
+        if (attackHitbox == null || attackPoint == null)
+            return;
+
+        attackHitboxOffset = 0f;
+        attackPoint.localPosition = new Vector3(0f, 0.15f, 0f);
+        BoxCollider2D box = attackPoint.GetComponent<BoxCollider2D>();
+        if (box != null)
+            box.size = new Vector2(3.4f, 2.4f);
+    }
+
     public void SetPushable()
     {
         if (rb != null)
@@ -231,6 +287,13 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
                     break;
                 }
 
+                // 孢子怪在蓄力期间会一鼓一鼓地胀大，给玩家时间跑开。
+                if (spore)
+                {
+                    float pulse = Mathf.PingPong(Time.time * 5f, 1f);
+                    transform.localScale = baseScale * (1.08f + 0.28f * pulse);
+                }
+
                 if (actionTimer <= 0f)
                     BeginStrike();
                 break;
@@ -283,6 +346,17 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
     {
         if (dead)
             return;
+
+        // 石甲虫：只有从上方砸下来的攻击才吃伤害，横向砍只会「叮」一声被弹开。
+        if (armored && hitFrom.y <= transform.position.y + 0.45f)
+        {
+            spriteRenderer.color = new Color(0.75f, 0.8f, 0.9f, 1f);
+            transform.localScale = new Vector3(baseScale.x * 0.94f, baseScale.y * 1.06f, baseScale.z);
+            action = EnemyAction.Hurt;
+            actionTimer = 0.18f;
+            AttackFeedback.Thud(transform.position);
+            return;
+        }
 
         EndStrike();
         health = Mathf.Max(0, health - amount);
@@ -382,7 +456,7 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
         actionTimer = windupDuration;
         HoldStill();
         FaceTowardPlayer();
-        spriteRenderer.color = new Color(1f, 0.72f, 0.2f, 1f);
+        spriteRenderer.color = windupColor;
         transform.localScale = baseScale * 1.12f;
     }
 
@@ -403,6 +477,8 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
         action = EnemyAction.Strike;
         actionTimer = strikeDuration;
         spriteRenderer.color = new Color(1f, 0.25f, 0.2f, 1f);
+        if (spore)
+            SpawnBurstVisual();
         if (attackHitbox != null)
             attackHitbox.BeginSwing();
     }
@@ -420,6 +496,39 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
     {
         if (attackHitbox != null)
             attackHitbox.EndSwing();
+    }
+
+    // 孢子喷发的可视范围（占位美术：一个扩散淡出的方块，正式美术可以换成孢子云）
+    private void SpawnBurstVisual()
+    {
+        GameObject ring = new GameObject("SporeBurst");
+        ring.transform.position = transform.position + Vector3.up * 0.2f;
+        SpriteRenderer ringSprite = ring.AddComponent<SpriteRenderer>();
+        ringSprite.sprite = CreatePlaceholderSprite();
+        ringSprite.color = new Color(0.65f, 1f, 0.45f, 0.5f);
+        ringSprite.sortingLayerName = "Player";
+        ringSprite.sortingOrder = 12;
+        ring.transform.localScale = new Vector3(1.2f, 0.8f, 1f);
+        StartCoroutine(AnimateBurst(ring, ringSprite));
+    }
+
+    private IEnumerator AnimateBurst(GameObject ring, SpriteRenderer ringSprite)
+    {
+        float elapsed = 0f;
+        const float duration = 0.35f;
+        while (elapsed < duration && ring != null)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            ring.transform.localScale = new Vector3(Mathf.Lerp(1.2f, 3.4f, t), Mathf.Lerp(0.8f, 2.4f, t), 1f);
+            Color color = ringSprite.color;
+            color.a = 0.5f * (1f - t);
+            ringSprite.color = color;
+            yield return null;
+        }
+
+        if (ring != null)
+            Destroy(ring);
     }
 
     private void Die()
