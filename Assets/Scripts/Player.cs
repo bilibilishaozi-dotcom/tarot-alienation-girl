@@ -62,6 +62,7 @@ public class Player : MonoBehaviour
     private Color bodySpriteColor = Color.white;
     private float hitStunTimer;
     private float invulnerableTimer;
+    private float nextHealTime;
     private const float WallDetachGrace = 0.08f;
     private float wallDetachTimer;
     // 玩家主动按离墙方向后的冷却：这段时间内不再判定为「贴在墙上」，
@@ -223,6 +224,13 @@ public class Player : MonoBehaviour
 
     private void Update()
     {
+        // H：一键回满血（有 1.2 秒冷却，避免连按）
+        if (Keyboard.current != null && Keyboard.current.hKey.wasPressedThisFrame && Time.unscaledTime >= nextHealTime)
+        {
+            nextHealTime = Time.unscaledTime + 1.2f;
+            RestoreFullHealth();
+        }
+
         //每帧检测地面、墙壁
         TickHurtTimers();
         HandleCollisionDetection();
@@ -323,6 +331,16 @@ public class Player : MonoBehaviour
     {
         IsDodging = true;
         hitStunTimer = 0f;
+    }
+
+    // 一键回血（演示/试玩用）。H 键触发，见 Update。
+    public void RestoreFullHealth()
+    {
+        if (IsDefeated || CurrentHealth >= maxHealth)
+            return;
+
+        CurrentHealth = maxHealth;
+        HealthChanged?.Invoke();
     }
 
     public void EndDodge()

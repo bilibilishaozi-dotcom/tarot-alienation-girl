@@ -83,6 +83,15 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
     private bool heavyFlash;
     private bool warned;
 
+    // ── 终局 Boss 专用：可以横向移动 + 半血后进入二阶段 ──
+    private bool mobile;
+    private float moveMinX;
+    private float moveMaxX;
+    private float moveSpeed = 1.6f;
+    private float anchorX;
+    private float phaseSpeed = 1f;
+    private bool phaseTwo;
+
     public int CurrentHealth => health;
     public int MaxHealth => maxHealth;
     public string DisplayName { get; private set; } = "裂隙守卫";
@@ -147,6 +156,7 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
         dropHeight = Mathf.Clamp(hazardHeight, 0.45f, meleeTop - groundY);
         dropWidth = Mathf.Clamp(hazardWidth, 0.8f, Mathf.Max(0.8f, grateX - thrustMinX));
         bound = player != null;
+        anchorX = transform.position.x;   // 移动时用它算攻击区的偏移
         Transform auraTransform = transform.Find("Aura");
         if (auraTransform != null)
             aura = auraTransform.GetComponent<SpriteRenderer>();
@@ -163,6 +173,19 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
     {
         foolReady = ready;
     }
+
+    // 让 Boss 能在 [minX, maxX] 之间横向巡走。攻击区会跟着它一起移动。
+    public void SetMobile(float minX, float maxX, float speed)
+    {
+        mobile = true;
+        moveMinX = Mathf.Min(minX, maxX);
+        moveMaxX = Mathf.Max(minX, maxX);
+        moveSpeed = Mathf.Max(0.1f, speed);
+        anchorX = transform.position.x;
+    }
+
+    // Boss 相对锚点移动了多少，攻击区要按这个偏移。
+    private float ShiftX => mobile ? transform.position.x - anchorX : 0f;
 
     private void Update()
     {
@@ -186,6 +209,11 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
         }
 
         timer -= Time.deltaTime;
+
+        // 巡走：蓄力/出手/未唤醒时不动，其余时间朝玩家挪，但不会贴到脸上
+        if (mobile && step != Step.Windup && step != Step.Strike && step != Step.Dormant)
+            StepTowardsPlayer();
+
         switch (step)
         {
             case Step.Dormant:
@@ -220,7 +248,7 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
                 break;
             case Step.Recover:
                 if (timer <= 0f)
-                    BeginIdle(IdleGap);
+                    BeginIdle(IdleGap / phaseSpeed);
                 break;
         }
 
@@ -236,6 +264,10 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
         heavyFlash = amount >= 2;
         hitFlash = heavyFlash ? 0.16f : 0.1f;
         HealthChanged?.Invoke();
+
+        if (!phaseTwo && health > 0 && health <= maxHealth / 2)
+            BeginPhaseTwo();
+
         if (health > 0)
             return;
 
@@ -285,8 +317,33 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
     private void BeginRecover()
     {
         step = Step.Recover;
-        timer = RecoverTime;
+        timer = RecoverTime / phaseSpeed;
         HideZone();
+    }
+
+    // 朝玩家横向挪，保持 2 格距离；只在 [moveMinX, moveMaxX] 之间走。
+    private void StepTowardsPlayer()
+    {
+        if (player == null || player.IsDefeated)
+            return;
+
+        float delta = player.transform.position.x - transform.position.x;
+        if (Mathf.Abs(delta) < 2f)
+            return;
+
+        float dir = Mathf.Sign(delta);
+        float x = Mathf.Clamp(transform.position.x + dir * moveSpeed * phaseSpeed * Time.deltaTime, moveMinX, moveMaxX);
+        transform.position = new Vector3(x, transform.position.y, transform.position.z);
+    }
+
+    // 半血进二阶段：抬手更快、间隔更短、移动更急。
+    private void BeginPhaseTwo()
+    {
+        phaseTwo = true;
+        phaseSpeed = 1.45f;
+        bodyColor = new Color(1f, 0.4f, 0.2f, 1f);
+        AttackFeedback.Thud(transform.position);
+        AttackFeedback.Hit((Vector2)transform.position, true);
     }
 
     private void Die()
@@ -374,16 +431,17 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
 
     private Zone ZoneFor(Move move)
     {
+        float shift = ShiftX;
         if (move == Move.Drop)
         {
             float half = dropWidth * 0.5f;
-            float minCenter = thrustMinX + half;
-            float maxCenter = grateX - half;
-            float center = player != null ? player.transform.position.x : (thrustMinX + grateX) * 0.5f;
+            float minCenter = thrustMinX + shift + half;
+            float maxCenter = grateX + shift - half;
+            float center = player != null ? player.transform.position.x : (thrustMinX + grateX) * 0.5f + shift;
             if (maxCenter >= minCenter)
                 center = Mathf.Clamp(center, minCenter, maxCenter);
             else
-                center = (thrustMinX + grateX) * 0.5f;
+                center = (thrustMinX + grateX) * 0.5f + shift;
 
             return new Zone
             {
@@ -394,11 +452,11 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
             };
         }
 
-        float minX = move == Move.Thrust ? thrustMinX : slashMinX;
+        float minX = (move == Move.Thrust ? thrustMinX : slashMinX) + shift;
         return new Zone
         {
             MinX = minX,
-            MaxX = grateX,
+            MaxX = grateX + shift,
             MinY = groundY,
             MaxY = meleeTop
         };
@@ -423,12 +481,13 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
     private bool PlayerInArena()
     {
         float x = player.transform.position.x;
-        return x >= thrustMinX && x <= grateX + 0.8f;
+        float shift = ShiftX;
+        return x >= thrustMinX + shift && x <= grateX + shift + 0.8f;
     }
 
     private bool PlayerInSlash()
     {
-        return player != null && player.transform.position.x >= slashMinX;
+        return player != null && player.transform.position.x >= slashMinX + ShiftX;
     }
 
     private void ApplyPose()
@@ -587,17 +646,23 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
         sprite.color = color;
     }
 
-    private static float WindupTime(Move move)
+    private float WindupTime(Move move)
     {
+        float baseTime;
         switch (move)
         {
             case Move.Thrust:
-                return 0.9f;
+                baseTime = 0.9f;
+                break;
             case Move.Drop:
-                return 1.02f;
+                baseTime = 1.02f;
+                break;
             default:
-                return 0.62f;
+                baseTime = 0.62f;
+                break;
         }
+
+        return baseTime / phaseSpeed;
     }
 
     private static float StrikeTime(Move move)

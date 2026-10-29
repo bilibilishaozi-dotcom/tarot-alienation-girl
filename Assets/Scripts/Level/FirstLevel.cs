@@ -261,7 +261,7 @@ public class FirstLevel : MonoBehaviour
         // 场中央的暗红地板，提示这是 Boss 房
         CreateSprite(root, "ArenaMark", new Vector3(20.5f, 0.02f, 0f), new Vector3(12f, 0.05f, 1f), new Color(0.55f, 0.16f, 0.18f, 0.75f), "Ground", 3);
 
-        CreateBoss(24.5f, 16);
+        CreateBoss(24.5f, 24);
         bossNameSign = Sign("BossLabel", root, new Vector3(24.5f, 4.9f, 0f), "裂隙守卫", 240f);
     }
 
@@ -302,6 +302,9 @@ public class FirstLevel : MonoBehaviour
         boss.Bind(player, health, "裂隙守卫", slashMin, stand + normalReach, slashMin - normalReach, 0f,
             playerHeight + 0.22f, playerHeight * 0.4f, Mathf.Max(1.15f, playerWidth * 2.2f));
         boss.Died += OnBossDefeated;
+
+        // 终局 Boss：会在场地里横向巡走，攻击区跟着一起动
+        boss.SetMobile(x - 4.2f, x + 3.2f, 1.7f);
     }
 
     // 第一关的小怪：统一的生成方式，具体种类和外观由调用方设置。
@@ -1117,7 +1120,7 @@ public class FirstLevel : MonoBehaviour
 
         if (x < 4f)
         {
-            SetObjective("WASD 移动，空格跳跃，左 Shift 冲刺");
+            SetObjective("WASD 移动，空格跳跃，左 Shift 冲刺，H 回血");
             return;
         }
 
@@ -1163,7 +1166,7 @@ public class FirstLevel : MonoBehaviour
 
         if (x < 3f)
         {
-            SetObjective("WASD 移动，空格跳跃，左 Shift 冲刺");
+            SetObjective("WASD 移动，空格跳跃，左 Shift 冲刺，H 回血");
             return;
         }
 
