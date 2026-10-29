@@ -72,6 +72,10 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
     public bool IsDead => dead;
     public Vector3 HudWorldPoint => transform.position + Vector3.up * 1.15f;
     public bool IsStrikeActive => !dead && action == EnemyAction.Strike;
+    // 蓄力中（孢子怪用来播「鼓起来」的动画）
+    public bool IsWindingUp => !dead && action == EnemyAction.Windup;
+    // 朝向：1 向右，-1 向左（骨骼动画用）
+    public int FacingDir => moveDirection;
     public event Action HealthChanged;
     public event Action Died;
     public static event Action<BasicEnemy> Spawned;

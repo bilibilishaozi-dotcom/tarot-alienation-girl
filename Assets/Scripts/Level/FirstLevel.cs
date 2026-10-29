@@ -214,7 +214,11 @@ public class FirstLevel : MonoBehaviour
             new Color(0.42f, 0.7f, 0.3f), new Vector3(1.15f, 1f, 1f), ground);
         arena[0].SetAsSpore();
         arena[0].StayOnPlatform(4.4f, 8.2f, 1 << ground);
-        CreateSprite(arena[0].transform, "SporeCap", new Vector3(0f, 0.45f, 0f), new Vector3(0.85f, 0.32f, 1f), new Color(0.26f, 0.5f, 0.18f), "Player", 7);
+        // 换成真美术：关掉占位方块，挂上 parts.json 搭的骨骼动画（待机 + 蓄力喷发）
+        SpriteRenderer sporePlaceholder = arena[0].GetComponent<SpriteRenderer>();
+        if (sporePlaceholder != null)
+            sporePlaceholder.enabled = false;
+        SporeRig.Attach(arena[0].transform, arena[0], 1.9f);
 
         // ② 骷髅兵：发现玩家就追过来挥刀；这一关先锁在平台 B 上，不往下跳。
         //    （以后的大关卡想让它跳下来追，只要不调用 StayOnPlatform 就行。）
