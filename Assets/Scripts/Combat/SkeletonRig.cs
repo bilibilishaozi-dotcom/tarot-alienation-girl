@@ -57,11 +57,14 @@ public class SkeletonRig : MonoBehaviour
 
     public static SkeletonRig Attach(Transform parent, BasicEnemy owner, float height)
     {
+        // 先建成 inactive 再填参数，避免 AddComponent 立刻跑 Awake 时用的是默认高度
         GameObject obj = new GameObject("SkeletonRig");
+        obj.SetActive(false);
         obj.transform.SetParent(parent, false);
         SkeletonRig rig = obj.AddComponent<SkeletonRig>();
         rig.targetHeight = height;
         rig.enemy = owner;
+        obj.SetActive(true);
         return rig;
     }
 

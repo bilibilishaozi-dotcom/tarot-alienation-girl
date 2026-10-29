@@ -388,15 +388,20 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
             return;
 
         // 石甲虫：只有从上方砸下来的攻击才吃伤害，横向砍只会「叮」一声被弹开。
-        if (armored && !IsHitFromAbove(hitFrom))
+        if (armored)
         {
-            spriteRenderer.color = new Color(0.75f, 0.8f, 0.9f, 1f);
-            transform.localScale = new Vector3(baseScale.x * 0.94f, baseScale.y * 1.06f, baseScale.z);
-            action = EnemyAction.Hurt;
-            actionTimer = 0.18f;
-            blockedTimer = 0.25f;
-            AttackFeedback.Thud(transform.position);
-            return;
+            // 空中挥砍/下砸一定算，其次再用几何（玩家脚底高过甲壳顶部）兜底
+            bool fromAbove = (player != null && player.IsAirAttack) || IsHitFromAbove(hitFrom);
+            if (!fromAbove)
+            {
+                spriteRenderer.color = new Color(0.75f, 0.8f, 0.9f, 1f);
+                transform.localScale = new Vector3(baseScale.x * 0.94f, baseScale.y * 1.06f, baseScale.z);
+                action = EnemyAction.Hurt;
+                actionTimer = 0.18f;
+                blockedTimer = 0.25f;
+                AttackFeedback.Thud(transform.position);
+                return;
+            }
         }
 
         EndStrike();

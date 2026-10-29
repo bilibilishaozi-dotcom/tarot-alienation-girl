@@ -70,6 +70,9 @@ public class Player : MonoBehaviour
     private float wallReleaseTimer;
     public bool IsDodging { get; private set; }
 
+    // 正在空中挥砍/下砸——石甲虫只有这种攻击能破甲
+    public bool IsAirAttack => stateMachine != null && stateMachine.currentState == jumpAttackState;
+
     [Header("Health")]
     [SerializeField] private int maxHealth = 5;
     public int CurrentHealth { get; private set; }

@@ -66,11 +66,15 @@ public class SporeRig : MonoBehaviour
 
     public static SporeRig Attach(Transform parent, BasicEnemy owner, float height)
     {
+        // 先建成 inactive 再填参数：AddComponent 会立刻跑 Awake → Build()，
+        // 否则会用默认 targetHeight 先建一次，传进来的高度就不生效了。
         GameObject obj = new GameObject("SporeRig");
+        obj.SetActive(false);
         obj.transform.SetParent(parent, false);
         SporeRig rig = obj.AddComponent<SporeRig>();
         rig.targetHeight = height;
         rig.enemy = owner;
+        obj.SetActive(true);
         return rig;
     }
 

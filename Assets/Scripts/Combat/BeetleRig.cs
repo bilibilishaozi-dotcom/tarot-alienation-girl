@@ -54,11 +54,15 @@ public class BeetleRig : MonoBehaviour
 
     public static BeetleRig Attach(Transform parent, BasicEnemy owner, float height)
     {
+        // 注意：AddComponent 会立刻触发 Awake → Build()，那时 targetHeight 还是默认值。
+        // 所以先建成 inactive 的对象，填好参数再激活，Awake 才会用上传进来的高度。
         GameObject obj = new GameObject("BeetleRig");
+        obj.SetActive(false);
         obj.transform.SetParent(parent, false);
         BeetleRig rig = obj.AddComponent<BeetleRig>();
         rig.targetHeight = height;
         rig.enemy = owner;
+        obj.SetActive(true);
         return rig;
     }
 
