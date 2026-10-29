@@ -218,19 +218,20 @@ public class SkeletonRig : MonoBehaviour
         float idle = 1f - Mathf.Max(charge, burst);
 
         // 躯干：站着轻微前后晃；蓄力后仰，劈砍前倾
-        SetAngle("torso", 1.5f * Mathf.Sin(t * 1.1f) * idle - 5f * charge + 12f * burst);
+        SetAngle("torso", 1.5f * Mathf.Sin(t * 1.1f) * idle + 6f * charge - 12f * burst);
 
         // 骨盆/裙摆：裙摆拖一点
         SetAngle("pelvis", 0.8f * Mathf.Sin(t * 1.3f + 0.4f) * idle);
-        SetAngle("skirt", 2.5f * Mathf.Sin(t * 1.5f + 0.8f) * idle - 4f * charge + 8f * burst);
+        SetAngle("skirt", 2.5f * Mathf.Sin(t * 1.5f + 0.8f) * idle + 4f * charge - 8f * burst);
 
         // 头骨：点头 + 蓄力抬头
-        SetAngle("skull", 2f * Mathf.Sin(t * 1.2f + 0.2f) * idle - 6f * charge + 6f * burst);
+        SetAngle("skull", 2f * Mathf.Sin(t * 1.2f + 0.2f) * idle + 7f * charge - 8f * burst);
 
-        // 剑臂：待机轻晃；蓄力抬高（负角度=往后上方），劈砍快速压下（正角度）
-        SetAngle("arm_sword", 2f * Mathf.Sin(t * 1.4f + 0.6f) * idle - 52f * charge + 70f * burst);
-        // 剑自身再补一点惯性
-        SetAngle("sword", -6f * idle * Mathf.Sin(t * 1.4f + 1.1f) - 10f * charge + 18f * burst);
+        // 剑臂：正角度=举起（画面右向时逆时针），负角度=往下劈。
+        // 蓄力要把剑高举过头，出手再顺着劈下来。
+        SetAngle("arm_sword", 2f * Mathf.Sin(t * 1.4f + 0.6f) * idle + 108f * charge + 42f * burst);
+        // 剑自身再补一点惯性：举剑时后压，劈砍时多甩一截
+        SetAngle("sword", -6f * idle * Mathf.Sin(t * 1.4f + 1.1f) + 18f * charge - 14f * burst);
 
         // 盾：跟着呼吸轻摆
         SetAngle("shield_arm", 1.2f * Mathf.Sin(t * 1.6f) * idle + 3f * charge);
