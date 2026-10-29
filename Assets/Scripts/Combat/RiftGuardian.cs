@@ -88,9 +88,10 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
     private float moveMinX;
     private float moveMaxX;
     private float moveSpeed = 1.6f;
-    private float anchorX;
     private float phaseSpeed = 1f;
     private bool phaseTwo;
+    // 攻击区半宽：以 Boss 自身为圆心，所以玩家绕到背后也会被打到
+    private float zoneHalf = 1.8f;
 
     public int CurrentHealth => health;
     public int MaxHealth => maxHealth;
@@ -155,8 +156,12 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
         meleeTop = Mathf.Max(groundY + 0.4f, headTop);
         dropHeight = Mathf.Clamp(hazardHeight, 0.45f, meleeTop - groundY);
         dropWidth = Mathf.Clamp(hazardWidth, 0.8f, Mathf.Max(0.8f, grateX - thrustMinX));
+
+        // 攻击区改成以 Boss 自己为圆心：原来只覆盖它左侧
+        // （终局房里玩家绕到右边就永远不在攻击范围内，Boss 只会走来走去不打人）
+        zoneHalf = Mathf.Max(1.7f, (grateX - thrustMinX) * 0.5f);
+
         bound = player != null;
-        anchorX = transform.position.x;   // 移动时用它算攻击区的偏移
         Transform auraTransform = transform.Find("Aura");
         if (auraTransform != null)
             aura = auraTransform.GetComponent<SpriteRenderer>();
@@ -174,20 +179,16 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
         foolReady = ready;
     }
 
-    // 让 Boss 能在 [minX, maxX] 之间横向巡走。攻击区会跟着它一起移动。
+    // 让 Boss 能在 [minX, maxX] 之间横向巡走。
     public void SetMobile(float minX, float maxX, float speed)
     {
         mobile = true;
         moveMinX = Mathf.Min(minX, maxX);
         moveMaxX = Mathf.Max(minX, maxX);
         moveSpeed = Mathf.Max(0.1f, speed);
-        anchorX = transform.position.x;
     }
 
-    // Boss 相对锚点移动了多少，攻击区要按这个偏移。
-    private float ShiftX => mobile ? transform.position.x - anchorX : 0f;
-
-    // 唤醒范围在攻击区左侧再放宽多少（终局是一整间房，靠近一点就醒）
+    // 唤醒范围在攻击区外再放宽多少（终局是一整间房，靠近一点就醒）
     private float arenaPad;
 
     public void SetArenaPad(float pad)
@@ -319,7 +320,9 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
         hasAttacked = true;
         Vector3 center = lockedZone.Center;
         Bounds bounds = new Bounds(center, lockedZone.Size);
-        AttackFeedback.Swing(bounds, -1, currentMove == Move.Thrust);
+        // 挥砍特效朝玩家那边甩（玩家绕到右边时也一致）
+        int facing = player != null && player.transform.position.x >= transform.position.x ? 1 : -1;
+        AttackFeedback.Swing(bounds, facing, currentMove == Move.Thrust);
     }
 
     private void BeginRecover()
@@ -329,14 +332,15 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
         HideZone();
     }
 
-    // 朝玩家横向挪，保持 2 格距离；只在 [moveMinX, moveMaxX] 之间走。
+    // 朝玩家横向挪，保持约 1.6 格距离（要小于攻击判定范围，否则会停在够不到的位置）；
+    // 只在 [moveMinX, moveMaxX] 之间走。
     private void StepTowardsPlayer()
     {
         if (player == null || player.IsDefeated)
             return;
 
         float delta = player.transform.position.x - transform.position.x;
-        if (Mathf.Abs(delta) < 2f)
+        if (Mathf.Abs(delta) < 1.6f)
             return;
 
         float dir = Mathf.Sign(delta);
@@ -439,17 +443,15 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
 
     private Zone ZoneFor(Move move)
     {
-        float shift = ShiftX;
+        float centerX = transform.position.x;
+
         if (move == Move.Drop)
         {
             float half = dropWidth * 0.5f;
-            float minCenter = thrustMinX + shift + half;
-            float maxCenter = grateX + shift - half;
-            float center = player != null ? player.transform.position.x : (thrustMinX + grateX) * 0.5f + shift;
-            if (maxCenter >= minCenter)
-                center = Mathf.Clamp(center, minCenter, maxCenter);
-            else
-                center = (thrustMinX + grateX) * 0.5f + shift;
+            float minCenter = centerX - zoneHalf + half;
+            float maxCenter = centerX + zoneHalf - half;
+            float center = player != null ? player.transform.position.x : centerX;
+            center = maxCenter >= minCenter ? Mathf.Clamp(center, minCenter, maxCenter) : centerX;
 
             return new Zone
             {
@@ -460,11 +462,12 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
             };
         }
 
-        float minX = (move == Move.Thrust ? thrustMinX : slashMinX) + shift;
+        // 挥击比突进宽一点；两者都以 Boss 为圆心，左右都能打到
+        float halfWidth = move == Move.Thrust ? zoneHalf * 0.82f : zoneHalf;
         return new Zone
         {
-            MinX = minX,
-            MaxX = grateX + shift,
+            MinX = centerX - halfWidth,
+            MaxX = centerX + halfWidth,
             MinY = groundY,
             MaxY = meleeTop
         };
@@ -488,22 +491,31 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
 
     private bool PlayerInArena()
     {
-        float x = player.transform.position.x;
-        float shift = ShiftX;
-        return x >= thrustMinX + shift - arenaPad && x <= grateX + shift + 0.8f;
+        if (player == null)
+            return false;
+
+        float distance = Mathf.Abs(player.transform.position.x - transform.position.x);
+        return distance <= zoneHalf + arenaPad;
     }
 
     // 真正能打到玩家的范围（不含唤醒用的放宽量），出手判定用这个
     private bool PlayerInZone()
     {
-        float x = player.transform.position.x;
-        float shift = ShiftX;
-        return x >= thrustMinX + shift && x <= grateX + shift + 0.8f;
+        if (player == null)
+            return false;
+
+        float distance = Mathf.Abs(player.transform.position.x - transform.position.x);
+        // 比挥击区略宽：Boss 会停在 1.6 距离上，判定要够得着它自己停下时的那条线
+        return distance <= zoneHalf + 0.35f;
     }
 
     private bool PlayerInSlash()
     {
-        return player != null && player.transform.position.x >= slashMinX + ShiftX;
+        if (player == null)
+            return false;
+
+        float distance = Mathf.Abs(player.transform.position.x - transform.position.x);
+        return distance <= zoneHalf + 0.4f;
     }
 
     private void ApplyPose()
