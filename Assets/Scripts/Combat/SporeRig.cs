@@ -146,6 +146,10 @@ public class SporeRig : MonoBehaviour
 
         // 先按 parts.json 的根轴心粗放，再用真实渲染包围盒把「最低像素」精确压到父物体碰撞盒底边。
         // 只靠手算锚点容易漏掉脚趾/触手尖比根轴心更低的情况（leg_4b 就比根轴心低 33px）。
+        // 注意：Collider2D.bounds 不会随 transform 立即更新，必须先 SyncTransforms，
+        // 否则会读到生成瞬间的旧位置（实测会导致整只怪下沉 0.85）。
+        Physics2D.SyncTransforms();
+
         float footDrop = (maxY - RootPivotY) / PPU;
         float footOffset = -0.5f;
         Collider2D parentBody = transform.parent != null ? transform.parent.GetComponent<Collider2D>() : null;
@@ -182,6 +186,8 @@ public class SporeRig : MonoBehaviour
 
         if (!hasBounds)
             return;
+
+        Physics2D.SyncTransforms();
 
         Collider2D parentBody = transform.parent.GetComponent<Collider2D>();
         float groundWorldY = parentBody != null
