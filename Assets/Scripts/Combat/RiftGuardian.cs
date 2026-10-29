@@ -92,6 +92,14 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
     private bool phaseTwo;
     // 攻击区半宽：以 Boss 自身为圆心，所以玩家绕到背后也会被打到
     private float zoneHalf = 1.8f;
+    // 突进/落砸的动作位移
+    private float baseY;
+    private float actionT;
+    private float lungeFromX;
+    private float lungeToX;
+    private float dropTargetX;
+    private float dropPeakY;
+    private float strikeTime = 0.12f;
 
     public int CurrentHealth => health;
     public int MaxHealth => maxHealth;
@@ -160,6 +168,7 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
         // 攻击区改成以 Boss 自己为圆心：原来只覆盖它左侧
         // （终局房里玩家绕到右边就永远不在攻击范围内，Boss 只会走来走去不打人）
         zoneHalf = Mathf.Max(1.7f, (grateX - thrustMinX) * 0.5f);
+        baseY = transform.position.y;
 
         bound = player != null;
         Transform auraTransform = transform.Find("Aura");
@@ -242,11 +251,24 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
                     timer = 0.2f;
                 break;
             case Step.Windup:
+                // 落砸：蓄力期间先升空，抬到最高点再砸下来
+                if (mobile && currentMove == Move.Drop)
+                {
+                    float rise = 1f - Mathf.Clamp01(timer / Mathf.Max(0.01f, WindupTime(currentMove)));
+                    float y = Mathf.Lerp(baseY, dropPeakY, Mathf.SmoothStep(0f, 1f, rise));
+                    transform.position = new Vector3(lungeFromX, y, transform.position.z);
+                }
+
                 if (timer <= 0f)
                     BeginStrike();
                 break;
             case Step.Strike:
-                if (!strikeConnected && HitsPlayer(lockedZone))
+                actionT = Mathf.Clamp01(actionT + Time.deltaTime / Mathf.Max(0.05f, strikeTime));
+                ApplyActionMotion();
+
+                // 落砸要等快落地才判定，不然玩家在天上就被打了
+                bool canHit = currentMove != Move.Drop || !mobile || actionT >= 0.62f;
+                if (canHit && !strikeConnected && HitsPlayer(lockedZone))
                 {
                     strikeConnected = true;
                     player.TakeDamage(AttackDamage, transform.position);
@@ -304,10 +326,78 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
             return;
 
         currentMove = move;
+        PrepareAction(move);
         lockedZone = ZoneFor(move);
         step = Step.Windup;
         timer = WindupTime(move);
         strikeConnected = false;
+    }
+
+    // 算出这一招的起止位置（只有终局那只会移动的 Boss 才用得到）
+    private void PrepareAction(Move move)
+    {
+        baseY = transform.position.y;
+        actionT = 0f;
+        lungeFromX = transform.position.x;
+
+        if (!mobile)
+        {
+            lungeToX = lungeFromX;
+            dropTargetX = lungeFromX;
+            dropPeakY = baseY;
+            return;
+        }
+
+        if (move == Move.Thrust)
+        {
+            float dir = player != null ? Mathf.Sign(player.transform.position.x - transform.position.x) : 1f;
+            if (Mathf.Abs(dir) < 0.5f)
+                dir = 1f;
+
+            // 冲 2.4 格，但如果玩家就在眼前，就停在它前面一点，别穿过去
+            float distance = player != null ? Mathf.Abs(player.transform.position.x - lungeFromX) : 2.4f;
+            float lunge = Mathf.Clamp(distance - 0.6f, 0.7f, 2.4f);
+
+            float target = lungeFromX + dir * lunge;
+            float low = Mathf.Min(moveMinX, moveMaxX);
+            float high = Mathf.Max(moveMinX, moveMaxX);
+            lungeToX = Mathf.Clamp(target, low, high);
+            dropTargetX = lungeToX;
+        }
+        else
+        {
+            float half = dropWidth * 0.5f;
+            float wanted = player != null ? player.transform.position.x : lungeFromX;
+            float low = Mathf.Min(moveMinX, moveMaxX) + half;
+            float high = Mathf.Max(moveMinX, moveMaxX) - half;
+            if (low <= high)
+                wanted = Mathf.Clamp(wanted, low, high);
+
+            dropTargetX = wanted;
+            lungeToX = wanted;
+            dropPeakY = baseY + 2.4f;
+        }
+    }
+
+    // 突进：向玩家冲 2.4 格；落砸：从空中砸到目标点
+    private void ApplyActionMotion()
+    {
+        if (!mobile)
+            return;
+
+        if (currentMove == Move.Thrust)
+        {
+            float t = Mathf.Sqrt(actionT);   // 起步快、收尾慢
+            float x = Mathf.Lerp(lungeFromX, lungeToX, t);
+            transform.position = new Vector3(x, baseY, transform.position.z);
+        }
+        else if (currentMove == Move.Drop)
+        {
+            float t = actionT * actionT;     // 越落越快
+            float x = Mathf.Lerp(lungeFromX, dropTargetX, Mathf.Min(1f, actionT * 1.4f));
+            float y = Mathf.Lerp(dropPeakY, baseY, t);
+            transform.position = new Vector3(x, y, transform.position.z);
+        }
     }
 
     private void BeginStrike()
@@ -316,7 +406,9 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
             return;
 
         step = Step.Strike;
-        timer = StrikeTime(currentMove);
+        strikeTime = StrikeTime(currentMove);
+        timer = strikeTime;
+        actionT = 0f;
         hasAttacked = true;
         Vector3 center = lockedZone.Center;
         Bounds bounds = new Bounds(center, lockedZone.Size);
@@ -327,6 +419,18 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
 
     private void BeginRecover()
     {
+        if (mobile)
+        {
+            // 招式结束时把位移收尾，避免停在半空
+            transform.position = new Vector3(lungeToX, baseY, transform.position.z);
+
+            if (currentMove == Move.Drop)
+            {
+                AttackFeedback.Thud(transform.position);
+                AttackFeedback.Hit((Vector2)transform.position, true);
+            }
+        }
+
         step = Step.Recover;
         timer = RecoverTime / phaseSpeed;
         HideZone();
@@ -447,18 +551,28 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
 
         if (move == Move.Drop)
         {
+            // 落砸：判定就是砸下来的那块地面（目标点在 PrepareAction 里算好）
             float half = dropWidth * 0.5f;
-            float minCenter = centerX - zoneHalf + half;
-            float maxCenter = centerX + zoneHalf - half;
-            float center = player != null ? player.transform.position.x : centerX;
-            center = maxCenter >= minCenter ? Mathf.Clamp(center, minCenter, maxCenter) : centerX;
-
             return new Zone
             {
-                MinX = center - half,
-                MaxX = center + half,
+                MinX = dropTargetX - half,
+                MaxX = dropTargetX + half,
                 MinY = groundY,
                 MaxY = groundY + dropHeight
+            };
+        }
+
+        if (move == Move.Thrust && mobile)
+        {
+            // 突进会把 Boss 从起点冲到终点，判定覆盖整条冲线
+            float lowX = Mathf.Min(lungeFromX, lungeToX) - 0.55f;
+            float highX = Mathf.Max(lungeFromX, lungeToX) + 0.55f;
+            return new Zone
+            {
+                MinX = lowX,
+                MaxX = highX,
+                MinY = groundY,
+                MaxY = meleeTop
             };
         }
 
@@ -695,7 +809,15 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
 
     private static float StrikeTime(Move move)
     {
-        return move == Move.Drop ? 0.16f : 0.12f;
+        switch (move)
+        {
+            case Move.Thrust:
+                return 0.26f;   // 冲刺位移要看得出来，比原来 0.12 拉长
+            case Move.Drop:
+                return 0.34f;   // 从最高点砸到地面的时间
+            default:
+                return 0.12f;
+        }
     }
 
     private void BuildTelegraph()
