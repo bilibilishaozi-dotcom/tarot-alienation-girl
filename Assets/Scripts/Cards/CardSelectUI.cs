@@ -96,6 +96,9 @@ public class CardSelectUI : MonoBehaviour
             return;
         }
 
+        if (IsStatusOpen && TrySwitchByNumber())
+            return;
+
         if (IsStatusOpen && escape)
             CloseStatus();
     }
@@ -304,7 +307,7 @@ public class CardSelectUI : MonoBehaviour
                 if (bag.Length > 0)
                     bag += "\n";
                 bool wearing = loadout.EquippedCard != null && loadout.EquippedCard.cardId == cards[i].cardId;
-                bag += cards[i].displayName + (wearing ? "    装备中" : "    持有");
+                bag += "[" + (i + 1) + "] " + cards[i].displayName + (wearing ? "   装备中" : "   持有");
             }
         }
 
@@ -312,10 +315,32 @@ public class CardSelectUI : MonoBehaviour
             + "\n攻击    " + damage
             + "\n\n当前装备    " + equipped
             + effect
-            + "\n\n卡牌背包\n" + bag
+            + "\n\n卡牌背包（按 1/2/3 切换）\n" + bag
             + "\n\nC 或 Esc 关闭";
         if (statusEquipButton != null)
             statusEquipButton.gameObject.SetActive(loadout.PendingCard != null);
+    }
+
+    // 状态栏里按数字键切换背包里的卡牌（不播得牌动画，换成身后的主题光）
+    private bool TrySwitchByNumber()
+    {
+        if (loadout == null || Keyboard.current == null)
+            return false;
+
+        for (int i = 0; i < 3; i++)
+        {
+            Key key = (Key)((int)Key.Digit1 + i);
+            if (!Keyboard.current[key].wasPressedThisFrame)
+                continue;
+
+            if (!loadout.EquipByIndex(i))
+                continue;
+
+            FillStatus();
+            return true;
+        }
+
+        return false;
     }
 
     private void HideWithoutEquipping()

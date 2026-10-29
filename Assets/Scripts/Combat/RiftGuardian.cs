@@ -187,6 +187,14 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
     // Boss 相对锚点移动了多少，攻击区要按这个偏移。
     private float ShiftX => mobile ? transform.position.x - anchorX : 0f;
 
+    // 唤醒范围在攻击区左侧再放宽多少（终局是一整间房，靠近一点就醒）
+    private float arenaPad;
+
+    public void SetArenaPad(float pad)
+    {
+        arenaPad = Mathf.Max(0f, pad);
+    }
+
     private void Update()
     {
         if (dead)
@@ -227,7 +235,7 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
             case Step.Idle:
                 if (timer > 0f)
                     break;
-                if (PlayerInArena())
+                if (PlayerInZone())
                     BeginWindup(NextMove());
                 else
                     timer = 0.2f;
@@ -479,6 +487,14 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
     }
 
     private bool PlayerInArena()
+    {
+        float x = player.transform.position.x;
+        float shift = ShiftX;
+        return x >= thrustMinX + shift - arenaPad && x <= grateX + shift + 0.8f;
+    }
+
+    // 真正能打到玩家的范围（不含唤醒用的放宽量），出手判定用这个
+    private bool PlayerInZone()
     {
         float x = player.transform.position.x;
         float shift = ShiftX;

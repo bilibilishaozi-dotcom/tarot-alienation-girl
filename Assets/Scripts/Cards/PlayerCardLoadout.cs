@@ -25,12 +25,9 @@ public class PlayerCardLoadout : MonoBehaviour
         CardReward.Granted += OnCardGranted;
     }
 
-    private void Start()
+    // 把愚者/战车/力量三张都放进背包（终局关开场用）。
+    public void GrantAllCards()
     {
-        // 从「牌之回响」选牌进 Boss 关时，把三张牌都放进背包，装上选中的那张。
-        if (string.IsNullOrEmpty(GameFlow.SelectedCardPath))
-            return;
-
         string[] all = { "Cards/Fool", "Cards/Chariot", "Cards/Strength" };
         for (int i = 0; i < all.Length; i++)
         {
@@ -38,10 +35,33 @@ public class PlayerCardLoadout : MonoBehaviour
             if (owned != null)
                 Remember(owned);
         }
+    }
 
-        MonsterCardData chosen = Resources.Load<MonsterCardData>(GameFlow.SelectedCardPath);
-        if (chosen != null)
-            Equip(chosen, false);
+    public bool EquipFromPath(string resourcePath)
+    {
+        if (string.IsNullOrEmpty(resourcePath))
+            return false;
+
+        MonsterCardData card = Resources.Load<MonsterCardData>(resourcePath);
+        if (card == null)
+            return false;
+
+        Equip(card, false);
+        return true;
+    }
+
+    // 按背包里的序号切换卡牌（状态栏的 1/2/3）。
+    public bool EquipByIndex(int index)
+    {
+        if (index < 0 || index >= owned.Count)
+            return false;
+
+        MonsterCardData card = owned[index];
+        if (card == null)
+            return false;
+
+        Equip(card, false);
+        return true;
     }
 
     private void OnDisable()
@@ -74,6 +94,8 @@ public class PlayerCardLoadout : MonoBehaviour
         active = CardEffects.Create(card.effectType);
         if (active != null && player != null)
             active.Attach(player, card);
+        // 身后那圈主题光跟着当前卡牌走
+        CardAura.Apply(player, card);
         Changed?.Invoke();
         if (playEffect)
             CardPossession.Play(player, card);
@@ -134,6 +156,7 @@ public class PlayerCardLoadout : MonoBehaviour
         ClearFool();
         ClearChariot();
         ClearStrength();
+        CardAura.Apply(player, null);
     }
 
     private void OnCardGranted(MonsterCardData card)

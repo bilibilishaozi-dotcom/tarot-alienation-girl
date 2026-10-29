@@ -26,6 +26,7 @@ public class FirstLevel : MonoBehaviour
     private bool chariotTrial;
     private bool bossLevel;
     private bool bossChoiceOpen;
+    private GameObject cardChoiceRoot;
     private bool echoFoolDone;
     private bool echoChariotDone;
     private bool echoStrengthDone;
@@ -86,6 +87,10 @@ public class FirstLevel : MonoBehaviour
         if (loadout != null)
             loadout.Changed += RefreshObjective;
         RefreshObjective();
+
+        // 终局关：开场先让玩家选一张要带的卡（从标题/选关直接进来也一样）
+        if (bossLevel && (loadout == null || loadout.EquippedCard == null))
+            ShowCardChoice(true);
     }
 
     private void OnDestroy()
@@ -303,8 +308,9 @@ public class FirstLevel : MonoBehaviour
             playerHeight + 0.22f, playerHeight * 0.4f, Mathf.Max(1.15f, playerWidth * 2.2f));
         boss.Died += OnBossDefeated;
 
-        // 终局 Boss：会在场地里横向巡走，攻击区跟着一起动
+        // 终局 Boss：会在场地里横向巡走，攻击区跟着一起动；玩家走近就醒
         boss.SetMobile(x - 4.2f, x + 3.2f, 1.7f);
+        boss.SetArenaPad(14f);
     }
 
     // 第一关的小怪：统一的生成方式，具体种类和外观由调用方设置。
@@ -606,26 +612,28 @@ public class FirstLevel : MonoBehaviour
         yield return ShowEchoBeat(point, new Color(1f, 0.35f, 0.18f, 0.9f), "力量震碎核心");
         if (finaleCore != null)
             finaleCore.gameObject.SetActive(false);
-        ShowBossCardChoice();
+        Complete();
     }
 
-    // 三牌收束之后：先选一张带进 Boss 关的牌，选完直接加载最终关。
-    private void ShowBossCardChoice()
+    // 选牌界面。applyHere = true 时把牌直接给当前场景的玩家（终局关开场用），
+    // 否则带着选好的牌加载终局关。
+    private void ShowCardChoice(bool applyHere)
     {
         if (bossChoiceOpen || cleared)
             return;
 
         bossChoiceOpen = true;
-        SetObjective("选一张牌，带着它走进裂隙深处");
+        SetObjective(applyHere ? "选一张开场装备的卡牌" : "选一张牌，带着它走进裂隙深处");
         Time.timeScale = 0f;
         if (player != null)
             player.SetGameplayInputEnabled(false);
-        if (cardUi != null)
+        if (!applyHere && cardUi != null)
             cardUi.HoldForClear();
 
         MenuKit.EnsureEventSystem();
 
         GameObject canvasObject = new GameObject("BossCardChoice");
+        cardChoiceRoot = canvasObject;
         Canvas canvas = canvasObject.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 140;
@@ -645,8 +653,10 @@ public class FirstLevel : MonoBehaviour
         PlaceCenter(title.rectTransform, new Vector2(0f, 330f), new Vector2(1100f, 64f));
 
         Text hint = CreateUiText(canvasObject.transform, "Hint", 24, TextAnchor.MiddleCenter, new Color(0.85f, 0.82f, 0.75f));
-        hint.text = "三张牌都会带进 Boss 战，这里选的是开场装备的那张。";
-        PlaceCenter(hint.rectTransform, new Vector2(0f, 268f), new Vector2(1100f, 40f));
+        hint.text = applyHere
+            ? "三张牌都会进背包，这里选的是开场装备的那张；打起来后按 C 还能换。"
+            : "三张牌都会带进 Boss 战，这里选的是开场装备的那张。";
+        PlaceCenter(hint.rectTransform, new Vector2(0f, 268f), new Vector2(1400f, 40f));
 
         string[] paths = { "Cards/Fool", "Cards/Chariot", "Cards/Strength" };
         float[] xs = { -560f, 0f, 560f };
@@ -683,8 +693,32 @@ public class FirstLevel : MonoBehaviour
             descText.text = cardDesc;
             PlaceCenter(descText.rectTransform, new Vector2(0f, 10f), new Vector2(400f, 140f));
 
-            CreateChoice(frame.transform, "带这张", new Vector2(0f, -150f), () => GameFlow.EnterBossWithCard(path), 300f);
+            CreateChoice(frame.transform, "带这张", new Vector2(0f, -150f), () => ChooseCard(path, applyHere), 300f);
         }
+    }
+
+    private void ChooseCard(string path, bool applyHere)
+    {
+        if (!applyHere)
+        {
+            GameFlow.EnterBossWithCard(path);
+            return;
+        }
+
+        if (loadout != null)
+        {
+            loadout.GrantAllCards();
+            loadout.EquipFromPath(path);
+        }
+
+        if (cardChoiceRoot != null)
+            Destroy(cardChoiceRoot);
+        cardChoiceRoot = null;
+        bossChoiceOpen = false;
+        Time.timeScale = 1f;
+        if (player != null)
+            player.SetGameplayInputEnabled(true);
+        RefreshObjective();
     }
 
     private static void PlaceCenter(RectTransform rect, Vector2 position, Vector2 size)
@@ -1271,7 +1305,7 @@ public class FirstLevel : MonoBehaviour
         if (bossLevel)
         {
             if (boss != null)
-                boss.SetFoolReady(FoolEquipped);
+                boss.SetFoolReady(true);
             RefreshObjective();
             return;
         }
@@ -1474,7 +1508,7 @@ public class FirstLevel : MonoBehaviour
         {
             // 主线顺序：第一关 → 愚者牌试用 → 牌之回响 → 终局
             if (chariotTrial)
-                CreateChoice(endPanel.transform, "再试一次", new Vector2(0f, 70f), ReplayLevel);
+                CreateChoice(endPanel.transform, "继续：终局", new Vector2(0f, 70f), () => GameFlow.LoadBossLevel(), 420f);
             else if (foolTrial)
                 CreateChoice(endPanel.transform, "继续：牌之回响", new Vector2(0f, 70f), () => GameFlow.LoadChariotTrial(), 420f);
             else
