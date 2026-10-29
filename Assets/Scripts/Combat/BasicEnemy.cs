@@ -83,6 +83,8 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
     public bool IsWindingUp => !dead && action == EnemyAction.Windup;
     // 受击中（骨骼动画用来闪白）
     public bool IsHurt => !dead && action == EnemyAction.Hurt;
+    // 刚刚被甲壳弹开（骨骼动画用来亮壳 + 后退）
+    public bool IsBlocked => blockedTimer > 0f;
     // 朝向：1 向右，-1 向左（骨骼动画用）
     public int FacingDir => moveDirection;
     public event Action HealthChanged;
@@ -93,6 +95,7 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
     // 敌人种类：靠这几个标记区分，共用同一套 巡逻/追击/蓄力/出手 状态机。
     private bool spore;      // 孢子怪：不追人，靠近后原地蓄力，然后大范围喷发
     private bool armored;    // 石甲虫：横向普通攻击会被甲壳弹开，只有从上方砸下来才吃伤害
+    private float blockedTimer;   // 被弹开后的短暂计时，给骨骼动画读
     private Color windupColor = new Color(1f, 0.72f, 0.2f, 1f);
 
 
@@ -268,6 +271,9 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
         if (dead)
             return;
 
+        if (blockedTimer > 0f)
+            blockedTimer -= Time.deltaTime;
+
         actionTimer -= Time.deltaTime;
         switch (action)
         {
@@ -367,6 +373,7 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
             transform.localScale = new Vector3(baseScale.x * 0.94f, baseScale.y * 1.06f, baseScale.z);
             action = EnemyAction.Hurt;
             actionTimer = 0.18f;
+            blockedTimer = 0.25f;
             AttackFeedback.Thud(transform.position);
             return;
         }

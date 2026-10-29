@@ -264,10 +264,30 @@ public class FirstLevel : MonoBehaviour
 
         // ③ 石甲虫：甲壳很硬，横向普通攻击只会被弹开，只有从上方砸下来的下落攻击能破甲。
         arena[2] = SpawnArenaEnemy("Armored", 25.6f, plinthTop + feetLift, 3, "石甲虫",
-            new Color(0.4f, 0.42f, 0.48f), new Vector3(1.25f, 0.9f, 1f), ground);
+            new Color(0.4f, 0.42f, 0.48f), new Vector3(1f, 1f, 1f), ground);
+
+        // 碰撞盒按甲虫的重心重设（1.4 x 0.8，中心偏上 0.4），底边压在矮台上
+        CapsuleCollider2D beetleBody = arena[2].GetComponent<CapsuleCollider2D>();
+        if (beetleBody != null)
+        {
+            beetleBody.size = new Vector2(1.4f, 0.8f);
+            beetleBody.offset = new Vector2(0f, 0.4f);
+        }
+
+        arena[2].transform.position = new Vector3(25.6f, plinthTop + 0.4f, 0f);
         arena[2].SetAsArmored();
         arena[2].StayOnPlatform(24.95f, 26.45f, 1 << ground);
-        CreateSprite(arena[2].transform, "Shell", new Vector3(0f, 0.38f, 0f), new Vector3(1.15f, 0.34f, 1f), new Color(0.58f, 0.63f, 0.72f), "Player", 7);
+
+        // 换成真美术：关掉占位方块与甲壳装饰，挂上 8 块部件的骨骼（六足爬行 + 弹刀亮壳）
+        SpriteRenderer beetlePlaceholder = arena[2].GetComponent<SpriteRenderer>();
+        if (beetlePlaceholder != null)
+            beetlePlaceholder.enabled = false;
+        Transform shellDecor = arena[2].transform.Find("Shell");
+        if (shellDecor != null)
+            shellDecor.gameObject.SetActive(false);
+
+        BeetleRig.Attach(arena[2].transform, arena[2], 1.05f);
+        arena[2].SetHudLift(1.35f);
 
         // 普通跳约 2.46，蹬墙跳在贴墙后再抬约 2.10。柱底 2.40 让人能走过去，台面 3.40 让普通跳和冲刺都上不去。
         // 柱子右侧到高台左侧留 2.85 的空档，必须靠左右蹬墙才能上去。
