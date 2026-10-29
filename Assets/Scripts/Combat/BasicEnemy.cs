@@ -361,13 +361,34 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
         rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
     }
 
+    // 判断这一下是不是「从上方砸下来」：用玩家的脚底去比甲壳顶部。
+    // 之前拿 hitFrom（玩家轴心，站地上也有 1.33）比「敌人轴心 + 0.45」，
+    // 石甲虫个子矮，站着平砍也会被判成从上方打 → 破甲规则形同虚设。
+    private bool IsHitFromAbove(Vector2 hitFrom)
+    {
+        float top = transform.position.y + 0.5f;
+        Collider2D ownCollider = GetComponent<Collider2D>();
+        if (ownCollider != null)
+            top = ownCollider.bounds.max.y;
+
+        float feet = hitFrom.y;
+        if (player != null)
+        {
+            Collider2D playerCollider = player.GetComponent<Collider2D>();
+            if (playerCollider != null)
+                feet = playerCollider.bounds.min.y;
+        }
+
+        return feet >= top - 0.15f;
+    }
+
     public void TakeDamage(int amount, Vector2 hitFrom)
     {
         if (dead)
             return;
 
         // 石甲虫：只有从上方砸下来的攻击才吃伤害，横向砍只会「叮」一声被弹开。
-        if (armored && hitFrom.y <= transform.position.y + 0.45f)
+        if (armored && !IsHitFromAbove(hitFrom))
         {
             spriteRenderer.color = new Color(0.75f, 0.8f, 0.9f, 1f);
             transform.localScale = new Vector3(baseScale.x * 0.94f, baseScale.y * 1.06f, baseScale.z);

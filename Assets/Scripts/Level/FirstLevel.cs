@@ -266,12 +266,12 @@ public class FirstLevel : MonoBehaviour
         arena[2] = SpawnArenaEnemy("Armored", 25.6f, plinthTop + feetLift, 3, "石甲虫",
             new Color(0.4f, 0.42f, 0.48f), new Vector3(1f, 1f, 1f), ground);
 
-        // 碰撞盒按甲虫的重心重设（1.5 x 0.9，中心偏上 0.45），底边正好压在矮台上
+        // 碰撞盒按甲虫的重心重设（2.2 x 1.25，中心偏上 0.625），底边正好压在矮台上
         CapsuleCollider2D beetleBody = arena[2].GetComponent<CapsuleCollider2D>();
         if (beetleBody != null)
         {
-            beetleBody.size = new Vector2(1.5f, 0.9f);
-            beetleBody.offset = new Vector2(0f, 0.45f);
+            beetleBody.size = new Vector2(2.2f, 1.25f);
+            beetleBody.offset = new Vector2(0f, 0.625f);
         }
 
         arena[2].transform.position = new Vector3(25.6f, plinthTop, 0f);
@@ -286,8 +286,8 @@ public class FirstLevel : MonoBehaviour
         if (shellDecor != null)
             shellDecor.gameObject.SetActive(false);
 
-        BeetleRig.Attach(arena[2].transform, arena[2], 1.32f);
-        arena[2].SetHudLift(1.6f);
+        BeetleRig.Attach(arena[2].transform, arena[2], 1.85f);
+        arena[2].SetHudLift(2.15f);
 
         // 普通跳约 2.46，蹬墙跳在贴墙后再抬约 2.10。柱底 2.40 让人能走过去，台面 3.40 让普通跳和冲刺都上不去。
         // 柱子右侧到高台左侧留 2.85 的空档，必须靠左右蹬墙才能上去。
