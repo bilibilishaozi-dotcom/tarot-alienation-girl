@@ -160,6 +160,8 @@ public class Player : MonoBehaviour
             gameObject.AddComponent<CombatHud>();
         if (GetComponent<TrainingEncounter>() == null)
             gameObject.AddComponent<TrainingEncounter>();
+        // 血量低于 33% 时的红屏 + 心跳
+        LowHealthWarning.Attach(this);
 
         rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
         rb.interpolation = RigidbodyInterpolation2D.Interpolate;
