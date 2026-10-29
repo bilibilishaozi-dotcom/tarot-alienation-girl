@@ -212,13 +212,27 @@ public class FirstLevel : MonoBehaviour
         // ① 孢子怪：守在平台 A，玩家靠近就鼓起来，约 1.1 秒后原地大范围喷发。
         arena[0] = SpawnArenaEnemy("Spore", 6.3f, deckTop + feetLift, 3, "孢子怪",
             new Color(0.42f, 0.7f, 0.3f), new Vector3(1.15f, 1f, 1f), ground);
+
+        // 碰撞盒按美术躯干重设，并让它的底边正好压在台面上：
+        // 敌人轴心在台面上方 0.5，胶囊高 1.6、中心偏上 0.3 → 底边落在 deckTop。
+        CapsuleCollider2D sporeBody = arena[0].GetComponent<CapsuleCollider2D>();
+        if (sporeBody != null)
+        {
+            sporeBody.size = new Vector2(1.1f, 1.6f);
+            sporeBody.offset = new Vector2(0f, 0.3f);
+        }
+
+        arena[0].transform.position = new Vector3(6.3f, deckTop + 0.5f, 0f);
         arena[0].SetAsSpore();
         arena[0].StayOnPlatform(4.4f, 8.2f, 1 << ground);
+
         // 换成真美术：关掉占位方块，挂上 parts.json 搭的骨骼动画（待机 + 蓄力喷发）
         SpriteRenderer sporePlaceholder = arena[0].GetComponent<SpriteRenderer>();
         if (sporePlaceholder != null)
             sporePlaceholder.enabled = false;
-        SporeRig.Attach(arena[0].transform, arena[0], 1.9f);
+        // 1.7 是骨架自身高度，父物体还有 1.15 的视觉缩放 → 实际约 1.95
+        SporeRig.Attach(arena[0].transform, arena[0], 1.7f);
+        arena[0].SetHudLift(1.9f);
 
         // ② 骷髅兵：发现玩家就追过来挥刀；这一关先锁在平台 B 上，不往下跳。
         //    （以后的大关卡想让它跳下来追，只要不调用 StayOnPlatform 就行。）

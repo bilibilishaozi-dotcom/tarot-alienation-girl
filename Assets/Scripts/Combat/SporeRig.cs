@@ -60,6 +60,9 @@ public class SporeRig : MonoBehaviour
     private float charge;   // 蓄力权重
     private float burst;    // 喷发权重
     private float facing = 1f;   // 1 = 面向左（原图朝向），-1 = 面向右
+    private bool dying;
+    private float deathFade;
+    private float hurtFlash;
 
     public static SporeRig Attach(Transform parent, BasicEnemy owner, float height)
     {
@@ -162,6 +165,47 @@ public class SporeRig : MonoBehaviour
             return;
 
         float dt = Time.deltaTime;
+
+        // 死亡：先脱离父节点（不然会被占位体的「缩小到 0.2」带着一起缩），再淡出+上飘后销毁
+        if (!dying && enemy != null && enemy.IsDead)
+        {
+            dying = true;
+            transform.SetParent(null, true);
+        }
+
+        if (dying)
+        {
+            deathFade += dt / 0.5f;
+            float alpha = Mathf.Clamp01(1f - deathFade);
+            foreach (SpriteRenderer art in arts.Values)
+            {
+                if (art == null)
+                    continue;
+                Color color = art.color;
+                color.a = alpha;
+                art.color = color;
+            }
+
+            transform.position += new Vector3(0f, dt * 0.7f, 0f);
+            if (deathFade >= 1f)
+                Destroy(gameObject);
+            return;
+        }
+
+        // 受击闪白（只改 RGB，保留光核自己控制的不透明度）
+        float hurtGoal = enemy != null && enemy.IsHurt ? 1f : 0f;
+        hurtFlash = Mathf.MoveTowards(hurtFlash, hurtGoal, dt * 12f);
+        Color tint = hurtFlash > 0f ? Color.Lerp(Color.white, new Color(1f, 0.7f, 0.62f), hurtFlash) : Color.white;
+        foreach (SpriteRenderer art in arts.Values)
+        {
+            if (art == null)
+                continue;
+            Color color = art.color;
+            color.r = tint.r;
+            color.g = tint.g;
+            color.b = tint.b;
+            art.color = color;
+        }
 
         bool winding = enemy != null && enemy.IsWindingUp;
         bool striking = enemy != null && enemy.IsStrikeActive;

@@ -70,10 +70,19 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
     public int MaxHealth => maxHealth;
     public string DisplayName => displayName;
     public bool IsDead => dead;
-    public Vector3 HudWorldPoint => transform.position + Vector3.up * 1.15f;
+    public Vector3 HudWorldPoint => transform.position + Vector3.up * hudLift;
+    private float hudLift = 1.15f;
+
+    // 血条挂多高（骨骼动画的怪比占位方块高，需要抬高）
+    public void SetHudLift(float lift)
+    {
+        hudLift = Mathf.Max(0.2f, lift);
+    }
     public bool IsStrikeActive => !dead && action == EnemyAction.Strike;
     // 蓄力中（孢子怪用来播「鼓起来」的动画）
     public bool IsWindingUp => !dead && action == EnemyAction.Windup;
+    // 受击中（骨骼动画用来闪白）
+    public bool IsHurt => !dead && action == EnemyAction.Hurt;
     // 朝向：1 向右，-1 向左（骨骼动画用）
     public int FacingDir => moveDirection;
     public event Action HealthChanged;
