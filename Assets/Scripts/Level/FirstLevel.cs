@@ -258,10 +258,12 @@ public class FirstLevel : MonoBehaviour
         Solid("LeftWall", new Vector2(-1.5f, 3.6f), new Vector2(0.8f, 7.2f), new Color(0.18f, 0.15f, 0.16f), ground, 0);
         Solid("RightWall", new Vector2(29.5f, 3.6f), new Vector2(0.8f, 7.2f), new Color(0.18f, 0.15f, 0.16f), ground, 0);
 
-        // 三层台子：给蹬墙跳、空中攻击和躲预兆留出空间
-        Solid("LedgeA", new Vector2(8.5f, 1.6f), new Vector2(4.4f, 0.4f), new Color(0.42f, 0.34f, 0.32f), ground, 1);
-        Solid("LedgeB", new Vector2(18.5f, 2.6f), new Vector2(4f, 0.4f), new Color(0.42f, 0.34f, 0.32f), ground, 1);
-        Solid("LedgeC", new Vector2(13.5f, 4.2f), new Vector2(3f, 0.4f), new Color(0.34f, 0.27f, 0.26f), ground, 1);
+        // 台子整体抬高/左移，给 Boss 留出一条能走通的地面通道：
+        // Boss 巡走范围是 20.3~27.7，这条通道上不能有低于 3 格的台子。
+        Solid("LedgeA", new Vector2(7.5f, 1.5f), new Vector2(4f, 0.4f), new Color(0.42f, 0.34f, 0.32f), ground, 1);
+        Solid("LedgeB", new Vector2(13f, 2.6f), new Vector2(3.6f, 0.4f), new Color(0.42f, 0.34f, 0.32f), ground, 1);
+        Solid("LedgeC", new Vector2(19.5f, 3.4f), new Vector2(3.4f, 0.4f), new Color(0.34f, 0.27f, 0.26f), ground, 1);
+        Solid("LedgeD", new Vector2(26.5f, 3.4f), new Vector2(3f, 0.4f), new Color(0.38f, 0.3f, 0.29f), ground, 1);
 
         // 场中央的暗红地板，提示这是 Boss 房
         CreateSprite(root, "ArenaMark", new Vector3(20.5f, 0.02f, 0f), new Vector3(12f, 0.05f, 1f), new Color(0.55f, 0.16f, 0.18f, 0.75f), "Ground", 3);

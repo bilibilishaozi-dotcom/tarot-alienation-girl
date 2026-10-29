@@ -16,6 +16,10 @@ public class CardAura : MonoBehaviour
         if (player == null)
             return;
 
+        // 正在停用/销毁（例如切场景时 PlayerCardLoadout.OnDisable）就不要挂组件了
+        if (!player.isActiveAndEnabled)
+            return;
+
         CardAura aura = player.GetComponent<CardAura>();
         if (aura == null)
             aura = player.gameObject.AddComponent<CardAura>();
@@ -24,16 +28,28 @@ public class CardAura : MonoBehaviour
 
     private void Flash(MonsterCardData card)
     {
+        // 卸下卡牌（包括切场景时 PlayerCardLoadout.OnDisable 触发的这次）：
+        // 只关掉已有的光，绝对不能在这里新建子物体——
+        // 父物体正在停用/销毁时 SetParent 会报
+        // "Cannot set the parent of the GameObject ... while activating or deactivating"，
+        // 还会留下没清理干净的对象。
+        if (card == null)
+        {
+            if (glow != null)
+            {
+                glow.enabled = false;
+                flashLeft = 0f;
+            }
+
+            return;
+        }
+
+        if (!isActiveAndEnabled)
+            return;
+
         EnsureGlow();
         if (glow == null)
             return;
-
-        if (card == null)
-        {
-            glow.enabled = false;
-            flashLeft = 0f;
-            return;
-        }
 
         tint = Tint(card);
         flashLeft = FlashDuration;
