@@ -144,7 +144,8 @@ public class SporeRig : MonoBehaviour
             arts[def.Id] = sprite;
         }
 
-        // 把最低点对到父节点的脚底（父节点的 collider 底边）
+        // 先按 parts.json 的根轴心粗放，再用真实渲染包围盒把「最低像素」精确压到父物体碰撞盒底边。
+        // 只靠手算锚点容易漏掉脚趾/触手尖比根轴心更低的情况（leg_4b 就比根轴心低 33px）。
         float footDrop = (maxY - RootPivotY) / PPU;
         float footOffset = -0.5f;
         Collider2D parentBody = transform.parent != null ? transform.parent.GetComponent<Collider2D>() : null;
@@ -152,6 +153,43 @@ public class SporeRig : MonoBehaviour
             footOffset = parentBody.bounds.min.y - transform.parent.position.y;
         transform.localPosition = new Vector3(0f, footOffset + footDrop * baseScale, 0f);
         ApplyScale();
+        SnapFeetToGround();
+    }
+
+    // 用所有部件的世界包围盒，把整只怪平移到「最低点贴着碰撞盒底边」。
+    private void SnapFeetToGround()
+    {
+        if (transform.parent == null)
+            return;
+
+        Bounds bounds = new Bounds();
+        bool hasBounds = false;
+        foreach (SpriteRenderer art in arts.Values)
+        {
+            if (art == null || art.sprite == null)
+                continue;
+
+            if (!hasBounds)
+            {
+                bounds = art.bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                bounds.Encapsulate(art.bounds);
+            }
+        }
+
+        if (!hasBounds)
+            return;
+
+        Collider2D parentBody = transform.parent.GetComponent<Collider2D>();
+        float groundWorldY = parentBody != null
+            ? parentBody.bounds.min.y
+            : transform.parent.position.y - 0.5f;
+
+        float delta = groundWorldY - bounds.min.y;
+        transform.position += new Vector3(0f, delta, 0f);
     }
 
     private void ApplyScale()
