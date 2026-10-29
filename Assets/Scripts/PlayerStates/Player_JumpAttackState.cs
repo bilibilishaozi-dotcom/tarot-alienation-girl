@@ -31,7 +31,10 @@ public class Player_JumpAttackState : EntityState
         elapsed += Time.deltaTime;
         UpdateHitWindow();
 
-        if (player.groundDetected && touchedGround == false)
+        // 碰地或踩到敌人/箱子都算「落地」，否则掉在怪物头上会一直卡在滞空状态。
+        bool landed = player.groundDetected || player.supportDetected;
+
+        if (landed && touchedGround == false)
         {
             touchedGround = true;
             anim.SetTrigger("jumpAttackTrigger");
@@ -41,7 +44,7 @@ public class Player_JumpAttackState : EntityState
                 player.PlayLandingSlam();
         }
 
-        if (triggerCalled && player.groundDetected)
+        if (triggerCalled && landed)
             stateMachine.ChangeState(player.idleState);
     }
 

@@ -1,35 +1,46 @@
 using UnityEngine;
 
 public class StateMachine
-    //StateMachine£º×´Ì¬¹ÜÀíÔ±
-    //ºËĞÄË¼Ïë£º¡°Í¬Ò»Ê±¼äÖ»ÄÜ´¦ÓÚÒ»¸öÖ÷×´Ì¬¡±
-    //Ëü×¨ÃÅ¸ºÔğ£ºµ±Ç°×´Ì¬ÊÇË­£»ÈçºÎÇĞ»»×´Ì¬£»½øÈë×´Ì¬£»Àë¿ª×´Ì¬
-    //·â×°µÄ×÷ÓÃÎª£º¿ÉÒÔÔÚUnityÊôĞÔÀ¸ÖĞ¿´µ½ÊıÖµ£¬µ«ÊÇÖ»¿ÉÒÔÔÚÔ­±¾´úÂëÖĞ¸ü¸ÄÊıÖµ/×÷³öĞŞ¸Ä
+    //StateMachineï¼šçŠ¶æ€ç®¡ç†å‘˜
+    //æ ¸å¿ƒæ€æƒ³ï¼šâ€œåŒä¸€æ—¶é—´åªèƒ½å¤„äºä¸€ä¸ªä¸»çŠ¶æ€â€
+    //å®ƒä¸“é—¨è´Ÿè´£ï¼šå½“å‰çŠ¶æ€æ˜¯è°ï¼›å¦‚ä½•åˆ‡æ¢çŠ¶æ€ï¼›è¿›å…¥çŠ¶æ€ï¼›ç¦»å¼€çŠ¶æ€
+    //å°è£…çš„ä½œç”¨ä¸ºï¼šå¯ä»¥åœ¨Unityå±æ€§æ ä¸­çœ‹åˆ°æ•°å€¼ï¼Œä½†æ˜¯åªå¯ä»¥åœ¨åŸæœ¬ä»£ç ä¸­æ›´æ”¹æ•°å€¼/ä½œå‡ºä¿®æ”¹
 {
     public EntityState currentState { get; private set; }
-    //ÉùÃ÷Ò»¸öÀàĞÍÊÇ EntityState µÄ±äÁ¿ currentState ²¢ÇÒ¸ø currentState ¸½ÉÏÊôĞÔ Íâ²¿¿É¶ÁÈ¡£¬²»¿ÉĞŞ¸Ä
-    //IdleState    RunState    JumpState    AttackStateÖ®ÀàµÄ×´Ì¬ÔÚÕâÀï±»µ÷ÓÃ
+    //å£°æ˜ä¸€ä¸ªç±»å‹æ˜¯ EntityState çš„å˜é‡ currentState å¹¶ä¸”ç»™ currentState é™„ä¸Šå±æ€§ å¤–éƒ¨å¯è¯»å–ï¼Œä¸å¯ä¿®æ”¹
+    //IdleState    RunState    JumpState    AttackStateä¹‹ç±»çš„çŠ¶æ€åœ¨è¿™é‡Œè¢«è°ƒç”¨
 
 
     public void Initialize(EntityState startState)
-        //¸æÖª¡°currentState¡±ÆğµãÔÚÄÄÀï
+        //å‘ŠçŸ¥â€œcurrentStateâ€èµ·ç‚¹åœ¨å“ªé‡Œ
     {
         currentState = startState;
-        //ÕâÀïµÄstartState£¬À´Ô´ÓÚ PlayerÖĞµÄprivate void Start()
-        //¶øIdleState¼Ì³ĞÓÚEntityState£¬ĞèÒªÔÙÀ¨ºÅÀïĞ´ËüµÄÃû×Ö
+        //è¿™é‡Œçš„startStateï¼Œæ¥æºäº Playerä¸­çš„private void Start()
+        //è€ŒIdleStateç»§æ‰¿äºEntityStateï¼Œéœ€è¦å†æ‹¬å·é‡Œå†™å®ƒçš„åå­—
         currentState.Enter();
-        //½«µ±Ç°×´Ì¬±äÁ¿¸ü¸ÄÎªÁíÒ»¸ö×´Ì¬
+        //å°†å½“å‰çŠ¶æ€å˜é‡æ›´æ”¹ä¸ºå¦ä¸€ä¸ªçŠ¶æ€
     }
 
     public void ChangeState(EntityState newState)
-    //ÓÃÀ´ÇĞ»»×´Ì¬£º´ı»ú ¡ú ÅÜ²½ ÅÜ²½ ¡ú ÌøÔ¾ ÌøÔ¾ ¡ú ¹¥»÷ µÈµÈ
+    //ç”¨æ¥åˆ‡æ¢çŠ¶æ€ï¼šå¾…æœº â†’ è·‘æ­¥ è·‘æ­¥ â†’ è·³è·ƒ è·³è·ƒ â†’ æ”»å‡» ç­‰ç­‰
     {
+        if (newState == null)
+            return;
+
+        // æ³¨æ„ï¼šå…è®¸"åˆ‡åˆ°åŒä¸€ä¸ªçŠ¶æ€"ï¼Œè¿å‡»å°±æ˜¯é  EnterAttackStateWithDelay é‡æ–° Enter åŒä¸€ä¸ªå®ä¾‹æ¥æ¨è¿›çš„ã€‚
         currentState.Exit();
-        //Àë¿ªµ±Ç°×´Ì¬
+        //ç¦»å¼€å½“å‰çŠ¶æ€
         currentState = newState;
-        //µ±Ç°×´Ì¬ = ĞÂ×´Ì¬
+        //å½“å‰çŠ¶æ€ = æ–°çŠ¶æ€
         currentState.Enter();
-        //½øÈëĞÂ×´Ì¬
+        //è¿›å…¥æ–°çŠ¶æ€
+    }
+
+    // å­ç±»åœ¨ base.Update() ä¹‹åè°ƒç”¨ï¼šçˆ¶ç±»å¯èƒ½å·²ç»æŠŠçŠ¶æ€æ¢æ‰äº†ï¼ˆå†²åˆºã€ç©ºä¸­æ”»å‡»ï¼‰ï¼Œ
+    // è¿™æ—¶ä¸è¦å†æ‰§è¡Œæœ¬çŠ¶æ€çš„åˆ¤æ–­ï¼Œå¦åˆ™åŒä¸€å¸§ä¼šè¿ç€åˆ‡ä¸¤ä¸ªçŠ¶æ€ã€‚
+    public bool IsActive(EntityState state)
+    {
+        return state != null && currentState == state;
     }
 
     public void UpdateActiveState()

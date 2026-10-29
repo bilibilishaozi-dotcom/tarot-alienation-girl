@@ -13,7 +13,7 @@ public class Player_DashState : EntityState
     {
         base.Enter();
 
-        //Èç¹ûÍæ¼ÒÕıÔÚ°´×óÓÒ·½Ïò¼ü£¬¾Í³¯ÊäÈë·½Ïò³å´Ì£»Èç¹ûÃ»ÓĞ·½ÏòÊäÈë£¬¾Í³¯½ÇÉ«µ±Ç°Ãæ³¯·½Ïò³å´Ì¡£
+        //å¦‚æœç©å®¶æ­£åœ¨æŒ‰å·¦å³æ–¹å‘é”®ï¼Œå°±æœè¾“å…¥æ–¹å‘å†²åˆºï¼›å¦‚æœæ²¡æœ‰æ–¹å‘è¾“å…¥ï¼Œå°±æœè§’è‰²å½“å‰é¢æœæ–¹å‘å†²åˆºã€‚
         dashDir = player.moveInput.x != 0 ? ((int)player.moveInput.x) : player.facingDir;
         stateTimer = player.dashDuration;
 

@@ -3,8 +3,8 @@ using UnityEngine;
 public class Player_IdleState : Player_GroundedState
 {
     public Player_IdleState(Player player, StateMachine stateMachine, string stateName) : base(player, stateMachine, stateName)
-    //º¯ÊıµÄÊéĞ´·½·¨´ÓEntityState¼Ì³Ğ£¬ÆäÖĞ×´Ì¬»úµÄµ÷È¡Ğ´·¨ÊÇ ÓÃÁËStateMachineÀà ÃüÃûÎª stateMachine
-    //base£¨£©º¯ÊıµÄ×÷ÓÃ£¬½«stateMachine, stateNameÕâÁ½¸ö²ÎÊı·µ»¹¸ø¸¸ÀàÒ²¾ÍÊÇEntityState
+    //å‡½æ•°çš„ä¹¦å†™æ–¹æ³•ä»EntityStateç»§æ‰¿ï¼Œå…¶ä¸­çŠ¶æ€æœºçš„è°ƒå–å†™æ³•æ˜¯ ç”¨äº†StateMachineç±» å‘½åä¸º stateMachine
+    //baseï¼ˆï¼‰å‡½æ•°çš„ä½œç”¨ï¼Œå°†stateMachine, stateNameè¿™ä¸¤ä¸ªå‚æ•°è¿”è¿˜ç»™çˆ¶ç±»ä¹Ÿå°±æ˜¯EntityState
     {
 
     }

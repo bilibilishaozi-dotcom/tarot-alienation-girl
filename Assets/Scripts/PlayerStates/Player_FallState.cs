@@ -10,8 +10,15 @@ public class Player_FallState : Player_AiredState
     {
         base.Update();
 
-        if (player.groundDetected)
+        // 父类可能已经切走（冲刺、空中攻击），这时不能再往下切第二次。
+        if (!stateMachine.IsActive(this))
+            return;
+
+        if (player.groundDetected || (player.supportDetected && rb.linearVelocity.y <= 0.05f))
+        {
             stateMachine.ChangeState(player.idleState);
+            return;
+        }
 
         if (player.wallDetected)
             stateMachine.ChangeState(player.wallSlideState);

@@ -13,7 +13,7 @@ public class Player : MonoBehaviour
     private CapsuleCollider2D bodyCollider;
     private PlayerCardLoadout cardLoadout;
     private PlayerAttackHitbox attackHitbox;
-    private readonly Collider2D[] overlapResults = new Collider2D[4];
+    private readonly Collider2D[] overlapResults = new Collider2D[16];
 
     private StateMachine stateMachine;
 
@@ -42,14 +42,14 @@ public class Player : MonoBehaviour
     public float jumpForce = 5;
     public Vector2 wallJumpForce;
 
-    //Range´ú±í»¬Ìõ(0,1)´ú±í´Ó0µ½1£¬·½±ãµ÷ÊÔ
+    //Rangeä»£è¡¨æ»‘æ¡(0,1)ä»£è¡¨ä»0åˆ°1ï¼Œæ–¹ä¾¿è°ƒè¯•
     [Range(0, 1)]
-    //inAirMoveMultiplier ¿ÕÖĞ¿ØÖÆÏ÷Èõ
+    //inAirMoveMultiplier ç©ºä¸­æ§åˆ¶å‰Šå¼±
     public float inAirMoveMultiplier = 0.7f;
     [Range(0, 1)]
-    //¿ØÖÆÌùÇ½ÏÂ»¬ËÙ¶È¼õÂı¶àÉÙ
+    //æ§åˆ¶è´´å¢™ä¸‹æ»‘é€Ÿåº¦å‡æ…¢å¤šå°‘
     public float wallSlideSlowMultiplier = 0.7f;
-    //[Space]:InspectorÀï¼Ó¿ÕĞĞ
+    //[Space]:Inspectoré‡ŒåŠ ç©ºè¡Œ
     [Space]
     public float dashDuration = 0.25f;
     public float dashSpeed = 20;
@@ -62,6 +62,8 @@ public class Player : MonoBehaviour
     private Color bodySpriteColor = Color.white;
     private float hitStunTimer;
     private float invulnerableTimer;
+    private const float WallDetachGrace = 0.08f;
+    private float wallDetachTimer;
     public bool IsDodging { get; private set; }
 
     [Header("Health")]
@@ -72,7 +74,7 @@ public class Player : MonoBehaviour
     public event Action HealthChanged;
     public event Action<int> Damaged;
 
-    //ÉäÏß·½ÏòºÍÌøÇ½·½Ïò¿ÉÄÜ»áÓÃµ½facingDir ¼ì²âÊÇ+1»¹ÊÇ-1
+    //å°„çº¿æ–¹å‘å’Œè·³å¢™æ–¹å‘å¯èƒ½ä¼šç”¨åˆ°facingDir æ£€æµ‹æ˜¯+1è¿˜æ˜¯-1
     public int facingDir { get; private set; } = 1;
     public Vector2 moveInput { get; private set; }
     public int CurrentAttackDamage => Mathf.Max(1, Mathf.RoundToInt(baseAttackDamage * (cardLoadout != null ? cardLoadout.DamageMultiplier : 1f)));
@@ -97,7 +99,7 @@ public class Player : MonoBehaviour
     }
 
     [Header("Collision detection")]
-    //[SerializeField]´ú±íËäÈ»ÊÇË½ÃÜÖµ£¬µ«ÊÇÏÔÊ¾ÔÚUnityÊôĞÔÀ¸ÖĞ
+    //[SerializeField]ä»£è¡¨è™½ç„¶æ˜¯ç§å¯†å€¼ï¼Œä½†æ˜¯æ˜¾ç¤ºåœ¨Unityå±æ€§æ ä¸­
     [SerializeField] private float groundCheckDistance;
     [SerializeField] private float wallCheckDistance;
     [SerializeField] private float groundStickDistance = 0.12f;
@@ -106,6 +108,8 @@ public class Player : MonoBehaviour
     [SerializeField] private Transform secondaryWallCheck;
     public bool groundDetected { get; private set; }
     public bool wallDetected { get; private set; }
+    // è„šä¸‹æ˜¯å¦æœ‰å®ä½“ï¼ˆå«æ•Œäºº/ç®±å­ï¼‰ï¼Œç”¨äºã€Œè¸©åœ¨æ€ªç‰©å¤´ä¸Šä¹Ÿç®—è½åœ°ã€
+    public bool supportDetected { get; private set; }
 
 
 
@@ -154,20 +158,37 @@ public class Player : MonoBehaviour
 
     private void OnEnable()
     {
-        //Æô¶¯Input System ¿ªÊ¼¼àÌıÊäÈëÊÂ¼ş
+        //å¯åŠ¨Input System å¼€å§‹ç›‘å¬è¾“å…¥äº‹ä»¶
         input.Enable();
 
-        //µ±MovementÊäÈë·¢ÉúÊ±,¸üĞÂmoveInput
-        //Movement:·½Ïò¼ü   performed:ÊäÈëÕıÔÚ·¢Éú   ctx:ÊäÈëĞÅÏ¢  ReadValue<Vector2>():¶ÁÈ¡ÊäÈëÖµ
-        input.Player.Movement.performed += ctx => moveInput = ctx.ReadValue<Vector2>() ;
-        //canceled´ú±íÊäÈë½áÊø  moveInput = Vector2.zero£ºÃ»ÓĞ·½ÏòÊäÈëÁË
-        input.Player.Movement.canceled += ctx => moveInput = Vector2.zero;
-
+        //å½“Movementè¾“å…¥å‘ç”Ÿæ—¶,æ›´æ–°moveInput
+        // ç”¨å…·åæ–¹æ³•è®¢é˜…ï¼ŒOnDisable é‡Œæ‰èƒ½é€€è®¢ï¼›
+        // ä¹‹å‰ç”¨ lambdaï¼Œç»„ä»¶æ¯æ¬¡å¯ç”¨éƒ½ä¼šå¤šæŒ‚ä¸€ä¸ªå›è°ƒï¼Œé€€ä¸æ‰ã€‚
+        input.Player.Movement.performed += OnMovePerformed;
+        input.Player.Movement.canceled += OnMoveCanceled;
     }
-    //OnDisable() ¹Ø±ÕÊäÈëÏµÍ³
+
+    //OnDisable() å…³é—­è¾“å…¥ç³»ç»Ÿ
     private void OnDisable()
     {
+        input.Player.Movement.performed -= OnMovePerformed;
+        input.Player.Movement.canceled -= OnMoveCanceled;
         input.Disable();
+    }
+
+    private void OnDestroy()
+    {
+        input?.Dispose();
+    }
+
+    private void OnMovePerformed(InputAction.CallbackContext context)
+    {
+        moveInput = context.ReadValue<Vector2>();
+    }
+
+    private void OnMoveCanceled(InputAction.CallbackContext context)
+    {
+        moveInput = Vector2.zero;
     }
 
     private void Start()
@@ -177,7 +198,7 @@ public class Player : MonoBehaviour
 
     private void Update()
     {
-        //Ã¿Ö¡¼ì²âµØÃæ¡¢Ç½±Ú
+        //æ¯å¸§æ£€æµ‹åœ°é¢ã€å¢™å£
         TickHurtTimers();
         HandleCollisionDetection();
         stateMachine.UpdateActiveState();
@@ -252,24 +273,24 @@ public class Player : MonoBehaviour
 
     public void EnterAttackStateWithDelay()
     {
-        //ÅĞ¶ÏÊÇ·ñÒÑ¾­´æÔÚµÈ´ıÖĞµÄĞ­³Ì
+        //åˆ¤æ–­æ˜¯å¦å·²ç»å­˜åœ¨ç­‰å¾…ä¸­çš„åç¨‹
         if (queuedAttackCo != null)
             StopCoroutine(queuedAttackCo);
-        //Æô¶¯Ğ­³Ì ·½±ãÒÔºóÍ£Ö¹
+        //å¯åŠ¨åç¨‹ æ–¹ä¾¿ä»¥ååœæ­¢
         queuedAttackCo = StartCoroutine(EnterAttackStateWithDelayCo());
     }
     private IEnumerator EnterAttackStateWithDelayCo()
     {
-        //µÈµ±Ç°Ö¡ËùÓĞ¸üĞÂÍê³ÉºóÔÙ¼ÌĞøÖ´ĞĞ
+        //ç­‰å½“å‰å¸§æ‰€æœ‰æ›´æ–°å®Œæˆåå†ç»§ç»­æ‰§è¡Œ
         yield return new WaitForEndOfFrame();
         stateMachine.ChangeState(basicAttackState);
     }
 
     public void CallAnimationTrigger()
     {
-        //¶¯»­×îºóÒ»Ö¡Ö´ĞĞ´Ë´úÂë£¬µ÷ÓÃµ±Ç°·½·¨
-        //Èç¹ûµ±Ç°×´Ì¬Ê±AttackState Êµ¼ÊÖ´ĞĞAttackState.CallAnimationTrigger()
-        //ÓÉÓÚAttackState¼Ì³ĞEntityState ËùÒÔ×îÖÕÖ´ĞĞ£ºtriggerCalled = true;£¨À´Ô´ÓÚEntityStateÖĞµÄÍ¬Ãû·½·¨£©
+        //åŠ¨ç”»æœ€åä¸€å¸§æ‰§è¡Œæ­¤ä»£ç ï¼Œè°ƒç”¨å½“å‰æ–¹æ³•
+        //å¦‚æœå½“å‰çŠ¶æ€æ—¶AttackState å®é™…æ‰§è¡ŒAttackState.CallAnimationTrigger()
+        //ç”±äºAttackStateç»§æ‰¿EntityState æ‰€ä»¥æœ€ç»ˆæ‰§è¡Œï¼štriggerCalled = true;ï¼ˆæ¥æºäºEntityStateä¸­çš„åŒåæ–¹æ³•ï¼‰
         stateMachine.currentState.CallAnimationTrigger();
     }
 
@@ -395,8 +416,48 @@ public class Player : MonoBehaviour
             return;
         }
 
-        wallDetected = Physics2D.Raycast(primaryWallCheck.position, Vector2.right * facingDir, wallCheckDistance, whatIsGround)
-                    && Physics2D.Raycast(secondaryWallCheck.position, Vector2.right * facingDir, wallCheckDistance, whatIsGround);
+        Vector2 dir = Vector2.right * facingDir;
+        // å°„çº¿ä»èº«ä½“ä¸­çº¿å‡ºå‘ï¼Œæ‰€ä»¥é•¿åº¦è¦è¦†ç›–ã€ŒåŠèº«å®½ + ä¸€ç‚¹ä½™é‡ã€ï¼Œ
+        // å¦åˆ™èƒ¶å›Šè´´ç€å¢™åœä¸‹æ—¶ï¼ˆä¸­çº¿ç¦»å¢™é¢çº¦ 0.39~0.44ï¼‰0.4 çš„å°„çº¿æ­£å¥½æ‰“ä¸åˆ°ã€‚
+        float halfWidth = bodyCollider != null ? bodyCollider.bounds.extents.x : 0.385f;
+        float probe = Mathf.Max(wallCheckDistance, halfWidth + 0.12f);
+        bool upperHit = Physics2D.Raycast(primaryWallCheck.position, dir, probe, whatIsGround);
+        bool lowerHit = Physics2D.Raycast(secondaryWallCheck.position, dir, probe, whatIsGround);
+        // ä¸¤æ¡å°„çº¿éƒ½ä»èº«ä½“ä¸­çº¿å‡ºå‘ï¼Œè´´ç€å¢™æ—¶å¯èƒ½éƒ½å·®ä¸€ç‚¹ï¼Œæ‰€ä»¥å†è¡¥ä¸€æ¬¡ä»ç¢°æ’ä½“è¾¹ç¼˜å‡ºå‘çš„èƒ¶å›ŠæŠ•å°„ã€‚
+        bool wallNow = (upperHit && lowerHit) || IsSolidAhead(facingDir);
+
+        // è´´å¢™åˆ¤å®šä¿æŒ 0.08 ç§’ï¼Œé¿å…æ¨ç€å¢™çš„ç¬é—´å› ä¸ºä¸€å¸§æ²¡æ‰“ä¸­è€Œæ‰å‡ºè´´å¢™çŠ¶æ€ã€‚
+        if (wallNow)
+        {
+            wallDetected = true;
+            wallDetachTimer = 0f;
+        }
+        else if (wallDetected)
+        {
+            wallDetachTimer += Time.deltaTime;
+            if (wallDetachTimer >= WallDetachGrace)
+                wallDetected = false;
+        }
+
+        UpdateSupport();
+    }
+
+    // è„šä¸‹æœ‰æ²¡æœ‰ã€Œèƒ½ç«™ä½çš„ä¸œè¥¿ã€ï¼šåœ°é¢ã€æ•Œäººè„‘è¢‹ã€ç®±å­éƒ½ç®—ã€‚
+    // groundDetected åªè®¤ Ground å±‚ï¼Œæ‰€ä»¥è¸©åœ¨æ€ªç‰©å¤´ä¸Šæ—¶å®ƒä¸€ç›´æ˜¯ falseï¼Œ
+    // ç©ºä¸­æ”»å‡»å°±ä¼šå› ä¸ºç­‰ä¸åˆ° groundDetected è€Œæ°¸è¿œå‡ºä¸æ¥ï¼ˆäººå¡åœ¨åŠç©ºï¼‰ã€‚
+    private void UpdateSupport()
+    {
+        supportDetected = false;
+        if (bodyCollider == null)
+            return;
+
+        Bounds bounds = bodyCollider.bounds;
+        Vector2 origin = new Vector2(bounds.center.x, bounds.min.y + 0.06f);
+        Vector2 size = new Vector2(Mathf.Max(0.12f, bounds.size.x * 0.7f), 0.12f);
+        int mask = ~(1 << gameObject.layer);
+        RaycastHit2D hit = Physics2D.BoxCast(origin, size, 0f, Vector2.down, 0.12f, mask);
+        // ä¾§é¢æ“¦åˆ°å¢™ï¼ˆnormal åŸºæœ¬æ˜¯ Â±xï¼‰ä¸ç®—ç«™ä½ï¼›è§¦å‘å™¨ï¼ˆå¡ç‰Œä¹‹ç±»çš„ï¼‰ä¹Ÿä¸ç®—ã€‚
+        supportDetected = hit.collider != null && !hit.collider.isTrigger && hit.normal.y > 0.5f;
     }
 
     private float FeetDistanceFromOrigin()

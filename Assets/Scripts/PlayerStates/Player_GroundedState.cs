@@ -12,13 +12,15 @@ public class Player_GroundedState : EntityState
         if (stateMachine.currentState != this)
             return;
 
-        if (rb.linearVelocity.y < 0 && player.groundDetected == false)
+        // 站在敌人头上 / 箱子上时 groundDetected 是 false，但 supportDetected 是 true，
+        // 这时候不该切回下落，否则会一直悬在半空抖。
+        if (rb.linearVelocity.y < 0 && player.groundDetected == false && player.supportDetected == false)
         {
             stateMachine.ChangeState(player.fallState);
             return;
         }
 
-        if (player.groundDetected && input.Player.Jump.WasPerformedThisFrame())
+        if ((player.groundDetected || player.supportDetected) && input.Player.Jump.WasPerformedThisFrame())
         {
             stateMachine.ChangeState(player.jumpState);
             return;

@@ -1,7 +1,7 @@
 using UnityEngine;
 
 public abstract class EntityState
-//abstractµÄ×÷ÓÃ£ºEntityState ÊÇÒ»¸ö¡°»ù´¡Ä£°åÀà¡±£¬²»ÄÜÖ±½Ó new ³öÀ´ÓÃ£¬Ö»ÄÜÈÃ±ğµÄÀà¼Ì³ĞËü¡£
+//abstractçš„ä½œç”¨ï¼šEntityState æ˜¯ä¸€ä¸ªâ€œåŸºç¡€æ¨¡æ¿ç±»â€ï¼Œä¸èƒ½ç›´æ¥ new å‡ºæ¥ç”¨ï¼Œåªèƒ½è®©åˆ«çš„ç±»ç»§æ‰¿å®ƒã€‚
 {
     protected Player player;
     protected StateMachine stateMachine;
@@ -15,13 +15,13 @@ public abstract class EntityState
     protected bool triggerCalled;
 
     public EntityState(Player player, StateMachine stateMachine, string animBoolName)
-    //È«¾Ö¶¼¿Éµ÷ÓÃµÄ¡°×´Ì¬»ú¡±£¬ĞèÒªÔÚ´Ë´¦½øĞĞ³õÊ¼»¯
+    //å…¨å±€éƒ½å¯è°ƒç”¨çš„â€œçŠ¶æ€æœºâ€ï¼Œéœ€è¦åœ¨æ­¤å¤„è¿›è¡Œåˆå§‹åŒ–
     {
         this.player = player;
         this.stateMachine = stateMachine;
         this.animBoolName = animBoolName;
-        //°ÑÍâ²¿´«½øÀ´µÄ stateMachine
-        //±£´æµ½ µ±Ç°¶ÔÏó×Ô¼ºµÄ stateMachine Àï
+        //æŠŠå¤–éƒ¨ä¼ è¿›æ¥çš„ stateMachine
+        //ä¿å­˜åˆ° å½“å‰å¯¹è±¡è‡ªå·±çš„ stateMachine é‡Œ
 
         anim = player.anim;
         rb = player.rb;
@@ -29,13 +29,13 @@ public abstract class EntityState
     }
 
     public virtual void Enter()
-    //´Ë´¦µÄ¡°virtual¡±´ú±íÔÚ¸¸ÀàÖĞ¿É±»µ÷ÓÃÖØĞ´µÄº¯Êı¡¢Ïà¶ÔÓ¦µÄ×ÓÀàÖĞÓÃ¡°overrid¡±
+    //æ­¤å¤„çš„â€œvirtualâ€ä»£è¡¨åœ¨çˆ¶ç±»ä¸­å¯è¢«è°ƒç”¨é‡å†™çš„å‡½æ•°ã€ç›¸å¯¹åº”çš„å­ç±»ä¸­ç”¨â€œoverridâ€
     {
-        //¸Ä±ä×´Ì¬Ê±£¬½«µ÷ÓÃ´Ë·½·¨£¬ÎªÁË³õÊ¼»¯×´Ì¬µÄÄ¬ÈÏÉèÖÃ
-        //ÆäËû½Å±¾ÀïÃæÃ¿´Îµ÷ÓÃÕâ¸ö½Å±¾ÖĞµÄEnterÊ±£¬»ábase.Enter£¬´ú±íÏÈÖ´ĞĞÒ»±é´Ë½Å±¾ÖĞµÄEnterÒ»´Î
-        //´úÂëµÄº¬ÒåÊÇ£º½øÈë×´Ì¬Ê±¿ªÆô¶¯»­£¬²¢ÇÒÖØÖÃ¶¯»­tigger×´Ì¬×ª»»³ÉÎªfalse£¬±ÜÃâÉÏÒ»×´Ì¬²ĞÁô
-        //µ±ÆäËû½Å±¾µ÷ÓÃEnterÊ±£¬»áÍ¨¹ıPlayer½Å±¾¸ü¸ÄÒÑ¾­¶¨ÒåºÃµÄÃû³Æ£¬²¢´«Êäµ½ÕâÀï£¬´ËÊ±¿ªÊ¼ÔËĞĞÒ»´ÎÏëÒªÖ´ĞĞµÄ¶¯»­
-        //Èç¹û¡°move¡±ÊÇ¡°true¡±×´Ì¬£¬ÔòÇĞ»»µ½¡°move¡±¶¯»­
+        //æ”¹å˜çŠ¶æ€æ—¶ï¼Œå°†è°ƒç”¨æ­¤æ–¹æ³•ï¼Œä¸ºäº†åˆå§‹åŒ–çŠ¶æ€çš„é»˜è®¤è®¾ç½®
+        //å…¶ä»–è„šæœ¬é‡Œé¢æ¯æ¬¡è°ƒç”¨è¿™ä¸ªè„šæœ¬ä¸­çš„Enteræ—¶ï¼Œä¼šbase.Enterï¼Œä»£è¡¨å…ˆæ‰§è¡Œä¸€éæ­¤è„šæœ¬ä¸­çš„Enterä¸€æ¬¡
+        //ä»£ç çš„å«ä¹‰æ˜¯ï¼šè¿›å…¥çŠ¶æ€æ—¶å¼€å¯åŠ¨ç”»ï¼Œå¹¶ä¸”é‡ç½®åŠ¨ç”»tiggerçŠ¶æ€è½¬æ¢æˆä¸ºfalseï¼Œé¿å…ä¸Šä¸€çŠ¶æ€æ®‹ç•™
+        //å½“å…¶ä»–è„šæœ¬è°ƒç”¨Enteræ—¶ï¼Œä¼šé€šè¿‡Playerè„šæœ¬æ›´æ”¹å·²ç»å®šä¹‰å¥½çš„åç§°ï¼Œå¹¶ä¼ è¾“åˆ°è¿™é‡Œï¼Œæ­¤æ—¶å¼€å§‹è¿è¡Œä¸€æ¬¡æƒ³è¦æ‰§è¡Œçš„åŠ¨ç”»
+        //å¦‚æœâ€œmoveâ€æ˜¯â€œtrueâ€çŠ¶æ€ï¼Œåˆ™åˆ‡æ¢åˆ°â€œmoveâ€åŠ¨ç”»
         anim.SetBool(animBoolName, true);
         triggerCalled = false;
 
@@ -43,26 +43,26 @@ public abstract class EntityState
 
     public virtual void Update()
     {
-        //ÀıÈç½øÈë¡°Dash¡± stateTimer = 0.2f È»ºóËæ×ÅÊ±¼ä½øĞĞ¼õÉÙ
+        //ä¾‹å¦‚è¿›å…¥â€œDashâ€ stateTimer = 0.2f ç„¶åéšç€æ—¶é—´è¿›è¡Œå‡å°‘
         stateTimer -= Time.deltaTime;
-        //ÔÚ´ËÔËĞĞ×´Ì¬µÄÂß¼­
+        //åœ¨æ­¤è¿è¡ŒçŠ¶æ€çš„é€»è¾‘
         anim.SetFloat("yVelocity", rb.linearVelocity.y);
 
-        //ÎªÊ²Ã´Dash¼ì²âĞ´ÔÚ¸¸ÀàÀï£ºËùÓĞµÄ×´Ì¬ÏÂ£¬¶¼ÔÊĞí³å´Ì
-        //Èç¹ûÄ³¸ö×´Ì¬²»ÔÊĞíDashÔõÃ´°ì£ºÕâÀïÃæ¾Í»á¡°override Update¡±
+        //ä¸ºä»€ä¹ˆDashæ£€æµ‹å†™åœ¨çˆ¶ç±»é‡Œï¼šæ‰€æœ‰çš„çŠ¶æ€ä¸‹ï¼Œéƒ½å…è®¸å†²åˆº
+        //å¦‚æœæŸä¸ªçŠ¶æ€ä¸å…è®¸Dashæ€ä¹ˆåŠï¼šè¿™é‡Œé¢å°±ä¼šâ€œoverride Updateâ€
         if (input.Player.Dash.WasPressedThisFrame() && CanDash())
             stateMachine.ChangeState(player.dashState);
     }
 
     public virtual void Exit()
     {
-        //Ã¿´ÎÍË³ö×´Ì¬²¢ÇĞ»»µ½ĞÂ×´Ì¬Ê±¶¼»áµ÷ÓÃ´Ë·½·¨
+        //æ¯æ¬¡é€€å‡ºçŠ¶æ€å¹¶åˆ‡æ¢åˆ°æ–°çŠ¶æ€æ—¶éƒ½ä¼šè°ƒç”¨æ­¤æ–¹æ³•
         anim.SetBool(animBoolName, false);
     }
 
     public void CallAnimationTrigger()
     {
-        //¿ÉÒÔÈÃ´úÂëÖªµÀ¶¯»­²¥ÍêÁË£¬´Ë·½·¨ÔÚĞèÒªµÄ¶¯»­µÄ×îºóÒ»Ö¡±»µ÷ÓÃ
+        //å¯ä»¥è®©ä»£ç çŸ¥é“åŠ¨ç”»æ’­å®Œäº†ï¼Œæ­¤æ–¹æ³•åœ¨éœ€è¦çš„åŠ¨ç”»çš„æœ€åä¸€å¸§è¢«è°ƒç”¨
         triggerCalled = true;
     }
 
