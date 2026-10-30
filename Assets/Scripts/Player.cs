@@ -120,6 +120,7 @@ public class Player : MonoBehaviour
 
     // ── 给骨骼动画（PlayerRig）读的只读状态 ──
     public bool IsMoving => Mathf.Abs(moveInput.x) > 0.01f;
+    public float HorizontalSpeed => rb != null ? Mathf.Abs(rb.linearVelocity.x) : 0f;
     public bool IsHurtNow => invulnerableTimer > 0.35f;
     public bool IsAttacking => stateMachine != null &&
         (stateMachine.currentState == basicAttackState || stateMachine.currentState == jumpAttackState);
@@ -172,9 +173,13 @@ public class Player : MonoBehaviour
         // 血量低于 33% 时的红屏 + 心跳
         LowHealthWarning.Attach(this);
 
-        // 换成设计图的角色骨骼：关掉旧的整张精灵与 Animator，改由 PlayerRig 驱动
-        PlayerRig rig = PlayerRig.Attach(this, 1.55f);
-        if (rig != null)
+        // 换成设计图的帧动画：关掉旧的整张精灵与 Animator，改由 PlayerFrameAnimator 驱动。
+        // 脚底高度直接沿用旧精灵的视觉底边——旧模型本来就站得是对的。
+        float feetY = bodySprite != null
+            ? bodySprite.bounds.min.y - transform.position.y
+            : (bodyCollider != null ? bodyCollider.bounds.min.y - transform.position.y : -0.75f);
+        PlayerFrameAnimator frames = PlayerFrameAnimator.Attach(this, feetY);
+        if (frames != null)
         {
             if (bodySprite != null)
                 bodySprite.enabled = false;
