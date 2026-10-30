@@ -173,16 +173,23 @@ public class Player : MonoBehaviour
         // 血量低于 33% 时的红屏 + 心跳
         LowHealthWarning.Attach(this);
 
-        // 换成设计图的帧动画：关掉旧的整张精灵与 Animator，改由 PlayerFrameAnimator 驱动。
-        // 脚底高度直接沿用旧精灵的视觉底边——旧模型本来就站得是对的。
+        // 换成冰蓝星辉魔法少女的骨骼：脚底沿用旧精灵的视觉底边（旧模型本来就站得对）
         float feetY = bodySprite != null
             ? bodySprite.bounds.min.y - transform.position.y
             : (bodyCollider != null ? bodyCollider.bounds.min.y - transform.position.y : -0.75f);
-        PlayerFrameAnimator frames = PlayerFrameAnimator.Attach(this, feetY);
-        if (frames != null)
+        WitchRig witch = WitchRig.Attach(this, feetY, 1.8f);
+        if (witch != null)
         {
-            if (bodySprite != null)
-                bodySprite.enabled = false;
+            // 关掉玩家身上所有旧的 SpriteRenderer（之前只关了 bodySprite，结果旧的还在显示，
+            // 屏幕上会同时出现两个角色）
+            SpriteRenderer[] renderers = GetComponentsInChildren<SpriteRenderer>(true);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] == null || renderers[i].transform.IsChildOf(witch.transform))
+                    continue;
+                renderers[i].enabled = false;
+            }
+
             if (anim != null)
                 anim.enabled = false;
         }
