@@ -31,6 +31,7 @@ public class PlayerAttackHitbox : MonoBehaviour
         hitCollider.enabled = true;
         Physics2D.SyncTransforms();
         AttackFeedback.Swing(hitCollider.bounds, player.facingDir, player.AttackReachMultiplier > 1.01f);
+        Juice.Slash();
         TryHitOverlapping();
     }
 
@@ -70,7 +71,24 @@ public class PlayerAttackHitbox : MonoBehaviour
             return;
 
         bool empowered = player.AttackReachMultiplier > 1.01f || player.CurrentAttackDamage > 1;
-        damageable.TakeDamage(player.CurrentAttackDamage, player.transform.position);
+        int damage = player.CurrentAttackDamage;
+        damageable.TakeDamage(damage, player.transform.position);
         AttackFeedback.Hit(other.bounds.center, empowered);
+
+        // 打击感：弹刀和真命中给不同反馈
+        BasicEnemy enemy = other.GetComponentInParent<BasicEnemy>();
+        if (enemy != null && enemy.IsBlocked)
+        {
+            Juice.Clang();
+            Juice.Shake(0.12f);
+            Juice.HitStop(0.03f);
+            return;
+        }
+
+        bool heavy = damage >= 2;
+        Juice.Number(other.bounds.center, damage, heavy);
+        Juice.Thump();
+        Juice.Shake(heavy ? 0.34f : 0.2f);
+        Juice.HitStop(heavy ? 0.075f : 0.045f);
     }
 }

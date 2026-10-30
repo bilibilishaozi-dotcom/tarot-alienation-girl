@@ -96,6 +96,10 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
     private bool spore;      // 孢子怪：不追人，靠近后原地蓄力，然后大范围喷发
     private bool armored;    // 石甲虫：横向普通攻击会被甲壳弹开，只有从上方砸下来才吃伤害
     private float blockedTimer;   // 被弹开后的短暂计时，给骨骼动画读
+    // 受击表演：1 → 0 的冲击量
+    private float hitPunch;
+    private float hitPunchDir = 1f;
+    private bool hitPunchHeavy;
     private Color windupColor = new Color(1f, 0.72f, 0.2f, 1f);
 
 
@@ -335,6 +339,32 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
                 }
                 break;
         }
+
+        ApplyHitPunch();
+    }
+
+    // 受击的挤压回弹：横向压扁、纵向拉长，再带一点摇晃，比硬翻转自然得多
+    private void ApplyHitPunch()
+    {
+        if (hitPunch <= 0f)
+            return;
+
+        float speed = hitPunchHeavy ? 4.5f : 6.8f;
+        hitPunch = Mathf.Max(0f, hitPunch - Time.deltaTime * speed);
+        float p = hitPunch * hitPunch;
+
+        transform.localScale = new Vector3(
+            baseScale.x * (1f - 0.2f * p),
+            baseScale.y * (1f + 0.26f * p),
+            baseScale.z);
+        transform.rotation = Quaternion.Euler(0f, 0f, -9f * p * hitPunchDir);
+
+        if (hitPunch <= 0f)
+        {
+            transform.rotation = Quaternion.identity;
+            if (action == EnemyAction.Hurt)
+                transform.localScale = baseScale;
+        }
     }
 
     private void LateUpdate()
@@ -408,11 +438,14 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
         health = Mathf.Max(0, health - amount);
         bool heavy = amount >= 2;
         spriteRenderer.color = heavy ? new Color(1f, 0.9f, 0.4f, 1f) : Color.white;
-        transform.localScale = new Vector3(baseScale.x * (heavy ? 1.28f : 1.08f), baseScale.y * (heavy ? 0.38f : 0.68f), baseScale.z);
 
+        // 受击表演：不翻转朝向，只做「挤压 + 回弹 + 轻微摇晃」（在 LateUpdate 里衰减）
         float knockDirection = transform.position.x >= hitFrom.x ? 1f : -1f;
+        hitPunch = 1f;
+        hitPunchDir = knockDirection;
+        hitPunchHeavy = heavy;
+
         rb.linearVelocity = rooted || platformLock ? Vector2.zero : new Vector2(knockDirection * knockback.x, knockback.y);
-        Face((int)knockDirection);
 
         HealthChanged?.Invoke();
         if (health <= 0)

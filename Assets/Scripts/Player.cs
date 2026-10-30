@@ -393,6 +393,11 @@ public class Player : MonoBehaviour
         if (bodySprite != null)
             bodySprite.color = new Color(1f, 0.3f, 0.3f, 1f);
 
+        // 挨打也要有反馈：震一下 + 顿一下 + 一声闷响
+        Juice.Thump();
+        Juice.Shake(0.4f);
+        Juice.HitStop(0.06f);
+
         if (CurrentHealth <= 0)
             Defeat();
 
