@@ -175,18 +175,17 @@ public class Player : MonoBehaviour
         // 血量低于 33% 时的红屏 + 心跳
         LowHealthWarning.Attach(this);
 
-        // 换成冰蓝星辉魔法少女的骨骼。
+        // 换成冰蓝星辉魔法少女的立绘（整张 + 程序化整体表演）。
         // 脚底对齐「胶囊碰撞盒底边」——实测玩家胶囊 size=(0.77,1.96) offset=(0,-0.35)，
-        // 它的底边正好是站立时的地面高度；旧精灵的 bounds 底边含透明留白，用它当基准会陷进地里。
+        // 它的底边正好是站立时的地面高度。
         Physics2D.SyncTransforms();
         float feetY = bodyCollider != null
             ? bodyCollider.bounds.min.y - transform.position.y
             : -1.33f;
-        WitchRig witch = WitchRig.Attach(this, feetY, 2.1f);
+        WitchVisual witch = WitchVisual.Attach(this, feetY, 2.1f);
         if (witch != null)
         {
-            // 关掉玩家身上所有旧的 SpriteRenderer（之前只关了 bodySprite，结果旧的还在显示，
-            // 屏幕上会同时出现两个角色）
+            // 只关掉旧的 SpriteRenderer（否则屏幕上会出现两个角色）
             SpriteRenderer[] renderers = GetComponentsInChildren<SpriteRenderer>(true);
             for (int i = 0; i < renderers.Length; i++)
             {
@@ -194,10 +193,11 @@ public class Player : MonoBehaviour
                     continue;
                 renderers[i].enabled = false;
             }
-
-            if (anim != null)
-                anim.enabled = false;
         }
+
+        // 注意：Animator 不能关。
+        // 攻击/受击等状态在等 CallAnimationTrigger()（动画事件）才结算，
+        // 关掉 Animator 后这些事件不再触发，状态机就会卡在攻击里 —— 表现就是「按左右不能正常移动」。
 
         rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
         rb.interpolation = RigidbodyInterpolation2D.Interpolate;
