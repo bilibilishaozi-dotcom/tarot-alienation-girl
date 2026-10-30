@@ -173,11 +173,14 @@ public class Player : MonoBehaviour
         // 血量低于 33% 时的红屏 + 心跳
         LowHealthWarning.Attach(this);
 
-        // 换成冰蓝星辉魔法少女的骨骼：脚底沿用旧精灵的视觉底边（旧模型本来就站得对）
-        float feetY = bodySprite != null
-            ? bodySprite.bounds.min.y - transform.position.y
-            : (bodyCollider != null ? bodyCollider.bounds.min.y - transform.position.y : -0.75f);
-        WitchRig witch = WitchRig.Attach(this, feetY, 1.8f);
+        // 换成冰蓝星辉魔法少女的骨骼。
+        // 脚底对齐「胶囊碰撞盒底边」——实测玩家胶囊 size=(0.77,1.96) offset=(0,-0.35)，
+        // 它的底边正好是站立时的地面高度；旧精灵的 bounds 底边含透明留白，用它当基准会陷进地里。
+        Physics2D.SyncTransforms();
+        float feetY = bodyCollider != null
+            ? bodyCollider.bounds.min.y - transform.position.y
+            : -1.33f;
+        WitchRig witch = WitchRig.Attach(this, feetY, 2.1f);
         if (witch != null)
         {
             // 关掉玩家身上所有旧的 SpriteRenderer（之前只关了 bodySprite，结果旧的还在显示，
