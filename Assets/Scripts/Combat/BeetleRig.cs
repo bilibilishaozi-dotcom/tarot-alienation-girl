@@ -51,6 +51,7 @@ public class BeetleRig : MonoBehaviour
     private float facing = 1f;
     private float blockedFlash;
     private float hurtPulse;
+    private Vector3 bodyBasePos;
 
     public static BeetleRig Attach(Transform parent, BasicEnemy owner, float height)
     {
@@ -136,6 +137,12 @@ public class BeetleRig : MonoBehaviour
         }
 
         ApplyScale();
+
+        // 缓存 body 基准位置（LateUpdate 只在其上叠加起伏）
+        Transform bodyBone = Find("body");
+        if (bodyBone != null)
+            bodyBasePos = bodyBone.localPosition;
+
         SnapFeetToGround();
     }
 
@@ -205,12 +212,12 @@ public class BeetleRig : MonoBehaviour
         float walk = Mathf.Sin(t * 6f);
         float idle = 1f - Mathf.Max(blockedFlash * 3f, hurtPulse);
 
-        // 身体：爬动时轻微上下 + 被弹开时后退
+        // 身体：爬动时轻微上下 + 被弹开时后退（在基准位置上叠加，不能覆盖基准）
         Transform body = Find("body");
         if (body != null)
         {
             float bob = Mathf.Abs(walk) * 0.02f * idle;
-            body.localPosition = new Vector3(0f, bob + hurtPulse * -0.01f, 0f);
+            body.localPosition = bodyBasePos + new Vector3(0f, bob + hurtPulse * -0.01f, 0f);
             SetAngle("body", -blockedFlash * 24f + Mathf.Sin(t * 2f) * 1f * idle);
         }
 

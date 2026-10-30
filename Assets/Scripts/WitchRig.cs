@@ -46,6 +46,7 @@ public class WitchRig : MonoBehaviour
     private Player player;
     private float baseScale = 1f;
     private float facing = 1f;
+    private Vector3 bodyBasePos;
 
     private float walk;
     private float rise;     // 起跳上升
@@ -139,6 +140,11 @@ public class WitchRig : MonoBehaviour
 
         ApplyScale();
 
+        // 缓存 body 的基准位置——LateUpdate 里只在其上叠加呼吸起伏，不能覆盖它
+        Transform bodyBone = Find("body");
+        if (bodyBone != null)
+            bodyBasePos = bodyBone.localPosition;
+
         // 脚底用「旧精灵的视觉底边」定位：旧模型站得对，新美术必然落在同一水平线
         transform.localPosition = new Vector3(0f, feetLocalY, 0f);
     }
@@ -182,7 +188,7 @@ public class WitchRig : MonoBehaviour
         if (body != null)
         {
             float bob = Mathf.Abs(step) * 0.03f * walk + Mathf.Sin(t * 1.6f) * 0.01f * (1f - walk);
-            body.localPosition = new Vector3(0f, bob, 0f);
+            body.localPosition = bodyBasePos + new Vector3(0f, bob, 0f);
             SetAngle("body",
                 Mathf.Sin(t * 1.6f) * 1.2f * (1f - walk)
                 - 4f * walk
