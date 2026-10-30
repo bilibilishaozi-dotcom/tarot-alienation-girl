@@ -118,6 +118,12 @@ public class Player : MonoBehaviour
     // 脚下是否有实体（含敌人/箱子），用于「踩在怪物头上也算落地」
     public bool supportDetected { get; private set; }
 
+    // ── 给骨骼动画（PlayerRig）读的只读状态 ──
+    public bool IsMoving => Mathf.Abs(moveInput.x) > 0.01f;
+    public bool IsHurtNow => invulnerableTimer > 0.35f;
+    public bool IsAttacking => stateMachine != null &&
+        (stateMachine.currentState == basicAttackState || stateMachine.currentState == jumpAttackState);
+
     // 「现在能不能贴墙」= 真的贴着墙 + 不在脱墙冷却里 + 没有按离墙方向。
     // 状态机里判断贴墙请用这个，不要直接用 wallDetected。
     public bool wallLatched
@@ -165,6 +171,16 @@ public class Player : MonoBehaviour
             gameObject.AddComponent<TrainingEncounter>();
         // 血量低于 33% 时的红屏 + 心跳
         LowHealthWarning.Attach(this);
+
+        // 换成设计图的角色骨骼：关掉旧的整张精灵与 Animator，改由 PlayerRig 驱动
+        PlayerRig rig = PlayerRig.Attach(this, 1.55f);
+        if (rig != null)
+        {
+            if (bodySprite != null)
+                bodySprite.enabled = false;
+            if (anim != null)
+                anim.enabled = false;
+        }
 
         rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
         rb.interpolation = RigidbodyInterpolation2D.Interpolate;
