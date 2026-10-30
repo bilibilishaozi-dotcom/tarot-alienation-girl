@@ -121,6 +121,8 @@ public class Player : MonoBehaviour
     // ── 给骨骼动画（PlayerRig）读的只读状态 ──
     public bool IsMoving => Mathf.Abs(moveInput.x) > 0.01f;
     public float HorizontalSpeed => rb != null ? Mathf.Abs(rb.linearVelocity.x) : 0f;
+    // 给骨骼动画区分「起跳上升」和「下落」
+    public float VerticalSpeed => rb != null ? rb.linearVelocity.y : 0f;
     public bool IsHurtNow => invulnerableTimer > 0.35f;
     public bool IsAttacking => stateMachine != null &&
         (stateMachine.currentState == basicAttackState || stateMachine.currentState == jumpAttackState);

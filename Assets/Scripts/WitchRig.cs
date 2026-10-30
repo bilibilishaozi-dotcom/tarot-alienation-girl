@@ -48,7 +48,8 @@ public class WitchRig : MonoBehaviour
     private float facing = 1f;
 
     private float walk;
-    private float air;
+    private float rise;     // 起跳上升
+    private float fall;     // 下落
     private float attack;
     private float dash;
     private float hurt;
@@ -161,8 +162,12 @@ public class WitchRig : MonoBehaviour
 
         bool moving = player.IsMoving && player.groundDetected && !player.IsDefeated;
         bool airborne = !player.groundDetected && !player.IsDefeated;
+        bool rising = airborne && player.VerticalSpeed > 0.15f;
+        bool falling = airborne && !rising;
+
         walk = Mathf.MoveTowards(walk, moving ? 1f : 0f, dt * 7f);
-        air = Mathf.MoveTowards(air, airborne ? 1f : 0f, dt * 9f);
+        rise = Mathf.MoveTowards(rise, rising ? 1f : 0f, dt * 11f);
+        fall = Mathf.MoveTowards(fall, falling ? 1f : 0f, dt * 9f);
         attack = Mathf.MoveTowards(attack, player.IsAttacking ? 1f : 0f, dt * (player.IsAttacking ? 16f : 7f));
         dash = Mathf.MoveTowards(dash, player.IsDodging ? 1f : 0f, dt * 12f);
         hurt = Mathf.MoveTowards(hurt, player.IsHurtNow ? 1f : 0f, dt * 12f);
@@ -172,7 +177,7 @@ public class WitchRig : MonoBehaviour
 
         float step = Mathf.Sin(t * 8f);
 
-        // 身体：呼吸起伏 + 走路前倾 + 冲刺压前 + 攻击前压
+        // 身体：呼吸起伏 + 走路前倾 + 冲刺压前 + 攻击前压 + 起跳前倾/下落略后仰
         Transform body = Find("body");
         if (body != null)
         {
@@ -183,25 +188,43 @@ public class WitchRig : MonoBehaviour
                 - 4f * walk
                 - 12f * dash
                 + 7f * attack
-                - 6f * air
+                - 7f * rise
+                + 4f * fall
                 - 9f * hurt
                 + 70f * deathT);
         }
 
-        // 长发：走路/转身时甩，攻击时被带着动
-        SetAngle("hair_back", Mathf.Sin(t * 2.2f) * 2.4f * (1f - walk) + 6f * walk + 8f * dash - 5f * attack);
+        // 长发：走路/转身时甩；上升时往下坠、下落时往上飘（拖尾）
+        SetAngle("hair_back",
+            Mathf.Sin(t * 2.2f) * 2.4f * (1f - walk)
+            + 6f * walk
+            + 8f * dash
+            - 5f * attack
+            + 9f * rise
+            - 11f * fall);
 
-        // 帽子：比头发慢半拍
-        SetAngle("hat", Mathf.Sin(t * 1.8f + 0.6f) * 1.8f * (1f - walk) + 4f * walk - 4f * attack);
+        // 帽子：比头发慢半拍，同样有拖尾
+        SetAngle("hat",
+            Mathf.Sin(t * 1.8f + 0.6f) * 1.8f * (1f - walk)
+            + 4f * walk
+            - 4f * attack
+            + 6f * rise
+            - 7f * fall);
 
         // 头：轻微点头
         SetAngle("head", Mathf.Sin(t * 2.4f + 0.3f) * 1.5f * (1f - walk) - 3f * hurt);
 
-        // 法杖：待机微摆，攻击向前劈，冲刺向后收
-        SetAngle("staff", Mathf.Sin(t * 1.5f) * 3f * (1f - walk) - 55f * attack + 12f * dash + Mathf.Sin(t * 8f) * 4f * walk);
+        // 法杖：待机微摆，攻击向前劈，冲刺向后收，跳跃时上举
+        SetAngle("staff",
+            Mathf.Sin(t * 1.5f) * 3f * (1f - walk)
+            - 55f * attack
+            + 12f * dash
+            + Mathf.Sin(t * 8f) * 4f * walk
+            + 14f * rise
+            - 6f * fall);
 
-        // 腿：走路交替 + 空中收腿
-        SetAngle("legs", step * 14f * walk - 14f * air + 5f * dash);
+        // 腿：走路前后摆；起跳收腿（向后摆），下落伸腿（向前摆）
+        SetAngle("legs", step * 18f * walk - 16f * rise + 8f * fall + 5f * dash);
 
         Color tint = Color.white;
         if (deathT > 0f)
