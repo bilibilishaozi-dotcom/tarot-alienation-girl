@@ -175,14 +175,14 @@ public class Player : MonoBehaviour
         // 血量低于 33% 时的红屏 + 心跳
         LowHealthWarning.Attach(this);
 
-        // 换成冰蓝星辉魔法少女的立绘（整张 + 程序化整体表演）。
+        // 换成冰蓝星辉魔法少女的骨骼（6 块重叠拆分）。
         // 脚底对齐「胶囊碰撞盒底边」——实测玩家胶囊 size=(0.77,1.96) offset=(0,-0.35)，
         // 它的底边正好是站立时的地面高度。
         Physics2D.SyncTransforms();
         float feetY = bodyCollider != null
             ? bodyCollider.bounds.min.y - transform.position.y
             : -1.33f;
-        WitchVisual witch = WitchVisual.Attach(this, feetY, 2.1f);
+        WitchRig witch = WitchRig.Attach(this, feetY, 2.1f);
         if (witch != null)
         {
             // 只关掉旧的 SpriteRenderer（否则屏幕上会出现两个角色）
