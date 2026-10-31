@@ -32,3 +32,6 @@
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# 素材中转目录里的录屏（体积大，不入库）
+/Tools/ArtIncoming/*.mp4

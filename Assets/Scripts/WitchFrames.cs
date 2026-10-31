@@ -6,8 +6,14 @@ using UnityEngine;
 public class WitchFrames : MonoBehaviour
 {
     private const float PPU = 121f;      // 255px 人物 → 约 2.1 世界单位
-    private const float IdleFps = 3f;    // 4 帧 ≈ 1.3 秒一次呼吸
+    private const float IdleFps = 5f;    // 4 帧待机呼吸 ≈ 0.8 秒一个循环（按 GIF 原始 200ms/帧）
     private const float WalkFps = 9f;    // 8 帧 ≈ 0.9 秒一个步循环
+    private const float JumpFps = 12f;   // 4 帧起跳 ≈ 0.33 秒
+    private const float FallFps = 12f;   // 3 帧下落 ≈ 0.25 秒，播完停在末帧
+    private const float RunFps = 14f;    // 6 帧奔跑 ≈ 0.43 秒
+    // 走路/奔跑的切换速度（玩家 moveSpeed = 8，冲刺另算）
+    private const float RunEnterSpeed = 5f;
+    private const float RunExitSpeed = 3.5f;
 
     [SerializeField] private int sortingOrder = 10;
     [SerializeField] private string sortingLayer = "Player";
@@ -26,6 +32,8 @@ public class WitchFrames : MonoBehaviour
     private float dash;
     private float hurt;
     private float deathT;
+    private int airPhase;    // 0 未在空中 / 1 上升 / 2 下落
+    private bool running;    // 当前是否在播奔跑
 
     public static WitchFrames Attach(Player owner, float feetY)
     {
@@ -127,17 +135,52 @@ public class WitchFrames : MonoBehaviour
         float dt = Time.deltaTime;
 
         bool moving = player.IsMoving && player.groundDetected && !player.IsDefeated;
+        bool airborne = !player.groundDetected && !player.IsDefeated;
+
+        // 空中阶段用「锁存」判断：起跳时进入上升段，明确开始下落（vy < -0.4）才切到下落段。
+        // 否则在最高点 vy≈0 时会在 jump / fall 之间来回切，每切一次就重播第一帧 → 抖动。
+        if (!airborne)
+        {
+            airPhase = 0;
+        }
+        else if (airPhase == 0)
+        {
+            airPhase = player.VerticalSpeed > 0.15f ? 1 : 2;
+        }
+        else if (airPhase == 1 && player.VerticalSpeed < -0.4f)
+        {
+            airPhase = 2;
+        }
+
         string wanted = "idle";
-        if (!player.IsDefeated && moving)
-            wanted = "walk";
+        if (airborne)
+        {
+            // 上升用「向上发力」那几帧，下落用「向下发力」那几帧，各播一次停在末帧
+            if (airPhase == 1 && clips.ContainsKey("jump")) wanted = "jump";
+            else if (airPhase == 2 && clips.ContainsKey("fall")) wanted = "fall";
+            else if (clips.ContainsKey("jump")) wanted = "jump";
+        }
+        else if (moving)
+        {
+            // 慢走 / 快跑：带一点迟滞，避免在阈值附近来回切
+            float speed = player.HorizontalSpeed;
+            float threshold = running ? RunExitSpeed : RunEnterSpeed;
+            running = speed > threshold;
+            wanted = running && clips.ContainsKey("run") ? "run" : "walk";
+        }
+        else
+        {
+            running = false;
+        }
 
         ApplyClip(wanted, false);
 
-        // 攻击/空中没有帧，用行走帧当姿态 + 整体前压
-        if (!player.groundDetected && !player.IsDefeated)
-            ApplyClip("walk", false);
+        float fps = IdleFps;
+        if (currentClip == "walk") fps = WalkFps;
+        else if (currentClip == "run") fps = RunFps;
+        else if (currentClip == "jump") fps = JumpFps;
+        else if (currentClip == "fall") fps = FallFps;
 
-        float fps = currentClip == "walk" ? WalkFps : IdleFps;
         frameTimer += dt;
         float step = 1f / Mathf.Max(1f, fps);
         while (frameTimer >= step)
@@ -148,7 +191,12 @@ public class WitchFrames : MonoBehaviour
 
         Sprite[] frames = clips[currentClip];
         if (frames != null && frames.Length > 0)
-            renderer.sprite = frames[frameIndex % frames.Length];
+        {
+            // 跳跃/下落都是一次性片段：播到最后停在最后一帧，落地再切回 idle/walk
+            bool holdLast = currentClip == "jump" || currentClip == "fall";
+            int index = holdLast ? Mathf.Min(frameIndex, frames.Length - 1) : frameIndex % frames.Length;
+            renderer.sprite = frames[index];
+        }
 
         attack = Mathf.MoveTowards(attack, player.IsAttacking ? 1f : 0f, dt * (player.IsAttacking ? 18f : 8f));
         dash = Mathf.MoveTowards(dash, player.IsDodging ? 1f : 0f, dt * 12f);
