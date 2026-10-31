@@ -1,8 +1,9 @@
 {
  "clip": "idle",
  "canvas": [
-  279,
-  279
+  227,
+  214
  ],
- "feetY": 267
+ "feetY": 214,
+ "frames": 4
 }
