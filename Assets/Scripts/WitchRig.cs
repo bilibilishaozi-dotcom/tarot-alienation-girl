@@ -213,13 +213,21 @@ public class WitchRig : MonoBehaviour
             deathT = Mathf.Min(1f, deathT + dt * 1.6f);
 
         float step = Mathf.Sin(t * 9f);
+        // 呼吸：待机时明显、走路时减弱（周期约 3.3 秒，跟帧动画的呼吸节奏接近）
+        float breath = Mathf.Sin(t * 1.9f) * (1f - walk);
 
-        // 身体：走路上下起伏；蓄力/冲刺/攻击时前压；死亡倒地
+        // 身体：走路上下起伏 + 待机呼吸起伏；蓄力/冲刺/攻击时前压；死亡倒地
         Transform body = Find("body");
         if (body != null)
         {
-            float bob = Mathf.Abs(step) * 0.03f * walk + Mathf.Sin(t * 1.7f) * 0.01f * (1f - walk);
+            float bob = Mathf.Abs(step) * 0.03f * walk
+                        + Mathf.Sin(t * 1.7f) * 0.01f * (1f - walk)
+                        + breath * 0.012f;
             body.localPosition = bodyBasePos + new Vector3(0f, bob, 0f);
+
+            // 胸腔起伏：横向略收、纵向略涨，只在待机时给到最大
+            body.localScale = new Vector3(1f - 0.008f * breath, 1f + 0.016f * breath, 1f);
+
             SetAngle("body",
                 Mathf.Sin(t * 1.7f) * 0.8f * (1f - walk)
                 + 6f * attack
