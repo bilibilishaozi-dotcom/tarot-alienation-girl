@@ -46,7 +46,6 @@ public class WitchRig : MonoBehaviour
     private readonly Dictionary<string, SpriteRenderer> arts = new Dictionary<string, SpriteRenderer>();
     private Player player;
     private float baseScale = 1f;
-    private float facing = 1f;
     private Vector3 bodyBasePos;
 
     private float walk;
@@ -150,7 +149,7 @@ public class WitchRig : MonoBehaviour
 
     private void ApplyScale()
     {
-        transform.localScale = new Vector3(baseScale * facing, baseScale, 1f);
+        transform.localScale = new Vector3(baseScale, baseScale, 1f);
     }
 
     // 用真实渲染包围盒把脚底压到地面线（不依赖枢轴和缩放的推算）
@@ -194,12 +193,10 @@ public class WitchRig : MonoBehaviour
         float dt = Time.deltaTime;
         float t = Time.time;
 
-        float wanted = player.facingDir < 0 ? -1f : 1f;
-        if (!Mathf.Approximately(facing, wanted))
-        {
-            facing = Mathf.MoveTowards(facing, wanted, dt * 18f);
+        // 朝向由 Player.Flip() 旋转玩家本体 180° 来完成（整条骨骼是玩家的子物体，会一起镜像）。
+        // 这里**不能**再对 localScale.x 取反，否则两次镜像相抵消，就会出现「按左不转身」。
+        if (!Mathf.Approximately(transform.localScale.x, baseScale))
             ApplyScale();
-        }
 
         bool moving = player.IsMoving && player.groundDetected && !player.IsDefeated;
         bool airborne = !player.groundDetected && !player.IsDefeated;
