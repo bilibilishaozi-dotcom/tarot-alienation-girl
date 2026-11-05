@@ -18,6 +18,11 @@ public static class GameFlow
         Load(LevelSelectScene);
     }
 
+    public static void LoadBlueWitchDemo()
+    {
+        Load("BlueWitchDemo");
+    }
+
     public static void LoadLevel(LevelSlot slot)
     {
         if (slot == null || !slot.available || string.IsNullOrEmpty(slot.sceneName))

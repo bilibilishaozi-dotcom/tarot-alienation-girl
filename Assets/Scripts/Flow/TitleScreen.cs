@@ -24,5 +24,6 @@ public class TitleScreen : MonoBehaviour
         MenuKit.CreateButton(canvas, "开始游戏", new Vector2(0f, 40f), GameFlow.LoadFirstLevel);
         MenuKit.CreateButton(canvas, "选择关卡", new Vector2(0f, -50f), GameFlow.LoadLevelSelect);
         MenuKit.CreateButton(canvas, "结束游戏", new Vector2(0f, -140f), GameFlow.Quit);
+        MenuKit.CreateButton(canvas, "魔女演示", new Vector2(0f, -230f), GameFlow.LoadBlueWitchDemo);
     }
 }
