@@ -84,28 +84,10 @@ public class CardPossession : MonoBehaviour
 
     private IEnumerator PlayRoutine(MonsterCardData card)
     {
-        // 愚者：异化约 0.7 秒。顿帧只占开头 0.12 秒，不把整段时间停成 0。
+        // 愚者演出单独一个方法，避免和下面的 token / elapsed 等同名局部变量冲突。
         if (card != null && card.effectType == CardEffectType.FoolLunge)
         {
-            player = GetComponent<Player>();
-            BeginTransform(true);
-            GameObject token = CreateToken(card);
-            float elapsed = 0f;
-            const float duration = 0.68f;
-            Vector3 start = player.transform.position + Vector3.up * 2.3f;
-            Vector3 end = player.transform.position + Vector3.up * 0.35f;
-            while (elapsed < duration)
-            {
-                elapsed += Time.unscaledDeltaTime;
-                float t = Mathf.Clamp01(elapsed / duration);
-                if (token != null)
-                    token.transform.position = Vector3.Lerp(start, end, Mathf.SmoothStep(0f, 1f, t));
-                yield return null;
-            }
-
-            if (token != null)
-                Destroy(token);
-            playing = null;
+            yield return PlayFoolRoutine(card);
             yield break;
         }
 
@@ -148,6 +130,30 @@ public class CardPossession : MonoBehaviour
             Destroy(flash.gameObject);
         if (ownsPause)
             Time.timeScale = restoreTimeScale;
+        playing = null;
+    }
+
+    // 愚者：异化约 0.7 秒。顿帧只占开头 0.12 秒，不把整段时间停成 0。
+    private IEnumerator PlayFoolRoutine(MonsterCardData card)
+    {
+        player = GetComponent<Player>();
+        BeginTransform(true);
+        GameObject foolToken = CreateToken(card);
+        float foolElapsed = 0f;
+        const float foolDuration = 0.68f;
+        Vector3 foolStart = player.transform.position + Vector3.up * 2.3f;
+        Vector3 foolEnd = player.transform.position + Vector3.up * 0.35f;
+        while (foolElapsed < foolDuration)
+        {
+            foolElapsed += Time.unscaledDeltaTime;
+            float foolT = Mathf.Clamp01(foolElapsed / foolDuration);
+            if (foolToken != null)
+                foolToken.transform.position = Vector3.Lerp(foolStart, foolEnd, Mathf.SmoothStep(0f, 1f, foolT));
+            yield return null;
+        }
+
+        if (foolToken != null)
+            Destroy(foolToken);
         playing = null;
     }
 
