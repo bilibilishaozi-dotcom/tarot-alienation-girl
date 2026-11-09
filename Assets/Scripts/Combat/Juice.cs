@@ -31,6 +31,13 @@ public static class Juice
         Root.PlayHitStop(seconds);
     }
 
+    // 切场景或打开暂停时清掉顿帧计时，避免之后把时间缩放写回 0.04。
+    public static void CancelHitStop()
+    {
+        if (root != null)
+            root.CancelHitStop();
+    }
+
     // 屏幕震动，power 0.1~0.6
     public static void Shake(float power)
     {
@@ -141,6 +148,11 @@ public class JuiceRoot : MonoBehaviour
 
         hitStopTimer = Mathf.Max(hitStopTimer, seconds);
         Time.timeScale = 0.04f;
+    }
+
+    public void CancelHitStop()
+    {
+        hitStopTimer = 0f;
     }
 
     public void PlayClip(ClipKind kind, float volume)

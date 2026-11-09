@@ -174,7 +174,14 @@ public class Player : MonoBehaviour
         bodySprite = GetComponentInChildren<SpriteRenderer>();
         if (bodySprite != null)
             bodySpriteColor = bodySprite.color;
-        cardLoadout = GetComponent<PlayerCardLoadout>();
+        PlayerCardLoadout[] loadouts = GetComponents<PlayerCardLoadout>();
+        for (int i = 1; i < loadouts.Length; i++)
+        {
+            if (loadouts[i] != null)
+                Destroy(loadouts[i]);
+        }
+
+        cardLoadout = loadouts.Length > 0 ? loadouts[0] : null;
         if (cardLoadout == null)
             cardLoadout = gameObject.AddComponent<PlayerCardLoadout>();
         if (GetComponent<CardSelectUI>() == null)
@@ -206,8 +213,13 @@ public class Player : MonoBehaviour
             }
         }
 
-        // 换塔罗形态不写在这个控制器里，只留一个引用。F 键和调色都在 TarotFormManager。
+        // 换塔罗形态不写在这个控制器里，只留一个引用。
         forms = TarotFormManager.Ensure(this);
+        if (GetComponent<PauseMenu>() == null)
+            gameObject.AddComponent<PauseMenu>();
+        // 重开本关后按装备的牌恢复形态。要在形态管理器创建之后。
+        cardLoadout.RestoreIfSameLevel();
+        MatchFormToLoadout();
 
         // 注意：Animator 不能关。
         // 攻击/受击等状态在等 CallAnimationTrigger()（动画事件）才结算，
@@ -406,6 +418,31 @@ public class Player : MonoBehaviour
     public void RestoreFoolLeap()
     {
         foolLeapReady = true;
+    }
+
+    // 死亡或掉落回到场上时，形态和空中跳跟当前装备的牌对齐。
+    public void MatchFormToLoadout()
+    {
+        if (forms == null)
+            forms = GetComponent<TarotFormManager>();
+        if (cardLoadout == null)
+            cardLoadout = GetComponent<PlayerCardLoadout>();
+
+        bool fool = cardLoadout != null
+            && cardLoadout.EquippedCard != null
+            && cardLoadout.EquippedCard.effectType == CardEffectType.FoolLunge;
+        if (forms == null)
+        {
+            RestoreFoolLeap();
+            return;
+        }
+
+        if (fool && forms.CurrentForm != TarotForm.Fool)
+            forms.ChangeForm(TarotForm.Fool);
+        else if (!fool && forms.CurrentForm == TarotForm.Fool)
+            forms.ChangeForm(TarotForm.Original);
+
+        RestoreFoolLeap();
     }
 
     // 愚者形态在空中再跳一次。落地或贴墙时 RestoreFoolLeap 会补回来。

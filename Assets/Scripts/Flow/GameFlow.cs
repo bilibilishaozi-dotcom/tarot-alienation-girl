@@ -8,6 +8,14 @@ public static class GameFlow
 
     public static string ActiveLevelId { get; private set; } = LevelCatalog.BasicCombatId;
 
+    // 只有「重新开始本关」才把背包带到新场景。换关、回标题都清掉。
+    public static bool KeepLoadoutOnNextLoad { get; private set; }
+
+    public static void ConsumeLoadoutKeep()
+    {
+        KeepLoadoutOnNextLoad = false;
+    }
+
     public static void LoadTitle()
     {
         Load(TitleScene);
@@ -104,12 +112,15 @@ public static class GameFlow
         }
 
         reloadFrame = Time.frameCount;
+        KeepLoadoutOnNextLoad = true;
+        Juice.CancelHitStop();
         Time.timeScale = 1f;
         SceneManager.LoadScene(sceneName);
     }
 
     public static void Quit()
     {
+        Juice.CancelHitStop();
         Time.timeScale = 1f;
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;
@@ -122,6 +133,8 @@ public static class GameFlow
 
     private static void Load(string sceneName)
     {
+        KeepLoadoutOnNextLoad = false;
+        Juice.CancelHitStop();
         Time.timeScale = 1f;
         if (string.IsNullOrEmpty(sceneName) || !Application.CanStreamedLevelBeLoaded(sceneName))
         {

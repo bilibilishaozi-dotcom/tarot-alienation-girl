@@ -20,9 +20,27 @@ public class PlayerCardLoadout : MonoBehaviour
     public bool LandingSlam { get; private set; }
     public int SlamDamage { get; private set; }
 
+    private string rememberedLevel;
+
     private void OnEnable()
     {
         CardReward.Granted += OnCardGranted;
+        rememberedLevel = GameFlow.ActiveLevelId;
+    }
+
+    // 重开本关时把刚才装备的牌装回来（不播演出）。换关则由 GameFlow 丢掉这份记录。
+    public void RestoreIfSameLevel()
+    {
+        if (!GameFlow.KeepLoadoutOnNextLoad || CardRunState.LevelId != rememberedLevel)
+        {
+            if (!GameFlow.KeepLoadoutOnNextLoad)
+                CardRunState.Clear();
+            GameFlow.ConsumeLoadoutKeep();
+            return;
+        }
+
+        GameFlow.ConsumeLoadoutKeep();
+        CardRunState.Apply(this);
     }
 
     // 把愚者/战车/力量三张都放进背包（终局关开场用）。
@@ -67,6 +85,15 @@ public class PlayerCardLoadout : MonoBehaviour
     private void OnDisable()
     {
         CardReward.Granted -= OnCardGranted;
+        if (GameFlow.KeepLoadoutOnNextLoad)
+        {
+            // 空的多余组件关掉时，不要盖掉已经记下的背包。
+            bool hasCards = owned.Count > 0 || EquippedCard != null;
+            if (hasCards || CardRunState.LevelId != rememberedLevel)
+                CardRunState.Save(rememberedLevel, this);
+        }
+        else
+            CardRunState.Clear();
         DetachActive();
     }
 
@@ -172,7 +199,7 @@ public class PlayerCardLoadout : MonoBehaviour
         Changed?.Invoke();
     }
 
-    private void Remember(MonsterCardData card)
+    public void Remember(MonsterCardData card)
     {
         for (int i = 0; i < owned.Count; i++)
         {
@@ -181,6 +208,50 @@ public class PlayerCardLoadout : MonoBehaviour
         }
 
         owned.Add(card);
+    }
+}
+
+static class CardRunState
+{
+    public static string LevelId;
+    static string equippedName;
+    static readonly List<string> ownedNames = new List<string>();
+
+    public static void Clear()
+    {
+        LevelId = null;
+        equippedName = null;
+        ownedNames.Clear();
+    }
+
+    public static void Save(string levelId, PlayerCardLoadout loadout)
+    {
+        LevelId = levelId;
+        equippedName = loadout.EquippedCard != null ? loadout.EquippedCard.name : null;
+        ownedNames.Clear();
+        IReadOnlyList<MonsterCardData> cards = loadout.OwnedCards;
+        for (int i = 0; i < cards.Count; i++)
+        {
+            if (cards[i] != null)
+                ownedNames.Add(cards[i].name);
+        }
+    }
+
+    public static void Apply(PlayerCardLoadout loadout)
+    {
+        for (int i = 0; i < ownedNames.Count; i++)
+        {
+            MonsterCardData card = Resources.Load<MonsterCardData>("Cards/" + ownedNames[i]);
+            if (card != null)
+                loadout.Remember(card);
+        }
+
+        if (string.IsNullOrEmpty(equippedName))
+            return;
+
+        MonsterCardData equipped = Resources.Load<MonsterCardData>("Cards/" + equippedName);
+        if (equipped != null)
+            loadout.Equip(equipped, false);
     }
 }
 

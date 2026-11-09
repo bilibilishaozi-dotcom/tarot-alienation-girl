@@ -83,7 +83,10 @@ public class CardSelectUI : MonoBehaviour
         if (panel != null && panel.activeSelf)
         {
             if (escape)
+            {
+                PauseMenu.SuppressFrame = Time.frameCount;
                 HideWithoutEquipping();
+            }
             return;
         }
 
@@ -100,7 +103,10 @@ public class CardSelectUI : MonoBehaviour
             return;
 
         if (IsStatusOpen && escape)
+        {
+            PauseMenu.SuppressFrame = Time.frameCount;
             CloseStatus();
+        }
     }
 
     private void OnEquipPressed(InputAction.CallbackContext context)

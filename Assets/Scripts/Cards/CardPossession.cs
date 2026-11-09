@@ -91,8 +91,9 @@ public class CardPossession : MonoBehaviour
             yield break;
         }
 
+        // 顿帧把时间缩成 0.04。若把这个数记成「恢复值」，演出结束后游戏会一直慢动作。
         ownsPause = Time.timeScale > 0.01f;
-        restoreTimeScale = ownsPause ? Time.timeScale : 1f;
+        restoreTimeScale = Time.timeScale > 0.5f ? Time.timeScale : 1f;
         if (ownsPause)
             Time.timeScale = 0f;
 
@@ -131,6 +132,16 @@ public class CardPossession : MonoBehaviour
         if (ownsPause)
             Time.timeScale = restoreTimeScale;
         playing = null;
+    }
+
+    private void OnDisable()
+    {
+        if (!ownsPause)
+            return;
+
+        ownsPause = false;
+        if (Time.timeScale <= 0.01f)
+            Time.timeScale = restoreTimeScale > 0.5f ? restoreTimeScale : 1f;
     }
 
     // 愚者：异化约 0.7 秒。顿帧只占开头 0.12 秒，不把整段时间停成 0。

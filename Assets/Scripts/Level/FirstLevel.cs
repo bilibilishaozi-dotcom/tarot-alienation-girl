@@ -141,7 +141,10 @@ public class FirstLevel : MonoBehaviour
 
         // 终局的结算面板不允许用 Esc 关掉：那是演示的终点，只能选按钮。
         if (!bossLevel && cleared && endPanel != null && endPanel.activeSelf && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+        {
+            PauseMenu.SuppressFrame = Time.frameCount;
             ContinueLevel();
+        }
 
         if (player != null && !busy && !player.IsDefeated)
             UpdateLesson();
@@ -665,6 +668,20 @@ public class FirstLevel : MonoBehaviour
 
         if (echoBossGate == null)
             return;
+
+        // 人正卡在门里时先推回门左侧，再拆碰撞，避免门沉下去后被夹住。
+        if (player != null)
+        {
+            float gateX = echoBossGate.transform.position.x;
+            if (player.transform.position.x > gateX - 0.7f && player.transform.position.x < gateX + 0.7f)
+            {
+                Vector3 nudged = player.transform.position;
+                nudged.x = gateX - 0.9f;
+                player.transform.position = nudged;
+                if (player.rb != null)
+                    player.rb.position = nudged;
+            }
+        }
 
         Collider2D[] blocking = echoBossGate.GetComponentsInChildren<Collider2D>();
         for (int i = 0; i < blocking.Length; i++)
@@ -1515,6 +1532,7 @@ public class FirstLevel : MonoBehaviour
 
     private bool IsCardOpen => cardUi != null && (cardUi.IsPanelOpen || cardUi.IsStatusOpen);
     private bool ClearPanelOpen => cleared && endPanel != null && endPanel.activeSelf;
+    public bool BlocksPause => ClearPanelOpen || bossChoiceOpen;
 
     private void ReloadLevel()
     {
@@ -1531,6 +1549,7 @@ public class FirstLevel : MonoBehaviour
         yield return Fade(0f, 0.82f, 0.2f);
         PlacePlayer(false);
         SnapCamera();
+        player.MatchFormToLoadout();
         yield return new WaitForSecondsRealtime(0.12f);
         yield return Fade(0.82f, 0f, 0.28f);
         if (!player.IsDefeated && !IsCardOpen && !ClearPanelOpen)
