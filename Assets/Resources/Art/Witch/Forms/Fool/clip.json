@@ -26,5 +26,29 @@
   ],
   "belowFeet": 9,
   "frames": 8
+ },
+ "jump": {
+  "canvas": [
+   227,
+   223
+  ],
+  "pivot": [
+   0.5,
+   0.556054
+  ],
+  "belowFeet": 16,
+  "frames": 9
+ },
+ "fall": {
+  "canvas": [
+   223,
+   215
+  ],
+  "pivot": [
+   0.5,
+   0.52093
+  ],
+  "belowFeet": 4,
+  "frames": 9
  }
 }

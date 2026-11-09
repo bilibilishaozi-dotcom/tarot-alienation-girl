@@ -6,9 +6,10 @@ GIF 放在 Tools/ArtIncoming/初始形态/。--check-original 只核对文件还
 
 愚者、战车、力量的待机和奔跑会写到
 Assets/Resources/Art/Witch/Forms/<Form>/idle_*.png 和 run_*.png。
-每个片段（一个形态的待机，或一个形态的奔跑）共用一个裁切框和同一个偏移，
+每个片段（待机、奔跑、起跳、下落）共用一个裁切框和同一个偏移，
 不按单帧的着地脚去挪。裁切框是所有帧包围盒的并集，水平用整段平均重心，
-纵向用整段同一条脚底。脚到底到轴心仍是 108 像素，和原版待机一致。
+纵向用整段同一条脚底。脚底到轴心仍是 108 像素，和原版待机一致。
+力量的下落文件叫「落下」，另外两个形态叫「落地」，都切成 fall。
 人物缩放用原版待机那一档（源图内容高 227 → 画面高 205）。
 
 用法（仓库根目录）：
@@ -344,17 +345,22 @@ DefaultImporter:
 
 
 def form_gifs(folder):
-    idle = None
-    run = None
+    found = {"idle": None, "run": None, "jump": None, "fall": None}
     for path in sorted(folder.glob("*.gif")):
         lower = path.name.lower()
+        stem = path.stem
         if "idle" in lower:
-            idle = path
+            found["idle"] = path
         elif "running" in lower:
-            run = path
-    if idle is None or run is None:
-        raise SystemExit(f"{folder} 里要有 idle 和 running 各一份 GIF")
-    return idle, run
+            found["run"] = path
+        elif stem == "跳跃":
+            found["jump"] = path
+        elif stem in ("落地", "落下"):
+            found["fall"] = path
+    missing = [name for name, path in found.items() if path is None]
+    if missing:
+        raise SystemExit(f"{folder} 缺少 {', '.join(missing)}")
+    return found
 
 
 def write_sprite_meta(png_path, pivot_x, pivot_y):
@@ -389,24 +395,27 @@ def write_forms():
     if not forms_meta.exists():
         forms_meta.write_text(folder_meta(), encoding="utf-8")
     for form_id, folder_name in FORMS.items():
-        idle_path, run_path = form_gifs(INCOMING / folder_name)
-        clips = {
-            "idle": gif_frames(idle_path),
-            "run": gif_frames(run_path),
-        }
+        found = form_gifs(INCOMING / folder_name)
+        clips = {name: gif_frames(path) for name, path in found.items()}
         out_dir = FORM_OUT / form_id
         out_dir.mkdir(parents=True, exist_ok=True)
         dir_meta = Path(str(out_dir) + ".meta")
         if not dir_meta.exists():
             dir_meta.write_text(folder_meta(), encoding="utf-8")
-        info = {
-            "form": form_id,
-            "pixelsPerUnit": PPU,
-            "footBelowPivot": FOOT_BELOW_PIVOT,
-            "centroidOffset": CENTROID_OFFSET,
-        }
+        info_path = out_dir / "clip.json"
+        if info_path.exists():
+            info = json.loads(info_path.read_text(encoding="utf-8"))
+        else:
+            info = {
+                "form": form_id,
+                "pixelsPerUnit": PPU,
+                "footBelowPivot": FOOT_BELOW_PIVOT,
+                "centroidOffset": CENTROID_OFFSET,
+            }
         for clip_name, frames in clips.items():
-            # 待机、奔跑各用自己的裁切框，框内各帧不再单独挪。
+            # 待机和奔跑已经切好，这里不重写。跳跃、下落各用自己的整段裁切框。
+            if clip_name in ("idle", "run"):
+                continue
             sheets, pivot_x, pivot_y, below, centers = place_clip(frames)
             for index, sheet in enumerate(sheets):
                 png_path = out_dir / f"{clip_name}_{index}.png"
@@ -421,7 +430,7 @@ def write_forms():
             span = max(centers) - min(centers)
             rounded = [round(value, 1) for value in centers]
             print(f"{form_id} {clip_name}: canvas {info[clip_name]['canvas'][0]}x{info[clip_name]['canvas'][1]} pivot {info[clip_name]['pivot']} below {below} src_cx {rounded} span {span:.2f}")
-        (out_dir / "clip.json").write_text(json.dumps(info, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        info_path.write_text(json.dumps(info, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
 
 
 def main():

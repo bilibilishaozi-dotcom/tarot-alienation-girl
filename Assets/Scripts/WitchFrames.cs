@@ -9,6 +9,8 @@ public class WitchFrames : MonoBehaviour
     private const float IdleFps = 5f;    // 4 帧待机呼吸 ≈ 0.8 秒一个循环（按 GIF 原始 200ms/帧）
     private const float FormIdleFps = 8f;  // 形态 8 帧待机 = 1 秒一个呼吸循环
     private const float FormRunFps = 16f;  // 形态 8 帧奔跑 = 0.5 秒一个步循环，接近原版奔跑
+    private const float FormJumpFps = 22.5f; // 形态 9 帧起跳 ≈ 0.40 秒，播完停在末帧
+    private const float FormFallFps = 20f;   // 形态 9 帧下落 ≈ 0.45 秒，播完停在末帧
     private const float WalkFps = 9f;    // 8 帧 ≈ 0.9 秒一个步循环
     private const float JumpFps = 12f;   // 4 帧起跳 ≈ 0.33 秒
     private const float FallFps = 12f;   // 3 帧下落 ≈ 0.25 秒，播完停在末帧
@@ -44,6 +46,7 @@ public class WitchFrames : MonoBehaviour
     private float hurt;
     private float deathT;
     private int airPhase;    // 0 未在空中 / 1 上升 / 2 下落
+    private float lastVerticalSpeed;
     private bool running;    // 当前是否在播奔跑
     private float currentFps = 5f;
 
@@ -125,10 +128,10 @@ public class WitchFrames : MonoBehaviour
         }
     }
 
-    // 装备愚者 / 战车 / 力量时，待机和奔跑用那一套。别的动作没有新帧，继续用原版。
+    // 装备愚者 / 战车 / 力量时，待机、奔跑、起跳、下落用那一套。别的动作没有新帧，继续用原版。
     private string ResolveClip(string wanted)
     {
-        if (wanted != "idle" && wanted != "run")
+        if (wanted != "idle" && wanted != "run" && wanted != "jump" && wanted != "fall")
             return wanted;
 
         string formKey = FormClip(wanted);
@@ -201,6 +204,10 @@ public class WitchFrames : MonoBehaviour
             return FormIdleFps;
         if (clip.EndsWith("_run"))
             return FormRunFps;
+        if (clip.EndsWith("_jump"))
+            return FormJumpFps;
+        if (clip.EndsWith("_fall"))
+            return FormFallFps;
 
         float baseFps = IdleFps;
         if (clip == "walk") baseFps = WalkFps;
@@ -241,15 +248,19 @@ public class WitchFrames : MonoBehaviour
 
         // 空中阶段用「锁存」判断：起跳时进入上升段，明确开始下落（vy < -0.4）才切到下落段。
         // 否则在最高点 vy≈0 时会在 jump / fall 之间来回切，每切一次就重播第一帧 → 抖动。
+        // 二段跳会把竖直速度重新拉高。这时回到上升段，jump 从第 0 帧再播。
+        float verticalSpeed = player.VerticalSpeed;
+        bool newHop = airborne && verticalSpeed > lastVerticalSpeed + 1f && verticalSpeed > 0.15f;
+        lastVerticalSpeed = verticalSpeed;
         if (!airborne)
         {
             airPhase = 0;
         }
-        else if (airPhase == 0)
+        else if (newHop || airPhase == 0)
         {
-            airPhase = player.VerticalSpeed > 0.15f ? 1 : 2;
+            airPhase = verticalSpeed > 0.15f ? 1 : 2;
         }
-        else if (airPhase == 1 && player.VerticalSpeed < -0.4f)
+        else if (airPhase == 1 && verticalSpeed < -0.4f)
         {
             airPhase = 2;
         }
@@ -323,7 +334,9 @@ public class WitchFrames : MonoBehaviour
             running = false;
         }
 
-        ApplyClip(ResolveClip(wanted), false);
+        string clipName = ResolveClip(wanted);
+        bool replayJump = newHop && (clipName == "jump" || clipName.EndsWith("_jump"));
+        ApplyClip(clipName, replayJump);
 
         frameTimer += dt;
         float step = 1f / Mathf.Max(1f, currentFps);
@@ -339,6 +352,7 @@ public class WitchFrames : MonoBehaviour
             // 跳跃 / 下落 / 攻击都是一次性片段：播到最后停在最后一帧
             bool holdLast = currentClip == "jump" || currentClip == "fall" || currentClip == "hurt"
                 || currentClip == "walljump"
+                || currentClip.EndsWith("_jump") || currentClip.EndsWith("_fall")
                 || currentClip.StartsWith("attack") || currentClip == "airattack";
             int index = holdLast ? Mathf.Min(frameIndex, frames.Length - 1) : frameIndex % frames.Length;
             renderer.sprite = frames[index];
