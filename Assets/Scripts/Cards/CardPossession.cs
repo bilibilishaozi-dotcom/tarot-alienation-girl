@@ -47,39 +47,82 @@ public class CardPossession : MonoBehaviour
         if (possession == null)
             possession = player.gameObject.AddComponent<CardPossession>();
         possession.player = player;
-        // 卸下愚者：更短、更暗，不锁操作。火花自己会消失，后面的装备演出不会把它清掉。
-        possession.BeginTransform(false);
+        // 卸下形态：更短、更暗，不锁操作。火花自己会消失，后面的装备演出不会把它清掉。
+        possession.BeginTransform(TransformTone.Quiet);
     }
 
-    private void BeginTransform(bool strong)
+    private enum TransformTone
+    {
+        Quiet,
+        Fool,
+        Chariot,
+        Strength
+    }
+
+    private void BeginTransform(TransformTone tone)
     {
         player = player != null ? player : GetComponent<Player>();
-        float hitStop = strong ? 0.12f : 0.05f;
+        float hitStop = 0.12f;
+        if (tone == TransformTone.Quiet)
+            hitStop = 0.05f;
+        else if (tone == TransformTone.Chariot || tone == TransformTone.Strength)
+            hitStop = 0.1f;
         Juice.HitStop(hitStop);
         WitchFrames frames = player != null ? player.GetComponentInChildren<WitchFrames>(true) : null;
-        if (frames != null)
+        Color firstFlash = new Color(0.82f, 0.84f, 0.9f);
+        Color spark = new Color(0.75f, 0.8f, 0.88f, 1f);
+        int sparks = 6;
+        float radius = 0.62f;
+        float life = 0.36f;
+        if (tone == TransformTone.Fool)
         {
-            frames.Flash(strong ? new Color(1f, 0.97f, 0.86f) : new Color(0.82f, 0.84f, 0.9f), strong ? 0.22f : 0.16f);
+            firstFlash = new Color(1f, 0.97f, 0.86f);
+            spark = new Color(1f, 0.86f, 0.38f, 1f);
+            sparks = 12;
+            radius = 1.15f;
+            life = 0.62f;
+        }
+        else if (tone == TransformTone.Chariot)
+        {
+            firstFlash = new Color(0.94f, 0.96f, 1f);
+            spark = new Color(0.72f, 0.84f, 1f, 1f);
+            sparks = 12;
+            radius = 1.05f;
+            life = 0.55f;
+        }
+        else if (tone == TransformTone.Strength)
+        {
+            firstFlash = new Color(1f, 0.96f, 0.9f);
+            spark = new Color(1f, 0.78f, 0.32f, 1f);
+            sparks = 12;
+            radius = 1.05f;
+            life = 0.55f;
         }
 
+        if (frames != null)
+            frames.Flash(firstFlash, tone == TransformTone.Quiet ? 0.16f : 0.2f);
+
         Vector3 center = player != null ? player.transform.position + Vector3.up * 0.8f : transform.position;
-        SpawnRing(center, strong ? 12 : 6, strong ? 1.15f : 0.62f, strong ? 0.62f : 0.36f);
-        if (strong && frames != null)
-            StartCoroutine(GoldAfterWhite(frames));
+        SpawnRing(center, sparks, radius, life, spark);
+        if (tone == TransformTone.Fool && frames != null)
+            StartCoroutine(FlashLater(frames, new Color(1f, 0.84f, 0.38f), 0.14f, 0.48f));
+        else if (tone == TransformTone.Chariot && frames != null)
+            StartCoroutine(FlashLater(frames, new Color(0.62f, 0.78f, 0.98f), 0.12f, 0.42f));
+        else if (tone == TransformTone.Strength && frames != null)
+            StartCoroutine(FlashLater(frames, new Color(1f, 0.62f, 0.28f), 0.12f, 0.4f));
     }
 
-    private static IEnumerator GoldAfterWhite(WitchFrames frames)
+    private static IEnumerator FlashLater(WitchFrames frames, Color laterColor, float wait, float seconds)
     {
-        float elapsed = 0f;
-        const float wait = 0.14f;
-        while (elapsed < wait)
+        float waited = 0f;
+        while (waited < wait)
         {
-            elapsed += Time.unscaledDeltaTime;
+            waited += Time.unscaledDeltaTime;
             yield return null;
         }
 
         if (frames != null)
-            frames.Flash(new Color(1f, 0.84f, 0.38f), 0.48f);
+            frames.Flash(laterColor, seconds);
     }
 
     private IEnumerator PlayRoutine(MonsterCardData card)
@@ -88,6 +131,18 @@ public class CardPossession : MonoBehaviour
         if (card != null && card.effectType == CardEffectType.FoolLunge)
         {
             yield return PlayFoolRoutine(card);
+            yield break;
+        }
+
+        if (card != null && card.effectType == CardEffectType.ChariotDash)
+        {
+            yield return PlayChariotRoutine(card);
+            yield break;
+        }
+
+        if (card != null && card.effectType == CardEffectType.StrengthSlam)
+        {
+            yield return PlayStrengthRoutine(card);
             yield break;
         }
 
@@ -148,7 +203,7 @@ public class CardPossession : MonoBehaviour
     private IEnumerator PlayFoolRoutine(MonsterCardData card)
     {
         player = GetComponent<Player>();
-        BeginTransform(true);
+        BeginTransform(TransformTone.Fool);
         GameObject foolToken = CreateToken(card);
         float foolElapsed = 0f;
         const float foolDuration = 0.68f;
@@ -165,6 +220,54 @@ public class CardPossession : MonoBehaviour
 
         if (foolToken != null)
             Destroy(foolToken);
+        playing = null;
+    }
+
+    // 战车：和愚者同一套结构，闪白再闪银蓝，粒子偏银蓝和一点金。时间不比愚者长。
+    private IEnumerator PlayChariotRoutine(MonsterCardData card)
+    {
+        player = GetComponent<Player>();
+        BeginTransform(TransformTone.Chariot);
+        GameObject chariotToken = CreateToken(card);
+        float chariotElapsed = 0f;
+        const float chariotDuration = 0.62f;
+        Vector3 chariotStart = player.transform.position + Vector3.up * 2.3f;
+        Vector3 chariotEnd = player.transform.position + Vector3.up * 0.35f;
+        while (chariotElapsed < chariotDuration)
+        {
+            chariotElapsed += Time.unscaledDeltaTime;
+            float chariotT = Mathf.Clamp01(chariotElapsed / chariotDuration);
+            if (chariotToken != null)
+                chariotToken.transform.position = Vector3.Lerp(chariotStart, chariotEnd, Mathf.SmoothStep(0f, 1f, chariotT));
+            yield return null;
+        }
+
+        if (chariotToken != null)
+            Destroy(chariotToken);
+        playing = null;
+    }
+
+    // 力量：先闪白再闪暖金/绯红。时长 0.6 秒，顿帧 0.1 秒，都不超过愚者。
+    private IEnumerator PlayStrengthRoutine(MonsterCardData card)
+    {
+        player = GetComponent<Player>();
+        BeginTransform(TransformTone.Strength);
+        GameObject strengthToken = CreateToken(card);
+        float strengthElapsed = 0f;
+        const float strengthDuration = 0.6f;
+        Vector3 strengthStart = player.transform.position + Vector3.up * 2.3f;
+        Vector3 strengthEnd = player.transform.position + Vector3.up * 0.35f;
+        while (strengthElapsed < strengthDuration)
+        {
+            strengthElapsed += Time.unscaledDeltaTime;
+            float strengthT = Mathf.Clamp01(strengthElapsed / strengthDuration);
+            if (strengthToken != null)
+                strengthToken.transform.position = Vector3.Lerp(strengthStart, strengthEnd, Mathf.SmoothStep(0f, 1f, strengthT));
+            yield return null;
+        }
+
+        if (strengthToken != null)
+            Destroy(strengthToken);
         playing = null;
     }
 
@@ -213,19 +316,24 @@ public class CardPossession : MonoBehaviour
         return image;
     }
 
-    private static void SpawnRing(Vector3 center, int count, float radius, float life)
+    private static void SpawnRing(Vector3 center, int count, float radius, float life, Color sparkColor)
     {
         int n = Mathf.Max(1, count);
         for (int i = 0; i < n; i++)
         {
             float angle = (i / (float)n) * Mathf.PI * 2f;
             Vector2 dir = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
-            GameObject dot = new GameObject("FoolSpark");
+            GameObject dot = new GameObject("FormSpark");
             dot.transform.position = center + (Vector3)(dir * 0.2f);
             dot.transform.localScale = Vector3.one * (n > 8 ? 0.16f : 0.12f);
             SpriteRenderer sprite = dot.AddComponent<SpriteRenderer>();
             sprite.sprite = TokenSprite();
-            sprite.color = new Color(1f, 0.86f, 0.38f, 1f);
+            sprite.color = sparkColor;
+            // 战车粒子：大多数银蓝，每隔几个点一粒金。不是画在身上的装饰。
+            if (sparkColor.b > 0.95f && i % 4 == 0)
+                sprite.color = new Color(0.92f, 0.78f, 0.42f, 1f);
+            else if (sparkColor.r > 0.9f && sparkColor.b < 0.5f && i % 4 == 0)
+                sprite.color = new Color(0.72f, 0.18f, 0.24f, 1f);
             sprite.sortingLayerName = "Player";
             sprite.sortingOrder = 40;
             FoolSpark spark = dot.AddComponent<FoolSpark>();

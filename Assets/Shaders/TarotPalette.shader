@@ -1,6 +1,5 @@
-// 愚者形态调色。规则与 Tools/tarot_palette_preview.py 保持一致。
-// 逐纹素判断，点采样，不做模糊，也不在相邻颜色之间插值。
-// _FormId = 0 原样输出；1 愚者；其它值（死亡、月亮）先原样输出。
+// 塔罗形态调色。逐纹素判断，点采样，不做模糊，也不在相邻颜色之间插值。
+// _FormId = 0 原样输出；1 愚者；2 战车；3 力量。死亡、月亮先原样输出。
 Shader "Tarot/PaletteSprite"
 {
     Properties
@@ -232,6 +231,122 @@ Shader "Tarot/PaletteSprite"
             return TarotHsvToRgb(hueOut, sat, val);
         }
 
+        // 战车：深海军蓝、银、皇家蓝、金。皮肤和描边不动。眼睛由 EyeGuarded 留在原蓝。
+        float3 RemapChariot(float3 rgb, float alpha)
+        {
+            if (alpha <= 0.004)
+                return rgb;
+
+            float3 hsv = TarotRgbToHsv(rgb);
+            float hue = hsv.x * 360.0;
+            float sat = hsv.y;
+            float val = hsv.z;
+
+            // 脸和皮肤：偏红的暖色，不参与换色。
+            bool skinLike = hue <= 36.0 && rgb.r > rgb.g + 0.03 && val > 0.55 && sat < 0.5;
+            if (skinLike)
+                return rgb;
+
+            // 描边、闭着的眼线：很暗且不是蓝，保持黑色。
+            if (val < 0.18 && !(hue >= 190.0 && hue <= 255.0 && sat >= 0.25))
+                return rgb;
+
+            bool warm = (hue <= 70.0 || hue >= 330.0) && sat >= 0.045 && val >= 0.12;
+            if (warm)
+            {
+                // 最亮的金点留一点金，其余金属、杖身、帽饰改成银。
+                if (sat >= 0.5 && val >= 0.82 && hue <= 58.0)
+                    return TarotHsvToRgb(46.0, min(0.7, sat), val);
+                return TarotHsvToRgb(214.0, 0.07, lerp(0.32, 0.9, saturate(val)));
+            }
+
+            bool cool = (hue >= 160.0 && hue <= 275.0 && sat >= 0.025) || (sat < 0.10 && (rgb.b - rgb.r) > 0.012 && val > 0.2);
+            if (!cool)
+            {
+                // 几乎纯白的衣料留白，略冷的浅色收成皇家蓝，形成分层。
+                if (sat < 0.06 && val > 0.9)
+                    return lerp(rgb, float3(0.94, 0.96, 0.99), 0.4);
+                if (val > 0.78 && sat < 0.16)
+                    return TarotHsvToRgb(222.0, 0.42, lerp(0.72, 0.9, saturate(val)));
+                return rgb;
+            }
+
+            // 法杖上很亮的蓝：发光的星晶蓝，不改成金。
+            if (sat >= 0.55 && val >= 0.72 && hue >= 185.0 && hue <= 240.0)
+                return TarotHsvToRgb(198.0, 0.7, min(1.0, 0.82 + 0.18 * val));
+
+            // 银白头发：亮部银蓝，暗部深海军蓝。
+            if (sat < 0.18)
+            {
+                if (val > 0.86)
+                    return TarotHsvToRgb(208.0, 0.18, min(1.0, val));
+                if (val > 0.68)
+                    return TarotHsvToRgb(216.0, 0.32, val * 0.82);
+                return TarotHsvToRgb(222.0, 0.68, val * 0.5 + 0.08);
+            }
+
+            // 帽子、衣服、斗篷外侧的蓝：浅处皇家蓝，深处海军蓝。
+            float depth = saturate(1.0 - val);
+            return TarotHsvToRgb(222.0, lerp(0.48, 0.78, depth), lerp(0.74, 0.2, depth));
+        }
+
+        // 力量：奶油白、深绯红、暖金、蜂蜜玫瑰棕。皮肤和描边不动。眼睛由 EyeGuarded 留在原蓝。
+        float3 RemapStrength(float3 rgb, float alpha)
+        {
+            if (alpha <= 0.004)
+                return rgb;
+
+            float3 hsv = TarotRgbToHsv(rgb);
+            float hue = hsv.x * 360.0;
+            float sat = hsv.y;
+            float val = hsv.z;
+
+            bool skinLike = hue <= 36.0 && rgb.r > rgb.g + 0.03 && val > 0.55 && sat < 0.5;
+            if (skinLike)
+                return rgb;
+
+            if (val < 0.18 && !(hue >= 190.0 && hue <= 255.0 && sat >= 0.25))
+                return rgb;
+
+            bool warm = (hue <= 70.0 || hue >= 330.0) && sat >= 0.045 && val >= 0.12;
+            if (warm)
+            {
+                // 最亮的金点留金。杖身、金属、帽饰改成暖金。
+                if (sat >= 0.5 && val >= 0.82 && hue <= 58.0)
+                    return TarotHsvToRgb(42.0, min(0.72, sat), val);
+                return TarotHsvToRgb(36.0, 0.48, lerp(0.42, 0.9, saturate(val)));
+            }
+
+            bool cool = (hue >= 160.0 && hue <= 275.0 && sat >= 0.025) || (sat < 0.10 && (rgb.b - rgb.r) > 0.012 && val > 0.2);
+            if (!cool)
+            {
+                // 几乎纯白 → 奶油白。略冷的浅色 → 暖象牙，和奶油白分层。
+                if (sat < 0.06 && val > 0.9)
+                    return TarotHsvToRgb(40.0, 0.1, min(1.0, val));
+                if (val > 0.78 && sat < 0.16)
+                    return TarotHsvToRgb(28.0, 0.22, lerp(0.78, 0.94, saturate(val)));
+                return rgb;
+            }
+
+            // 法杖蓝珠改成暖金琥珀光，不再留蓝，免得和战车的星晶蓝混在一起。
+            if (sat >= 0.55 && val >= 0.72 && hue >= 185.0 && hue <= 240.0)
+                return TarotHsvToRgb(38.0, 0.72, min(1.0, 0.8 + 0.2 * val));
+
+            // 银白头发：亮部玫瑰金，暗部蜂蜜玫瑰棕。
+            if (sat < 0.18)
+            {
+                if (val > 0.86)
+                    return TarotHsvToRgb(32.0, 0.38, min(1.0, val));
+                if (val > 0.68)
+                    return TarotHsvToRgb(24.0, 0.42, val * 0.78);
+                return TarotHsvToRgb(18.0, 0.48, val * 0.55 + 0.12);
+            }
+
+            // 帽子、蝴蝶结、衣服上的蓝：浅处亮绯红，深处深绯红。
+            float depth = saturate(1.0 - val);
+            return TarotHsvToRgb(352.0, lerp(0.55, 0.78, depth), lerp(0.72, 0.24, depth));
+        }
+
         Varyings Vert(Attributes input)
         {
             Varyings output;
@@ -246,12 +361,22 @@ Shader "Tarot/PaletteSprite"
             float alpha;
             float3 srgb = SampleSrgb(input.uv, alpha);
             // HLSL 的 && 不会短路，所以换色放进真正的分支里。原版不采样周围像素。
-            // 只有愚者（1）换色。死亡、月亮先原样画。
+            // 愚者（1）、战车（2）、力量（3）换色。死亡、月亮先原样画。
             [branch]
             if (_FormId > 0.5 && _FormId < 1.5)
             {
                 if (alpha > 0.004 && !EyeGuarded(input.uv, srgb, alpha))
                     srgb = RemapFool(srgb, alpha);
+            }
+            else if (_FormId > 1.5 && _FormId < 2.5)
+            {
+                if (alpha > 0.004 && !EyeGuarded(input.uv, srgb, alpha))
+                    srgb = RemapChariot(srgb, alpha);
+            }
+            else if (_FormId > 2.5 && _FormId < 3.5)
+            {
+                if (alpha > 0.004 && !EyeGuarded(input.uv, srgb, alpha))
+                    srgb = RemapStrength(srgb, alpha);
             }
 
             float4 color = float4(SRGBToLinear(srgb), alpha) * input.color;
