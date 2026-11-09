@@ -1,17 +1,30 @@
 {
  "form": "Fool",
- "canvas": [
-  299,
-  230
- ],
- "pivot": [
-  0.5,
-  0.552174
- ],
  "pixelsPerUnit": 97,
- "filter": "Point",
- "belowFeet": 19,
- "idleFrames": 8,
- "runFrames": 8,
- "frameMs": 200
+ "footBelowPivot": 108,
+ "centroidOffset": 6.35,
+ "idle": {
+  "canvas": [
+   213,
+   213
+  ],
+  "pivot": [
+   0.5,
+   0.516432
+  ],
+  "belowFeet": 2,
+  "frames": 8
+ },
+ "run": {
+  "canvas": [
+   245,
+   209
+  ],
+  "pivot": [
+   0.5,
+   0.559809
+  ],
+  "belowFeet": 9,
+  "frames": 8
+ }
 }

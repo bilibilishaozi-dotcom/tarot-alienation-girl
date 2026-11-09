@@ -6,9 +6,10 @@ GIF 放在 Tools/ArtIncoming/初始形态/。--check-original 只核对文件还
 
 愚者、战车、力量的待机和奔跑会写到
 Assets/Resources/Art/Witch/Forms/<Form>/idle_*.png 和 run_*.png。
-画布按脚底对齐：脚到轴心的距离和原版待机一致（216 高、轴心在正中时是 108 像素），
+每个片段（一个形态的待机，或一个形态的奔跑）共用一个裁切框和同一个偏移，
+不按单帧的着地脚去挪。裁切框是所有帧包围盒的并集，水平用整段平均重心，
+纵向用整段同一条脚底。脚到底到轴心仍是 108 像素，和原版待机一致。
 人物缩放用原版待机那一档（源图内容高 227 → 画面高 205）。
-长枪可以画出脚底线，不会把靴子抬起来。
 
 用法（仓库根目录）：
   python3 Tools/build_clip.py --check-original
@@ -31,8 +32,9 @@ FORM_OUT = ROOT / "Assets" / "Resources" / "Art" / "Witch" / "Forms"
 SCALE = 205 / 227
 # 原版画布 216、轴心 0.5 时，脚底在轴心正下方 108 像素。
 FOOT_BELOW_PIVOT = 108
-# 原版 idle_0 腿的重心在轴心右边约 12.5 像素。三个形态对准同一个点。
-LEG_OFFSET = 12.5
+# 原版待机四帧不透明像素的水平重心，平均在轴心右边 6.35 像素。
+# 形态的整段动画对准这个点，换形态时身体不横跳。
+CENTROID_OFFSET = 6.35
 PPU = 97
 MIN_PART = 24
 
@@ -170,57 +172,54 @@ def check_original():
     print("初始形态路径可用。已导入的 Anim 帧不会重写。")
 
 
-def place_form(frames):
-    prepared = []
-    for frame in frames:
-        image = prepare(frame)
-        leg_x, foot_y = foot_anchor(image)
-        prepared.append((image, leg_x, foot_y))
-
-    min_x = min_y = 10 ** 9
-    max_x = max_y = -10 ** 9
-    for image, leg_x, foot_y in prepared:
+def place_clip(frames):
+    """一个片段共用一个裁切框和同一个偏移，帧与帧的相对位置跟 GIF 一样。"""
+    images = [prepare(frame) for frame in frames]
+    boxes = []
+    centers = []
+    feet = []
+    for image in images:
         mask = image[:, :, 3] > 20
         ys, xs = np.where(mask)
-        rel_x = xs.astype(np.float64) - leg_x
-        rel_y = ys.astype(np.float64) - foot_y
-        min_x = min(min_x, float(rel_x.min()))
-        max_x = max(max_x, float(rel_x.max()))
-        min_y = min(min_y, float(rel_y.min()))
-        max_y = max(max_y, float(rel_y.max()))
+        boxes.append((int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())))
+        centers.append(float(xs.mean()))
+        _, foot_y = foot_anchor(image)
+        feet.append(int(foot_y))
 
+    x0 = min(box[0] for box in boxes)
+    y0 = min(box[1] for box in boxes)
+    x1 = max(box[2] for box in boxes)
+    y1 = max(box[3] for box in boxes)
+    avg_cx = float(np.mean(centers))
+    # 整段用同一条脚底。取各帧靴底的中位数，不被某一帧的长枪拉下去。
+    foot_y = int(round(float(np.median(feet))))
+    crop_w = x1 - x0 + 1
+    crop_h = y1 - y0 + 1
+    cent_in_crop = avg_cx - x0
     pad = 2
-    need_left = int(np.ceil(-min_x)) + pad
-    need_right = int(np.ceil(max_x)) + pad
-    above = int(np.ceil(-min_y)) + pad
-    below = int(np.ceil(max_y)) + pad
-    width = max(int(np.ceil(2 * (need_left - LEG_OFFSET))), int(np.ceil(2 * (need_right + LEG_OFFSET))))
-    width = max(width, need_left + need_right + 1)
-    if width % 2 == 0:
-        width += 1
-    anchor_x = width / 2 + LEG_OFFSET
-    if anchor_x < need_left or width - anchor_x < need_right:
-        width += 4
-        anchor_x = width / 2 + LEG_OFFSET
+    above = (foot_y - y0) + pad
+    below = (y1 - foot_y) + pad
     height = above + below + 1
     foot_row = above
+    left = cent_in_crop + pad
+    right = (crop_w - cent_in_crop) + pad
+    width = int(np.ceil(max(2 * (left - CENTROID_OFFSET), 2 * (right + CENTROID_OFFSET))))
+    if width % 2 == 0:
+        width += 1
+    anchor_x = width / 2.0 + CENTROID_OFFSET
+    dst_x = int(round(anchor_x - cent_in_crop))
+    dst_y = int(foot_row - (foot_y - y0))
+    if dst_x < 0 or dst_y < 0 or dst_x + crop_w > width or dst_y + crop_h > height:
+        raise RuntimeError(f"裁切框放不进画布 dst=({dst_x},{dst_y}) crop={crop_w}x{crop_h} canvas={width}x{height}")
+
     sheets = []
-    for image, leg_x, foot_y in prepared:
+    for image in images:
         sheet = np.zeros((height, width, 4), np.uint8)
-        offset_x = int(round(anchor_x - leg_x))
-        offset_y = int(round(foot_row - foot_y))
-        src_y0 = max(0, -offset_y)
-        src_x0 = max(0, -offset_x)
-        dst_y = max(0, offset_y)
-        dst_x = max(0, offset_x)
-        copy_h = min(image.shape[0] - src_y0, height - dst_y)
-        copy_w = min(image.shape[1] - src_x0, width - dst_x)
-        if copy_h > 0 and copy_w > 0:
-            sheet[dst_y:dst_y + copy_h, dst_x:dst_x + copy_w] = image[src_y0:src_y0 + copy_h, src_x0:src_x0 + copy_w]
+        sheet[dst_y:dst_y + crop_h, dst_x:dst_x + crop_w] = image[y0:y1 + 1, x0:x1 + 1]
         sheets.append(sheet)
     pivot_x = 0.5
-    pivot_y = (FOOT_BELOW_PIVOT + below) / height
-    return sheets, pivot_x, pivot_y, below
+    pivot_y = (FOOT_BELOW_PIVOT + below) / float(height)
+    return sheets, pivot_x, pivot_y, below, centers
 
 
 def meta_text(pivot_x, pivot_y):
@@ -358,6 +357,32 @@ def form_gifs(folder):
     return idle, run
 
 
+def write_sprite_meta(png_path, pivot_x, pivot_y):
+    """轴心变了就改已有 .meta 里的两行，guid 保持不变。"""
+    custom = abs(pivot_x - 0.5) > 0.001 or abs(pivot_y - 0.5) > 0.001
+    alignment = 9 if custom else 0
+    pivot_line = f"  spritePivot: {{x: {pivot_x:.6f}, y: {pivot_y:.6f}}}"
+    align_line = f"  alignment: {alignment}"
+    meta_path = Path(str(png_path) + ".meta")
+    if meta_path.exists():
+        lines = meta_path.read_text(encoding="utf-8").splitlines()
+        replaced_align = False
+        replaced_pivot = False
+        for i, line in enumerate(lines):
+            if line.startswith("  alignment:"):
+                lines[i] = align_line
+                replaced_align = True
+            elif line.startswith("  spritePivot:"):
+                lines[i] = pivot_line
+                replaced_pivot = True
+        if not replaced_align or not replaced_pivot:
+            raise RuntimeError(f"{meta_path} 里没有 alignment 或 spritePivot")
+        meta_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return
+    text, _, _ = meta_text(pivot_x, pivot_y)
+    meta_path.write_text(text, encoding="utf-8")
+
+
 def write_forms():
     FORM_OUT.mkdir(parents=True, exist_ok=True)
     forms_meta = ROOT / "Assets" / "Resources" / "Art" / "Witch" / "Forms.meta"
@@ -369,34 +394,34 @@ def write_forms():
             "idle": gif_frames(idle_path),
             "run": gif_frames(run_path),
         }
-        # 待机和奔跑共用一块画布、同一个轴心，两段动画切换时人不跳。
-        combined = clips["idle"] + clips["run"]
-        sheets, pivot_x, pivot_y, below = place_form(combined)
-        idle_count = len(clips["idle"])
         out_dir = FORM_OUT / form_id
         out_dir.mkdir(parents=True, exist_ok=True)
         dir_meta = Path(str(out_dir) + ".meta")
         if not dir_meta.exists():
             dir_meta.write_text(folder_meta(), encoding="utf-8")
-        names = [f"idle_{i}" for i in range(idle_count)] + [f"run_{i}" for i in range(len(clips["run"]))]
-        for name, sheet in zip(names, sheets):
-            png_path = out_dir / f"{name}.png"
-            Image.fromarray(sheet, "RGBA").save(png_path)
-            meta, _, _ = meta_text(pivot_x, pivot_y)
-            (out_dir / f"{name}.png.meta").write_text(meta, encoding="utf-8")
         info = {
             "form": form_id,
-            "canvas": [int(sheets[0].shape[1]), int(sheets[0].shape[0])],
-            "pivot": [round(pivot_x, 6), round(pivot_y, 6)],
             "pixelsPerUnit": PPU,
-            "filter": "Point",
-            "belowFeet": int(below),
-            "idleFrames": idle_count,
-            "runFrames": len(clips["run"]),
-            "frameMs": 200,
+            "footBelowPivot": FOOT_BELOW_PIVOT,
+            "centroidOffset": CENTROID_OFFSET,
         }
+        for clip_name, frames in clips.items():
+            # 待机、奔跑各用自己的裁切框，框内各帧不再单独挪。
+            sheets, pivot_x, pivot_y, below, centers = place_clip(frames)
+            for index, sheet in enumerate(sheets):
+                png_path = out_dir / f"{clip_name}_{index}.png"
+                Image.fromarray(sheet, "RGBA").save(png_path)
+                write_sprite_meta(png_path, pivot_x, pivot_y)
+            info[clip_name] = {
+                "canvas": [int(sheets[0].shape[1]), int(sheets[0].shape[0])],
+                "pivot": [round(pivot_x, 6), round(pivot_y, 6)],
+                "belowFeet": int(below),
+                "frames": len(sheets),
+            }
+            span = max(centers) - min(centers)
+            rounded = [round(value, 1) for value in centers]
+            print(f"{form_id} {clip_name}: canvas {info[clip_name]['canvas'][0]}x{info[clip_name]['canvas'][1]} pivot {info[clip_name]['pivot']} below {below} src_cx {rounded} span {span:.2f}")
         (out_dir / "clip.json").write_text(json.dumps(info, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-        print(f"{form_id}: canvas {info['canvas'][0]}x{info['canvas'][1]} pivot {info['pivot']} idle {idle_count} run {info['runFrames']} below {below}")
 
 
 def main():

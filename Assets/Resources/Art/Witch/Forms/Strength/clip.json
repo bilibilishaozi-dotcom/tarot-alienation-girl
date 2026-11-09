@@ -1,17 +1,30 @@
 {
  "form": "Strength",
- "canvas": [
-  293,
-  229
- ],
- "pivot": [
-  0.5,
-  0.537118
- ],
  "pixelsPerUnit": 97,
- "filter": "Point",
- "belowFeet": 15,
- "idleFrames": 8,
- "runFrames": 8,
- "frameMs": 200
+ "footBelowPivot": 108,
+ "centroidOffset": 6.35,
+ "idle": {
+  "canvas": [
+   215,
+   216
+  ],
+  "pivot": [
+   0.5,
+   0.509259
+  ],
+  "belowFeet": 2,
+  "frames": 8
+ },
+ "run": {
+  "canvas": [
+   209,
+   195
+  ],
+  "pivot": [
+   0.5,
+   0.620513
+  ],
+  "belowFeet": 13,
+  "frames": 8
+ }
 }

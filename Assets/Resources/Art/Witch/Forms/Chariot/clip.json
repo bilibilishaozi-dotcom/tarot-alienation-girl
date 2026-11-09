@@ -1,17 +1,30 @@
 {
  "form": "Chariot",
- "canvas": [
-  295,
-  240
- ],
- "pivot": [
-  0.5,
-  0.591667
- ],
  "pixelsPerUnit": 97,
- "filter": "Point",
- "belowFeet": 34,
- "idleFrames": 8,
- "runFrames": 8,
- "frameMs": 200
+ "footBelowPivot": 108,
+ "centroidOffset": 6.35,
+ "idle": {
+  "canvas": [
+   283,
+   222
+  ],
+  "pivot": [
+   0.5,
+   0.558559
+  ],
+  "belowFeet": 16,
+  "frames": 8
+ },
+ "run": {
+  "canvas": [
+   267,
+   211
+  ],
+  "pivot": [
+   0.5,
+   0.582938
+  ],
+  "belowFeet": 15,
+  "frames": 8
+ }
 }
