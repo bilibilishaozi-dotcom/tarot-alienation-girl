@@ -428,19 +428,23 @@ public class Player : MonoBehaviour
         if (cardLoadout == null)
             cardLoadout = GetComponent<PlayerCardLoadout>();
 
-        bool fool = cardLoadout != null
-            && cardLoadout.EquippedCard != null
-            && cardLoadout.EquippedCard.effectType == CardEffectType.FoolLunge;
+        TarotForm want = TarotForm.Original;
+        if (cardLoadout != null && cardLoadout.EquippedCard != null)
+        {
+            if (cardLoadout.EquippedCard.effectType == CardEffectType.FoolLunge)
+                want = TarotForm.Fool;
+            else if (cardLoadout.EquippedCard.effectType == CardEffectType.ChariotDash)
+                want = TarotForm.Chariot;
+        }
+
         if (forms == null)
         {
             RestoreFoolLeap();
             return;
         }
 
-        if (fool && forms.CurrentForm != TarotForm.Fool)
-            forms.ChangeForm(TarotForm.Fool);
-        else if (!fool && forms.CurrentForm == TarotForm.Fool)
-            forms.ChangeForm(TarotForm.Original);
+        if (forms.CurrentForm != want)
+            forms.ChangeForm(want);
 
         RestoreFoolLeap();
     }

@@ -82,10 +82,17 @@ public class ChariotEcho : MonoBehaviour
                 target.sharedMaterial = source.sharedMaterial;
         }
 
-        bool palette = target.sharedMaterial != null && target.sharedMaterial.HasProperty("_FormId");
-        target.color = palette
-            ? new Color(1f, 1f, 1f, alpha)
-            : new Color(0.55f, 0.82f, 1f, alpha);
+        float formId = 0f;
+        if (target.sharedMaterial != null && target.sharedMaterial.HasProperty("_FormId"))
+            formId = target.sharedMaterial.GetFloat("_FormId");
+
+        // 2 = 战车：残影再偏一层银蓝。1 = 愚者：保持调色本身的颜色。
+        if (formId > 1.5f && formId < 2.5f)
+            target.color = new Color(0.72f, 0.84f, 1f, alpha);
+        else if (formId > 0.5f)
+            target.color = new Color(1f, 1f, 1f, alpha);
+        else
+            target.color = new Color(0.55f, 0.82f, 1f, alpha);
     }
 
     private void Strike(int direction)

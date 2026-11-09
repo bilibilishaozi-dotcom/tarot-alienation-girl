@@ -70,11 +70,16 @@ public static class CardEffects
         public void Attach(Player player, MonsterCardData card)
         {
             PlayerCardLoadout loadout = player.GetComponent<PlayerCardLoadout>();
-            if (loadout == null)
-                return;
+            if (loadout != null)
+            {
+                int damage = card != null ? Mathf.Max(1, card.echoDamage) : 1;
+                loadout.ApplyChariot(damage);
+            }
 
-            int damage = card != null ? Mathf.Max(1, card.echoDamage) : 1;
-            loadout.ApplyChariot(damage);
+            // 装备战车牌时换成战车形态的配色
+            TarotFormManager forms = TarotFormManager.Ensure(player);
+            if (forms != null)
+                forms.ChangeForm(TarotForm.Chariot);
         }
 
         public void Detach(Player player)
@@ -82,6 +87,12 @@ public static class CardEffects
             PlayerCardLoadout loadout = player.GetComponent<PlayerCardLoadout>();
             if (loadout != null)
                 loadout.ClearChariot();
+            // 卸下（含切场景）时只改回原版，不新加组件
+            TarotFormManager forms = player.GetComponent<TarotFormManager>();
+            if (forms != null)
+                forms.ChangeForm(TarotForm.Original);
+            if (player != null && player.isActiveAndEnabled)
+                CardPossession.PlayQuiet(player);
         }
     }
 
