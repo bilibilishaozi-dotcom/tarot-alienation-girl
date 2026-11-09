@@ -96,7 +96,7 @@ public class ChariotEcho : MonoBehaviour
         Vector2 center = (origin + tail) * 0.5f;
         Vector2 size = new Vector2(TrailDistance + 0.7f, 1.55f);
         // 旧的 OverlapBoxNonAlloc 已过时。带结果数组的新接口要带 ContactFilter，noFilter 与原来的默认查询一致。
-        int count = Physics2D.OverlapBox(center, size, 0f, ContactFilter2D.noFilter, overlaps);
+        int count = Physics2D.OverlapBox(center, size, 0f, new ContactFilter2D().NoFilter(), overlaps);
         for (int i = 0; i < count; i++)
         {
             Collider2D hit = overlaps[i];
