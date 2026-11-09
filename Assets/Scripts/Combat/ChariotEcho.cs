@@ -86,10 +86,12 @@ public class ChariotEcho : MonoBehaviour
         if (target.sharedMaterial != null && target.sharedMaterial.HasProperty("_FormId"))
             formId = target.sharedMaterial.GetFloat("_FormId");
 
-        // 2 = 战车：残影再偏一层银蓝。1 = 愚者：保持调色本身的颜色。
-        if (formId > 1.5f && formId < 2.5f)
+        // 3 = 力量：残影偏暖金/绯红。2 = 战车：银蓝。1 = 愚者：保持调色本身。
+        if (formId > 2.5f && formId < 3.5f)
+            target.color = new Color(1f, 0.62f, 0.42f, alpha);
+        else if (formId > 1.5f && formId < 2.5f)
             target.color = new Color(0.72f, 0.84f, 1f, alpha);
-        else if (formId > 0.5f)
+        else if (formId > 0.5f && formId < 1.5f)
             target.color = new Color(1f, 1f, 1f, alpha);
         else
             target.color = new Color(0.55f, 0.82f, 1f, alpha);

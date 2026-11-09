@@ -435,6 +435,8 @@ public class Player : MonoBehaviour
                 want = TarotForm.Fool;
             else if (cardLoadout.EquippedCard.effectType == CardEffectType.ChariotDash)
                 want = TarotForm.Chariot;
+            else if (cardLoadout.EquippedCard.effectType == CardEffectType.StrengthSlam)
+                want = TarotForm.Strength;
         }
 
         if (forms == null)

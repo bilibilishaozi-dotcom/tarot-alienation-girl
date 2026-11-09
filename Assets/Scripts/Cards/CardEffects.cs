@@ -105,12 +105,17 @@ public static class CardEffects
         public void Attach(Player player, MonsterCardData card)
         {
             PlayerCardLoadout loadout = player.GetComponent<PlayerCardLoadout>();
-            if (loadout == null)
-                return;
+            if (loadout != null)
+            {
+                int damage = card != null && card.slamDamage > 0 ? card.slamDamage : 3;
+                loadout.ApplyStrength(damage);
+            }
 
-            int damage = card != null && card.slamDamage > 0 ? card.slamDamage : 3;
-            loadout.ApplyStrength(damage);
             claw = StrengthClawVisual.Create(player.transform);
+            // 装备力量牌时换成力量形态的配色
+            TarotFormManager forms = TarotFormManager.Ensure(player);
+            if (forms != null)
+                forms.ChangeForm(TarotForm.Strength);
         }
 
         public void Detach(Player player)
@@ -123,6 +128,13 @@ public static class CardEffects
                 Object.Destroy(claw.gameObject);
                 claw = null;
             }
+
+            // 卸下（含切场景）时只改回原版，不新加组件
+            TarotFormManager forms = player.GetComponent<TarotFormManager>();
+            if (forms != null)
+                forms.ChangeForm(TarotForm.Original);
+            if (player != null && player.isActiveAndEnabled)
+                CardPossession.PlayQuiet(player);
         }
     }
 }

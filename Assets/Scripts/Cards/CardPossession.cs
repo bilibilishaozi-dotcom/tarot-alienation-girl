@@ -55,13 +55,18 @@ public class CardPossession : MonoBehaviour
     {
         Quiet,
         Fool,
-        Chariot
+        Chariot,
+        Strength
     }
 
     private void BeginTransform(TransformTone tone)
     {
         player = player != null ? player : GetComponent<Player>();
-        float hitStop = tone == TransformTone.Quiet ? 0.05f : tone == TransformTone.Chariot ? 0.1f : 0.12f;
+        float hitStop = 0.12f;
+        if (tone == TransformTone.Quiet)
+            hitStop = 0.05f;
+        else if (tone == TransformTone.Chariot || tone == TransformTone.Strength)
+            hitStop = 0.1f;
         Juice.HitStop(hitStop);
         WitchFrames frames = player != null ? player.GetComponentInChildren<WitchFrames>(true) : null;
         Color firstFlash = new Color(0.82f, 0.84f, 0.9f);
@@ -85,6 +90,14 @@ public class CardPossession : MonoBehaviour
             radius = 1.05f;
             life = 0.55f;
         }
+        else if (tone == TransformTone.Strength)
+        {
+            firstFlash = new Color(1f, 0.96f, 0.9f);
+            spark = new Color(1f, 0.78f, 0.32f, 1f);
+            sparks = 12;
+            radius = 1.05f;
+            life = 0.55f;
+        }
 
         if (frames != null)
             frames.Flash(firstFlash, tone == TransformTone.Quiet ? 0.16f : 0.2f);
@@ -95,6 +108,8 @@ public class CardPossession : MonoBehaviour
             StartCoroutine(FlashLater(frames, new Color(1f, 0.84f, 0.38f), 0.14f, 0.48f));
         else if (tone == TransformTone.Chariot && frames != null)
             StartCoroutine(FlashLater(frames, new Color(0.62f, 0.78f, 0.98f), 0.12f, 0.42f));
+        else if (tone == TransformTone.Strength && frames != null)
+            StartCoroutine(FlashLater(frames, new Color(1f, 0.62f, 0.28f), 0.12f, 0.4f));
     }
 
     private static IEnumerator FlashLater(WitchFrames frames, Color laterColor, float wait, float seconds)
@@ -122,6 +137,12 @@ public class CardPossession : MonoBehaviour
         if (card != null && card.effectType == CardEffectType.ChariotDash)
         {
             yield return PlayChariotRoutine(card);
+            yield break;
+        }
+
+        if (card != null && card.effectType == CardEffectType.StrengthSlam)
+        {
+            yield return PlayStrengthRoutine(card);
             yield break;
         }
 
@@ -226,6 +247,30 @@ public class CardPossession : MonoBehaviour
         playing = null;
     }
 
+    // 力量：先闪白再闪暖金/绯红。时长 0.6 秒，顿帧 0.1 秒，都不超过愚者。
+    private IEnumerator PlayStrengthRoutine(MonsterCardData card)
+    {
+        player = GetComponent<Player>();
+        BeginTransform(TransformTone.Strength);
+        GameObject strengthToken = CreateToken(card);
+        float strengthElapsed = 0f;
+        const float strengthDuration = 0.6f;
+        Vector3 strengthStart = player.transform.position + Vector3.up * 2.3f;
+        Vector3 strengthEnd = player.transform.position + Vector3.up * 0.35f;
+        while (strengthElapsed < strengthDuration)
+        {
+            strengthElapsed += Time.unscaledDeltaTime;
+            float strengthT = Mathf.Clamp01(strengthElapsed / strengthDuration);
+            if (strengthToken != null)
+                strengthToken.transform.position = Vector3.Lerp(strengthStart, strengthEnd, Mathf.SmoothStep(0f, 1f, strengthT));
+            yield return null;
+        }
+
+        if (strengthToken != null)
+            Destroy(strengthToken);
+        playing = null;
+    }
+
     private static Color Tint(MonsterCardData card)
     {
         if (card == null)
@@ -287,6 +332,8 @@ public class CardPossession : MonoBehaviour
             // 战车粒子：大多数银蓝，每隔几个点一粒金。不是画在身上的装饰。
             if (sparkColor.b > 0.95f && i % 4 == 0)
                 sprite.color = new Color(0.92f, 0.78f, 0.42f, 1f);
+            else if (sparkColor.r > 0.9f && sparkColor.b < 0.5f && i % 4 == 0)
+                sprite.color = new Color(0.72f, 0.18f, 0.24f, 1f);
             sprite.sortingLayerName = "Player";
             sprite.sortingOrder = 40;
             FoolSpark spark = dot.AddComponent<FoolSpark>();
