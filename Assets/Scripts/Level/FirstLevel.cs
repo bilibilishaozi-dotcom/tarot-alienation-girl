@@ -1549,7 +1549,7 @@ public class FirstLevel : MonoBehaviour
         yield return Fade(0f, 0.82f, 0.2f);
         PlacePlayer(false);
         SnapCamera();
-        player.MatchFormToLoadout();
+        player.RestoreFoolLeap();
         yield return new WaitForSecondsRealtime(0.12f);
         yield return Fade(0.82f, 0f, 0.28f);
         if (!player.IsDefeated && !IsCardOpen && !ClearPanelOpen)

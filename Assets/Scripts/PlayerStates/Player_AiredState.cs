@@ -12,7 +12,7 @@ public class Player_AiredState : EntityState
         if (player.moveInput.x != 0)
             player.SetVelocity(player.moveInput.x * (player.moveSpeed * player.inAirMoveMultiplier), rb.linearVelocity.y);
 
-        // 愚者形态多一次空中跳。原版 TryFoolLeap 直接失败，这里不会改速度。
+        // 装备了愚者牌才多一次空中跳。没装备时 TryFoolLeap 直接失败，这里不会改速度。
         if (input.Player.Jump.WasPressedThisFrame() && player.TryFoolLeap())
         {
             stateMachine.ChangeState(player.jumpState);

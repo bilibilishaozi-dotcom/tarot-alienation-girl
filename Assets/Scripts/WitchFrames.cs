@@ -30,17 +30,6 @@ public class WitchFrames : MonoBehaviour
     private Player player;
     // Component 上已有过时的 renderer 属性，这里加 new，避免 CS0108。
     private new SpriteRenderer renderer;
-
-    // 给塔罗换色用。朝向仍然是 Player.Flip() 在转整个角色，这里不负责镜像。
-    public SpriteRenderer Body => renderer;
-
-    // 异化时的白/金闪。LateUpdate 每帧会重写 color，所以闪白记在这里，不会被盖掉。
-    public void Flash(Color color, float seconds)
-    {
-        flashTint = color;
-        flashDuration = Mathf.Max(0.05f, seconds);
-        flashLeft = flashDuration;
-    }
     private Transform spriteTransform;
     private readonly Dictionary<string, Sprite[]> clips = new Dictionary<string, Sprite[]>();
 
@@ -54,9 +43,6 @@ public class WitchFrames : MonoBehaviour
     private float deathT;
     private int airPhase;    // 0 未在空中 / 1 上升 / 2 下落
     private bool running;    // 当前是否在播奔跑
-    private Color flashTint = Color.white;
-    private float flashLeft;
-    private float flashDuration;
     private float currentFps = 5f;
 
     public static WitchFrames Attach(Player owner, float feetY)
@@ -320,13 +306,6 @@ public class WitchFrames : MonoBehaviour
             tint = new Color(1f, 0.85f, 0.9f, 1f - deathT);
         else if (hurt > 0.01f && currentClip != "hurt")
             tint = Color.Lerp(Color.white, new Color(1f, 0.55f, 0.55f, 1f), hurt);
-
-        if (flashLeft > 0f)
-        {
-            flashLeft -= Time.unscaledDeltaTime;
-            float k = flashDuration > 0.01f ? Mathf.Clamp01(flashLeft / flashDuration) : 0f;
-            tint = Color.Lerp(tint, flashTint, k);
-        }
 
         renderer.color = tint;
     }
