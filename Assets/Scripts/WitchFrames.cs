@@ -21,6 +21,9 @@ public class WitchFrames : MonoBehaviour
 
     private Player player;
     private SpriteRenderer renderer;
+
+    // 给塔罗换色用。朝向仍然是 Player.Flip() 在转整个角色，这里不负责镜像。
+    public SpriteRenderer Body => renderer;
     private Transform spriteTransform;
     private readonly Dictionary<string, Sprite[]> clips = new Dictionary<string, Sprite[]>();
 
