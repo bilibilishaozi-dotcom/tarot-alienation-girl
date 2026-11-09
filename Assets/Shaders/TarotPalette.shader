@@ -29,6 +29,7 @@ Shader "Tarot/PaletteSprite"
 
         HLSLINCLUDE
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+        #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 
         TEXTURE2D(_MainTex);
         float4 _MainTex_ST;
@@ -55,7 +56,7 @@ Shader "Tarot/PaletteSprite"
             float2 uv : TEXCOORD0;
         };
 
-        float3 RgbToHsv(float3 c)
+        float3 TarotRgbToHsv(float3 c)
         {
             float4 K = float4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
             float4 p = lerp(float4(c.bg, K.wz), float4(c.gb, K.xy), step(c.b, c.g));
@@ -65,7 +66,7 @@ Shader "Tarot/PaletteSprite"
             return float3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
         }
 
-        float3 HsvToRgb(float hDeg, float s, float v)
+        float3 TarotHsvToRgb(float hDeg, float s, float v)
         {
             // 与 Python colorsys.hsv_to_rgb 一致（Unity Color.hlsl 的写法）。
             float h = frac(hDeg / 360.0);
@@ -89,7 +90,7 @@ Shader "Tarot/PaletteSprite"
                 return false;
             if (!(rgb.r > rgb.g + 0.035 && rgb.g + 0.02 >= rgb.b && rgb.r > 0.72 && rgb.b < 0.92))
                 return false;
-            float3 hsv = RgbToHsv(rgb);
+            float3 hsv = TarotRgbToHsv(rgb);
             float hue = hsv.x * 360.0;
             return hue >= 4.0 && hue <= 30.0 && hsv.y >= 0.07 && hsv.y <= 0.36 && hsv.z >= 0.70;
         }
@@ -98,7 +99,7 @@ Shader "Tarot/PaletteSprite"
         {
             if (alpha < 0.55)
                 return false;
-            float3 hsv = RgbToHsv(rgb);
+            float3 hsv = TarotRgbToHsv(rgb);
             float hue = hsv.x * 360.0;
             return hue >= 185.0 && hue <= 235.0 && hsv.y >= 0.42 && hsv.z >= 0.45;
         }
@@ -107,7 +108,7 @@ Shader "Tarot/PaletteSprite"
         {
             if (alpha < 0.30)
                 return false;
-            float3 hsv = RgbToHsv(rgb);
+            float3 hsv = TarotRgbToHsv(rgb);
             float hue = hsv.x * 360.0;
             return hue >= 180.0 && hue <= 250.0 && hsv.y >= 0.35 && hsv.z >= 0.35;
         }
@@ -116,7 +117,7 @@ Shader "Tarot/PaletteSprite"
         {
             if (alpha < 0.25)
                 return false;
-            float3 hsv = RgbToHsv(rgb);
+            float3 hsv = TarotRgbToHsv(rgb);
             float hue = hsv.x * 360.0;
             return hue >= 170.0 && hue <= 255.0 && hsv.y >= 0.12 && hsv.z >= 0.20;
         }
@@ -187,7 +188,7 @@ Shader "Tarot/PaletteSprite"
             if (alpha <= 0.004)
                 return rgb;
 
-            float3 hsv = RgbToHsv(rgb);
+            float3 hsv = TarotRgbToHsv(rgb);
             float hue = hsv.x * 360.0;
             float s = hsv.y;
             float v = hsv.z;
@@ -211,24 +212,24 @@ Shader "Tarot/PaletteSprite"
             }
 
             if (v < 0.22)
-                return HsvToRgb(22.0, min(0.55, 0.22 + s * 0.35), v * 0.92);
+                return TarotHsvToRgb(22.0, min(0.55, 0.22 + s * 0.35), v * 0.92);
 
             if (s >= 0.55 && v >= 0.70 && hue >= 185.0 && hue <= 240.0)
-                return HsvToRgb(46.0, 0.78, min(1.0, 0.78 + 0.20 * v));
+                return TarotHsvToRgb(46.0, 0.78, min(1.0, 0.78 + 0.20 * v));
 
             if (s < 0.18)
             {
                 float shadow = saturate((0.96 - v) / 0.55);
                 float sat = min(0.40, 0.07 + 0.30 * shadow + s * 0.35);
                 float hueOut = 38.0 + 6.0 * (1.0 - shadow);
-                return HsvToRgb(hueOut, sat, min(1.0, v * 0.99 + 0.01));
+                return TarotHsvToRgb(hueOut, sat, min(1.0, v * 0.99 + 0.01));
             }
 
             float clothShadow = saturate(1.0 - v);
             float hueOut = 34.0 + 10.0 * v;
             float sat = min(0.62, 0.22 + 0.40 * min(1.0, s) + 0.08 * clothShadow);
             float val = min(1.0, v * 0.78 + 0.16);
-            return HsvToRgb(hueOut, sat, val);
+            return TarotHsvToRgb(hueOut, sat, val);
         }
 
         Varyings Vert(Attributes input)
