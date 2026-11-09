@@ -1,0 +1,17 @@
+{
+ "form": "Chariot",
+ "canvas": [
+  295,
+  240
+ ],
+ "pivot": [
+  0.5,
+  0.591667
+ ],
+ "pixelsPerUnit": 97,
+ "filter": "Point",
+ "belowFeet": 34,
+ "idleFrames": 8,
+ "runFrames": 8,
+ "frameMs": 200
+}

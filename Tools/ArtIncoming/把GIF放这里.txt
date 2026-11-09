@@ -1,1 +1,6 @@
 ﻿把 GIF / ZIP / 帧序列 PNG 放进这个文件夹，然后告诉小鲸鱼文件名即可（这个目录在 Assets 之外，Unity 不会导入它）。
+
+原版动作在「初始形态/」。愚者、战车、力量各自一个子文件夹。
+切帧脚本：python3 Tools/build_clip.py --check-original
+它只核对初始形态的 GIF 还在，不会改已经导入的原版帧。
+三个形态的待机和奔跑：python3 Tools/build_clip.py --forms

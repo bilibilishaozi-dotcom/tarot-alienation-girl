@@ -1,0 +1,17 @@
+{
+ "form": "Fool",
+ "canvas": [
+  299,
+  230
+ ],
+ "pivot": [
+  0.5,
+  0.552174
+ ],
+ "pixelsPerUnit": 97,
+ "filter": "Point",
+ "belowFeet": 19,
+ "idleFrames": 8,
+ "runFrames": 8,
+ "frameMs": 200
+}

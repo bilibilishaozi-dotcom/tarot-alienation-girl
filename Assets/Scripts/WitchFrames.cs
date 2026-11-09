@@ -7,6 +7,7 @@ public class WitchFrames : MonoBehaviour
 {
     private const float PPU = 121f;      // 255px 人物 → 约 2.1 世界单位
     private const float IdleFps = 5f;    // 4 帧待机呼吸 ≈ 0.8 秒一个循环（按 GIF 原始 200ms/帧）
+    private const float FormFps = 5f;    // 形态待机、奔跑也是 GIF 的 200 毫秒一帧
     private const float WalkFps = 9f;    // 8 帧 ≈ 0.9 秒一个步循环
     private const float JumpFps = 12f;   // 4 帧起跳 ≈ 0.33 秒
     private const float FallFps = 12f;   // 3 帧下落 ≈ 0.25 秒，播完停在末帧
@@ -76,11 +77,22 @@ public class WitchFrames : MonoBehaviour
 
     private void LoadClips()
     {
-        Sprite[] all = Resources.LoadAll<Sprite>("Art/Witch/Anim");
-        Dictionary<string, List<Sprite>> grouped = new Dictionary<string, List<Sprite>>();
+        LoadFolder("Art/Witch/Anim", null);
+        LoadFolder("Art/Witch/Forms/Fool", "Fool");
+        LoadFolder("Art/Witch/Forms/Chariot", "Chariot");
+        LoadFolder("Art/Witch/Forms/Strength", "Strength");
+    }
 
+    // prefix 为空时用原版名字（idle、run）。形态帧存成 Fool_idle 这种名字，缺的动作不会占掉原版。
+    private void LoadFolder(string resourcePath, string prefix)
+    {
+        Sprite[] all = Resources.LoadAll<Sprite>(resourcePath);
+        Dictionary<string, List<Sprite>> grouped = new Dictionary<string, List<Sprite>>();
         for (int i = 0; i < all.Length; i++)
         {
+            if (all[i] == null)
+                continue;
+
             string id = all[i].name;
             int cut = id.LastIndexOf('_');
             if (cut <= 0)
@@ -91,10 +103,11 @@ public class WitchFrames : MonoBehaviour
             if (!int.TryParse(id.Substring(cut + 1), out index))
                 continue;
 
-            if (!grouped.TryGetValue(clip, out List<Sprite> list))
+            string key = string.IsNullOrEmpty(prefix) ? clip : prefix + "_" + clip;
+            if (!grouped.TryGetValue(key, out List<Sprite> list))
             {
                 list = new List<Sprite>();
-                grouped[clip] = list;
+                grouped[key] = list;
             }
 
             while (list.Count <= index)
@@ -106,8 +119,48 @@ public class WitchFrames : MonoBehaviour
         {
             List<Sprite> list = pair.Value;
             list.RemoveAll(s => s == null);
-            clips[pair.Key] = list.ToArray();
+            if (list.Count > 0)
+                clips[pair.Key] = list.ToArray();
         }
+    }
+
+    // 装备愚者 / 战车 / 力量时，待机和奔跑用那一套。别的动作没有新帧，继续用原版。
+    private string ResolveClip(string wanted)
+    {
+        if (wanted != "idle" && wanted != "run")
+            return wanted;
+
+        string formKey = FormClip(wanted);
+        if (formKey != null && clips.ContainsKey(formKey))
+            return formKey;
+        return wanted;
+    }
+
+    private string FormClip(string action)
+    {
+        if (player == null)
+            return null;
+
+        PlayerCardLoadout loadout = player.GetComponent<PlayerCardLoadout>();
+        if (loadout == null || loadout.EquippedCard == null)
+            return null;
+
+        string prefix = null;
+        if (loadout.EquippedCard.effectType == CardEffectType.FoolLunge)
+            prefix = "Fool";
+        else if (loadout.EquippedCard.effectType == CardEffectType.ChariotDash)
+            prefix = "Chariot";
+        else if (loadout.EquippedCard.effectType == CardEffectType.StrengthSlam)
+            prefix = "Strength";
+        if (prefix == null)
+            return null;
+        return prefix + "_" + action;
+    }
+
+    // 重开本关、牌装回来之后调用。脚底已经按原版待机吸过一次，这里只换图。
+    public void SyncForm()
+    {
+        ApplyClip(ResolveClip("idle"), true);
     }
 
     // 把脚底压到地面线（所有帧共用同一张画布，所以只需要做一次）
@@ -142,6 +195,10 @@ public class WitchFrames : MonoBehaviour
     // 跳跃和下落仍按 Animator 时长铺帧。攻击用固定的较快帧率，不再跟着旧片段拉长。
     private float ResolveFps(string clip, int frameCount)
     {
+        // 形态片段叫 Fool_idle / Chariot_run，不走原版奔跑的 14fps。200 毫秒一帧。
+        if (clip.EndsWith("_idle") || clip.EndsWith("_run"))
+            return FormFps;
+
         float baseFps = IdleFps;
         if (clip == "walk") baseFps = WalkFps;
         else if (clip == "run") baseFps = RunFps;
@@ -263,7 +320,7 @@ public class WitchFrames : MonoBehaviour
             running = false;
         }
 
-        ApplyClip(wanted, false);
+        ApplyClip(ResolveClip(wanted), false);
 
         frameTimer += dt;
         float step = 1f / Mathf.Max(1f, currentFps);

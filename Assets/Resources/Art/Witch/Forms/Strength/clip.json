@@ -1,0 +1,17 @@
+{
+ "form": "Strength",
+ "canvas": [
+  293,
+  229
+ ],
+ "pivot": [
+  0.5,
+  0.537118
+ ],
+ "pixelsPerUnit": 97,
+ "filter": "Point",
+ "belowFeet": 15,
+ "idleFrames": 8,
+ "runFrames": 8,
+ "frameMs": 200
+}

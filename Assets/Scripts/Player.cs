@@ -214,8 +214,10 @@ public class Player : MonoBehaviour
 
         if (GetComponent<PauseMenu>() == null)
             gameObject.AddComponent<PauseMenu>();
-        // 重开本关后把刚才装备的牌装回来。
+        // 重开本关后把刚才装备的牌装回来，待机帧跟着这张牌走。
         cardLoadout.RestoreIfSameLevel();
+        if (witch != null)
+            witch.SyncForm();
 
         // 注意：Animator 不能关。
         // 攻击/受击等状态在等 CallAnimationTrigger()（动画事件）才结算，
