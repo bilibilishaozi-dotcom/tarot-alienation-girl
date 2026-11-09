@@ -34,6 +34,8 @@ public class FirstLevel : MonoBehaviour
     private bool finaleLaneClear;
     private bool finaleEnding;
     private GameObject finaleGate;
+    private GameObject echoBossGate;
+    private bool echoBossOpen;
     private FinaleTarget finaleSeal;
     private FinaleTarget finaleCore;
     private BasicEnemy[] finaleLane;
@@ -98,7 +100,10 @@ public class FirstLevel : MonoBehaviour
         if (loadout != null)
             loadout.Changed -= RefreshObjective;
         if (boss != null)
+        {
             boss.Died -= OnBossDefeated;
+            boss.Died -= OnEchoBossDefeated;
+        }
         if (arena != null)
         {
             for (int i = 0; i < arena.Length; i++)
@@ -471,9 +476,10 @@ public class FirstLevel : MonoBehaviour
 
     private void BuildEchoRoom(int ground)
     {
-        Solid("Floor", new Vector2(29.25f, -1f), new Vector2(61.5f, 2f), new Color(0.31f, 0.27f, 0.23f), ground, 0);
+        // 右端多留一间小房间给回响守卫。左边起点仍在 -1.5。
+        Solid("Floor", new Vector2(35.75f, -1f), new Vector2(74.5f, 2f), new Color(0.31f, 0.27f, 0.23f), ground, 0);
         Solid("LeftWall", new Vector2(-1.8f, 3f), new Vector2(0.7f, 6f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
-        Solid("RightWall", new Vector2(60.4f, 3f), new Vector2(0.7f, 6f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
+        Solid("RightWall", new Vector2(73.3f, 3f), new Vector2(0.7f, 6f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
         Sign("HubSign", root, new Vector3(2.4f, 2.3f, 0f), "左边单牌，右边收束", 280f);
 
         MonsterCardData fool = Resources.Load<MonsterCardData>("Cards/Fool");
@@ -489,6 +495,8 @@ public class FirstLevel : MonoBehaviour
         echoStrengthMark = PlaceSeal(new Vector3(25.2f, 1.15f, 0f), strength, "力量", new Color(0.86f, 0.28f, 0.18f));
         BuildStrengthStation(ground);
         BuildFinale(ground, fool, chariot, strength);
+        echoBossGate = Solid("EchoBossGate", new Vector2(56.2f, 1.6f), new Vector2(0.55f, 3.2f), new Color(0.42f, 0.18f, 0.22f), ground, 4);
+        CreateEchoBoss(64.5f);
         RefreshEchoMarks();
     }
 
@@ -595,6 +603,68 @@ public class FirstLevel : MonoBehaviour
         CreateSprite(finaleCore.transform, "CoreHeart", new Vector3(0f, 0.05f, 0f), new Vector3(0.38f, 0.48f, 1f), new Color(1f, 0.9f, 0.7f, 1f), "Player", 8);
     }
 
+    // 牌之回响尽头的小 Boss：不动，沿用裂隙守卫的三招（挥击、突进、落点），都先给地面预兆。
+    private void CreateEchoBoss(float x)
+    {
+        CapsuleCollider2D body = player != null ? player.GetComponent<CapsuleCollider2D>() : null;
+        float normalReach = player != null ? player.AttackFrontReach(1f) : 1.6f;
+        float stand = x - 1.8f;
+        float slashMin = stand - 0.08f;
+        float playerHeight = body != null ? body.size.y * Mathf.Abs(player.transform.lossyScale.y) : 1.9f;
+        float playerWidth = body != null ? body.size.x * Mathf.Abs(player.transform.lossyScale.x) : 0.77f;
+
+        GameObject enemyObject = new GameObject("EchoBoss");
+        enemyObject.transform.SetParent(root, false);
+        enemyObject.transform.localScale = new Vector3(1.2f, 1.45f, 1f);
+        SpriteRenderer enemySprite = enemyObject.AddComponent<SpriteRenderer>();
+        Rigidbody2D enemyBody = enemyObject.AddComponent<Rigidbody2D>();
+        enemyBody.bodyType = RigidbodyType2D.Kinematic;
+        enemyBody.gravityScale = 0f;
+        enemyBody.constraints = RigidbodyConstraints2D.FreezeAll;
+        CapsuleCollider2D capsule = enemyObject.AddComponent<CapsuleCollider2D>();
+        capsule.size = new Vector2(0.8f, 1.5f);
+        capsule.offset = new Vector2(0f, -0.05f);
+        boss = enemyObject.AddComponent<RiftGuardian>();
+
+        float enemyBottom = capsule.offset.y - capsule.size.y * 0.5f;
+        enemyObject.transform.position = new Vector3(x, 0.04f - enemyObject.transform.localScale.y * enemyBottom, 0f);
+        enemySprite.sortingLayerName = "Ground";
+        enemySprite.sortingOrder = 2;
+        CreateSprite(enemyObject.transform, "Core", new Vector3(0f, 0.2f, 0f), new Vector3(0.34f, 0.42f, 1f), new Color(1f, 0.86f, 0.45f), "Ground", 3);
+        CreateSprite(enemyObject.transform, "Aura", Vector3.zero, new Vector3(1.25f, 1.85f, 1f), new Color(0.55f, 0.22f, 0.62f, 0.33f), "Player", -8);
+
+        boss.Bind(player, 6, "回响守卫", slashMin, stand + normalReach, slashMin - normalReach, 0f,
+            playerHeight + 0.22f, playerHeight * 0.4f, Mathf.Max(1.15f, playerWidth * 2.2f));
+        boss.SetArenaPad(1.6f);
+        boss.Died += OnEchoBossDefeated;
+        Sign("EchoBossLabel", root, new Vector3(x, 3.6f, 0f), "回响守卫", 180f);
+        CreateSprite(root, "EchoBossMark", new Vector3(x, 0.04f, 0f), new Vector3(6.5f, 0.08f, 1f), new Color(0.45f, 0.16f, 0.28f, 0.8f), "Ground", 3);
+    }
+
+    private void OpenEchoBossGate()
+    {
+        echoBossOpen = true;
+        if (boss != null)
+            boss.SetFoolReady(true);
+
+        if (echoBossGate == null)
+            return;
+
+        Collider2D[] blocking = echoBossGate.GetComponentsInChildren<Collider2D>();
+        for (int i = 0; i < blocking.Length; i++)
+            blocking[i].enabled = false;
+        AttackFeedback.Thud(echoBossGate.transform.position);
+        StartCoroutine(SinkObject(echoBossGate, 3.4f));
+    }
+
+    private void OnEchoBossDefeated()
+    {
+        if (!chariotTrial || cleared)
+            return;
+
+        Complete();
+    }
+
     private FinaleTarget CreateFinaleTarget(string name, Vector3 position, Vector3 scale, Color color, int health, UnityEngine.Events.UnityAction onBroken)
     {
         GameObject target = new GameObject(name);
@@ -673,7 +743,8 @@ public class FirstLevel : MonoBehaviour
         yield return ShowEchoBeat(point, new Color(1f, 0.35f, 0.18f, 0.9f), "力量震碎核心");
         if (finaleCore != null)
             finaleCore.gameObject.SetActive(false);
-        Complete();
+        OpenEchoBossGate();
+        RefreshObjective();
     }
 
     // 选牌界面。applyHere = true 时把牌直接给当前场景的玩家（终局关开场用），
@@ -1259,38 +1330,21 @@ public class FirstLevel : MonoBehaviour
             return;
         }
 
-        if (x < 3f)
-        {
-            SetObjective("WASD 移动，空格跳跃，左 Shift 冲刺，H 回血");
-            return;
-        }
-
-        if (ArenaAlive(2) && x > 19f)
-        {
-            SetObjective("石甲虫的甲壳砍不动：跳起来从上方砸下去（下落攻击）");
-            return;
-        }
-
-        if (ArenaAlive(1) && x > 9.5f)
-        {
-            SetObjective("骷髅兵会主动冲过来，等它抬手时冲刺躲开");
-            return;
-        }
-
-        if (ArenaAlive(0) && x > 3f)
-        {
-            SetObjective("孢子怪会先鼓起来再喷发，看到鼓包就往后退");
-            return;
-        }
-
-        SetObjective("三个敌人都倒下后，再去蹬墙跳");
+        // 开场三段（孢子、骷髅、石甲虫）不放文字提示，动作自己能看出来。
+        SetObjective("");
     }
 
     private void RefreshChariotObjective()
     {
-        if (cleared || finaleEnding)
+        if (cleared)
         {
             SetObjective("三张牌一起合上了核心");
+            return;
+        }
+
+        if (echoBossOpen && boss != null && !boss.IsDead)
+        {
+            SetObjective(boss.IsTelegraphing ? "看地面预兆再躲开" : "打倒尽头的回响守卫");
             return;
         }
 
@@ -1326,11 +1380,6 @@ public class FirstLevel : MonoBehaviour
         }
 
         SetObjective("触碰印记换牌");
-    }
-
-    private bool ArenaAlive(int index)
-    {
-        return arena != null && index >= 0 && index < arena.Length && arena[index] != null && !arena[index].IsDead;
     }
 
     private void SetObjective(string value)

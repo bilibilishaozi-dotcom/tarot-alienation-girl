@@ -20,7 +20,10 @@ public class ChariotEcho : MonoBehaviour
         if (owner == null || !owner.HasChariot)
             return null;
 
-        SpriteRenderer visual = owner.GetComponentInChildren<SpriteRenderer>();
+        WitchFrames frames = owner.GetComponentInChildren<WitchFrames>(true);
+        SpriteRenderer visual = frames != null && frames.Body != null
+            ? frames.Body
+            : owner.GetComponentInChildren<SpriteRenderer>();
         GameObject root = new GameObject("ChariotEcho");
         ChariotEcho echo = root.AddComponent<ChariotEcho>();
         echo.player = owner;
@@ -74,9 +77,15 @@ public class ChariotEcho : MonoBehaviour
             target.flipX = source.flipX;
             target.flipY = source.flipY;
             target.sortingLayerID = source.sortingLayerID;
+            // 跟当前形态共用同一份运行时材质（上面已经写好 _FormId），残影才会是愚者的颜色。
+            if (source.sharedMaterial != null)
+                target.sharedMaterial = source.sharedMaterial;
         }
 
-        target.color = new Color(0.55f, 0.82f, 1f, alpha);
+        bool palette = target.sharedMaterial != null && target.sharedMaterial.HasProperty("_FormId");
+        target.color = palette
+            ? new Color(1f, 1f, 1f, alpha)
+            : new Color(0.55f, 0.82f, 1f, alpha);
     }
 
     private void Strike(int direction)
