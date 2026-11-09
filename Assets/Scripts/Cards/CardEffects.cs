@@ -57,6 +57,9 @@ public static class CardEffects
             TarotFormManager forms = player.GetComponent<TarotFormManager>();
             if (forms != null)
                 forms.ChangeForm(TarotForm.Original);
+            // 切场景时组件正在关掉，不再播回原版的小闪光。换牌时人还在，播短的一版。
+            if (player != null && player.isActiveAndEnabled)
+                CardPossession.PlayQuiet(player);
         }
     }
 

@@ -6,6 +6,13 @@ public class Player_WallSlideState : EntityState
     {
     }
 
+    public override void Enter()
+    {
+        base.Enter();
+        // 贴上墙就找回那一次空中跳，蹬离之后还能再跃一次。
+        player.RestoreFoolLeap();
+    }
+
     public override void Update()
     {
         base.Update();

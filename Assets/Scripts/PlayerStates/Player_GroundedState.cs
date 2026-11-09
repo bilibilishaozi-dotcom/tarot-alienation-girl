@@ -6,6 +6,12 @@ public class Player_GroundedState : EntityState
     {
     }
 
+    public override void Enter()
+    {
+        base.Enter();
+        player.RestoreFoolLeap();
+    }
+
     public override void Update()
     {
         base.Update();

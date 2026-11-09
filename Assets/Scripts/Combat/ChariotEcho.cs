@@ -95,7 +95,7 @@ public class ChariotEcho : MonoBehaviour
         Vector3 tail = origin - Vector3.right * face * TrailDistance;
         Vector2 center = (origin + tail) * 0.5f;
         Vector2 size = new Vector2(TrailDistance + 0.7f, 1.55f);
-        int count = Physics2D.OverlapBoxNonAlloc(center, size, 0f, overlaps);
+        int count = Physics2D.OverlapBox(center, size, 0f, overlaps);
         for (int i = 0; i < count; i++)
         {
             Collider2D hit = overlaps[i];

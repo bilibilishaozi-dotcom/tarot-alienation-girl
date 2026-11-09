@@ -389,11 +389,72 @@ public class Player : MonoBehaviour
     // 一键回血（演示/试玩用）。H 键触发，见 Update。
     public void RestoreFullHealth()
     {
-        if (IsDefeated || CurrentHealth >= maxHealth)
+        Heal(maxHealth);
+    }
+
+    public void Heal(int amount)
+    {
+        if (amount <= 0 || IsDefeated || CurrentHealth >= maxHealth)
             return;
 
-        CurrentHealth = maxHealth;
+        CurrentHealth = Mathf.Min(maxHealth, CurrentHealth + amount);
         HealthChanged?.Invoke();
+    }
+
+    private bool foolLeapReady = true;
+
+    public void RestoreFoolLeap()
+    {
+        foolLeapReady = true;
+    }
+
+    // 愚者形态在空中再跳一次。落地或贴墙时 RestoreFoolLeap 会补回来。
+    public bool TryFoolLeap()
+    {
+        if (foolLeapReady == false || forms == null || forms.CurrentForm != TarotForm.Fool)
+            return false;
+
+        foolLeapReady = false;
+        SpawnLeapPuff();
+        return true;
+    }
+
+    private void SpawnLeapPuff()
+    {
+        Vector3 origin = transform.position + Vector3.down * 0.35f;
+        for (int i = 0; i < 5; i++)
+        {
+            float angle = (-70f + i * 35f) * Mathf.Deg2Rad;
+            Vector2 dir = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+            GameObject dot = new GameObject("FoolLeapPuff");
+            dot.transform.position = origin;
+            dot.transform.localScale = Vector3.one * 0.14f;
+            SpriteRenderer sprite = dot.AddComponent<SpriteRenderer>();
+            sprite.sprite = LeapPuffSprite();
+            sprite.color = new Color(1f, 0.84f, 0.32f, 0.95f);
+            sprite.sortingLayerName = "Player";
+            sprite.sortingOrder = 12;
+            FoolLeapPuff puff = dot.AddComponent<FoolLeapPuff>();
+            puff.Begin(dir);
+        }
+    }
+
+    private static Sprite leapPuffSprite;
+
+    private static Sprite LeapPuffSprite()
+    {
+        if (leapPuffSprite != null)
+            return leapPuffSprite;
+
+        Texture2D texture = new Texture2D(4, 4);
+        Color[] pixels = new Color[16];
+        for (int i = 0; i < pixels.Length; i++)
+            pixels[i] = Color.white;
+        texture.SetPixels(pixels);
+        texture.filterMode = FilterMode.Point;
+        texture.Apply();
+        leapPuffSprite = Sprite.Create(texture, new Rect(0f, 0f, 4f, 4f), new Vector2(0.5f, 0.5f), 4f);
+        return leapPuffSprite;
     }
 
     public void EndDodge()
@@ -698,5 +759,39 @@ public class Player : MonoBehaviour
             Gizmos.DrawLine(primaryWallCheck.position, primaryWallCheck.position + new Vector3(wallCheckDistance * facingDir, 0));
         if (secondaryWallCheck != null)
             Gizmos.DrawLine(secondaryWallCheck.position, secondaryWallCheck.position + new Vector3(wallCheckDistance * facingDir, 0));
+    }
+}
+
+// 愚者空中再跳时脚下的一小团金点。
+public class FoolLeapPuff : MonoBehaviour
+{
+    private Vector2 direction;
+    private float age;
+    private Vector3 origin;
+    private SpriteRenderer sprite;
+    private Color color;
+
+    public void Begin(Vector2 dir)
+    {
+        direction = dir.sqrMagnitude > 0.001f ? dir.normalized : Vector2.up;
+        origin = transform.position;
+        sprite = GetComponent<SpriteRenderer>();
+        color = sprite != null ? sprite.color : Color.white;
+    }
+
+    private void Update()
+    {
+        age += Time.deltaTime;
+        float t = Mathf.Clamp01(age / 0.28f);
+        transform.position = origin + (Vector3)(direction * (0.45f * t));
+        if (sprite != null)
+        {
+            Color faded = color;
+            faded.a = color.a * (1f - t);
+            sprite.color = faded;
+        }
+
+        if (t >= 1f)
+            Destroy(gameObject);
     }
 }

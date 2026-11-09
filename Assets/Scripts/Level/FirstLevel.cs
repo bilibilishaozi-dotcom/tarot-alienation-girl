@@ -471,7 +471,23 @@ public class FirstLevel : MonoBehaviour
         CreateCard(new Vector3(cardX, 2.2f, 0f), fool);
         CreateSprite(root, "CardMat", new Vector3(cardX, 0.16f, 0f), new Vector3(1.5f, 0.1f, 1f), new Color(0.95f, 0.78f, 0.28f, 0.9f), "Ground", 2);
         CreateExit();
+        // 出口和右墙之间的高台。单跳脚大约到 2.5，头顶大约到 4.5，所以台底放在 4.55，只有空中再跳才站得上。
+        Solid("FoolLeapLedge", new Vector2(33.05f, 4.725f), new Vector2(1.2f, 0.35f), new Color(0.95f, 0.78f, 0.34f), ground, 2);
+        CreateHealGem(new Vector3(33.05f, 5.2f, 0f));
         BuildGuideArrow();
+    }
+
+    private void CreateHealGem(Vector3 position)
+    {
+        GameObject gem = new GameObject("HealGem");
+        gem.transform.SetParent(root, false);
+        gem.transform.position = position;
+        CreateSprite(gem.transform, "Core", Vector3.zero, new Vector3(0.28f, 0.28f, 1f), new Color(1f, 0.9f, 0.45f, 1f), "Player", 8);
+        CreateSprite(gem.transform, "Glow", Vector3.zero, new Vector3(0.5f, 0.5f, 1f), new Color(1f, 0.78f, 0.3f, 0.35f), "Player", 7);
+        BoxCollider2D trigger = gem.AddComponent<BoxCollider2D>();
+        trigger.isTrigger = true;
+        trigger.size = new Vector2(0.8f, 0.8f);
+        gem.AddComponent<HealGem>().Arm(2);
     }
 
     private void BuildEchoRoom(int ground)
@@ -1872,6 +1888,42 @@ public class CardPickup : MonoBehaviour
 
         taken = true;
         CardReward.Grant(card);
+        gameObject.SetActive(false);
+    }
+}
+
+public class HealGem : MonoBehaviour
+{
+    private int amount = 2;
+    private Vector3 origin;
+    private bool taken;
+
+    public void Arm(int healAmount)
+    {
+        amount = Mathf.Max(1, healAmount);
+        origin = transform.position;
+    }
+
+    private void Update()
+    {
+        if (taken)
+            return;
+
+        float wave = Mathf.Sin(Time.time * 3f) * 0.06f;
+        transform.position = origin + Vector3.up * wave;
+    }
+
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        if (taken)
+            return;
+
+        Player player = other.GetComponent<Player>();
+        if (player == null || player.IsDefeated || player.CurrentHealth >= player.MaxHealth)
+            return;
+
+        taken = true;
+        player.Heal(amount);
         gameObject.SetActive(false);
     }
 }
