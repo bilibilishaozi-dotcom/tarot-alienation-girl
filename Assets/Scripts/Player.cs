@@ -7,6 +7,7 @@ public class Player : MonoBehaviour
 {
 
     public Animator anim { get; private set; }
+    public TarotFormManager forms { get; private set; }
 
     public Rigidbody2D rb { get; private set; }
     public PlayerInputSet input { get; private set; }
@@ -194,6 +195,9 @@ public class Player : MonoBehaviour
                 renderers[i].enabled = false;
             }
         }
+
+        // 换塔罗形态不写在这个控制器里，只留一个引用。F 键和调色都在 TarotFormManager。
+        forms = TarotFormManager.Ensure(this);
 
         // 注意：Animator 不能关。
         // 攻击/受击等状态在等 CallAnimationTrigger()（动画事件）才结算，
