@@ -11,6 +11,14 @@ public class WitchFrames : MonoBehaviour
     private const float JumpFps = 12f;   // 4 帧起跳 ≈ 0.33 秒
     private const float FallFps = 12f;   // 3 帧下落 ≈ 0.25 秒，播完停在末帧
     private const float RunFps = 14f;    // 6 帧奔跑 ≈ 0.43 秒
+    private const float AttackFps = 20f; // 9 帧约 0.45 秒。不再被旧片段拉长，挥击更干脆。
+    private const float HurtFps = 16f;   // 9 帧受击约 0.56 秒，之后停在最后一帧
+    private const float WallSlideFps = 5f; // 9 帧滑墙，按 GIF 的 200 毫秒一帧循环
+    private const float WallJumpFps = 36f; // 9 帧约 0.25 秒，蹬出更快，剩下的上升停在最后一帧
+    // 第一、二段都是横扫；第三段是重砸 GIF 的水平翻转。
+    private const bool UseAttackFrames = true;
+    // 视觉上让脚「压进」地面一点点（像素靴底有描边，贴齐反而显浮）
+    private const float GroundSink = 0.03f;
     // 走路/奔跑的切换速度（玩家 moveSpeed = 8，冲刺另算）
     private const float RunEnterSpeed = 5f;
     private const float RunExitSpeed = 3.5f;
@@ -21,6 +29,9 @@ public class WitchFrames : MonoBehaviour
 
     private Player player;
     private SpriteRenderer renderer;
+
+    // 给塔罗换色用。朝向仍然是 Player.Flip() 在转整个角色，这里不负责镜像。
+    public SpriteRenderer Body => renderer;
     private Transform spriteTransform;
     private readonly Dictionary<string, Sprite[]> clips = new Dictionary<string, Sprite[]>();
 
@@ -34,6 +45,7 @@ public class WitchFrames : MonoBehaviour
     private float deathT;
     private int airPhase;    // 0 未在空中 / 1 上升 / 2 下落
     private bool running;    // 当前是否在播奔跑
+    private float currentFps = 5f;
 
     public static WitchFrames Attach(Player owner, float feetY)
     {
@@ -107,7 +119,8 @@ public class WitchFrames : MonoBehaviour
             return;
 
         Physics2D.SyncTransforms();
-        float desiredMin = transform.parent.position.y + feetLocalY;
+        // 稍微往下压一点点：像素角色的靴底有一圈描边，贴得严丝合缝反而看着像浮空
+        float desiredMin = transform.parent.position.y + feetLocalY - GroundSink;
         spriteTransform.position += new Vector3(0f, desiredMin - renderer.bounds.min.y, 0f);
         baseY = spriteTransform.localPosition.y;
     }
@@ -124,7 +137,38 @@ public class WitchFrames : MonoBehaviour
         frameIndex = 0;
         frameTimer = 0f;
         renderer.sprite = frames[0];
+        currentFps = ResolveFps(clip, frames.Length);
         return true;
+    }
+
+    // 跳跃和下落仍按 Animator 时长铺帧。攻击用固定的较快帧率，不再跟着旧片段拉长。
+    private float ResolveFps(string clip, int frameCount)
+    {
+        float baseFps = IdleFps;
+        if (clip == "walk") baseFps = WalkFps;
+        else if (clip == "run") baseFps = RunFps;
+        else if (clip == "jump") baseFps = JumpFps;
+        else if (clip == "fall") baseFps = FallFps;
+        else if (clip.StartsWith("attack") || clip == "airattack")
+            return AttackFps;
+        else if (clip == "hurt")
+            return HurtFps;
+        else if (clip == "wallslide")
+            return WallSlideFps;
+        else if (clip == "walljump")
+            return WallJumpFps;
+        else if (clip == "dash" && player != null)
+            return Mathf.Clamp(frameCount / Mathf.Max(0.12f, player.dashDuration), 12f, 32f);
+
+        bool oneShot = clip == "jump" || clip == "fall";
+        if (!oneShot || player == null || player.anim == null)
+            return baseFps;
+
+        float length = player.anim.GetCurrentAnimatorStateInfo(0).length;
+        if (length <= 0.05f)
+            return baseFps;
+
+        return Mathf.Clamp(frameCount / length, 6f, 30f);
     }
 
     private void LateUpdate()
@@ -153,7 +197,55 @@ public class WitchFrames : MonoBehaviour
         }
 
         string wanted = "idle";
-        if (airborne)
+        bool playingAttack = false;
+        bool playingSpecial = false;
+        if (!player.IsDefeated && player.IsDodging && clips.ContainsKey("dash"))
+        {
+            wanted = "dash";
+            playingSpecial = true;
+        }
+        else if (!player.IsDefeated && player.IsHurtPose && clips.ContainsKey("hurt"))
+        {
+            wanted = "hurt";
+            playingSpecial = true;
+        }
+        else if (!player.IsDefeated && player.IsWallSliding && clips.ContainsKey("wallslide"))
+        {
+            // 贴墙时人还在空中，要先于跳跃/下落选中，否则滑墙帧永远播不出来。
+            wanted = "wallslide";
+            playingSpecial = true;
+        }
+        else if (!player.IsDefeated && player.IsWallJumping && clips.ContainsKey("walljump"))
+        {
+            // 原图和滑墙一样朝向墙。蹬出时角色已经转向，这里不要再把图翻一次。
+            wanted = "walljump";
+            playingSpecial = true;
+        }
+        else if (UseAttackFrames && !player.IsDefeated && player.IsGroundAttacking)
+        {
+            // 只在地面连击里换图：第一、二段横扫，第三段翻转后的重砸。
+            string combo = "attack" + Mathf.Clamp(player.AttackComboIndex, 1, 3);
+            if (clips.ContainsKey(combo))
+            {
+                wanted = combo;
+                playingAttack = true;
+            }
+        }
+        else if (UseAttackFrames && !player.IsDefeated && player.IsAirAttack && clips.ContainsKey("airattack")
+            && !player.groundDetected && !player.supportDetected)
+        {
+            // 只在还没落地时播。落地后状态还要等动画事件才退出，画面应立刻回到待机。
+            wanted = "airattack";
+            playingAttack = true;
+        }
+
+        bool jumpStrikeLanded = player.IsAirAttack && (player.groundDetected || player.supportDetected);
+
+        if (playingAttack || playingSpecial || jumpStrikeLanded)
+        {
+            running = false;
+        }
+        else if (airborne)
         {
             // 上升用「向上发力」那几帧，下落用「向下发力」那几帧，各播一次停在末帧
             if (airPhase == 1 && clips.ContainsKey("jump")) wanted = "jump";
@@ -175,14 +267,8 @@ public class WitchFrames : MonoBehaviour
 
         ApplyClip(wanted, false);
 
-        float fps = IdleFps;
-        if (currentClip == "walk") fps = WalkFps;
-        else if (currentClip == "run") fps = RunFps;
-        else if (currentClip == "jump") fps = JumpFps;
-        else if (currentClip == "fall") fps = FallFps;
-
         frameTimer += dt;
-        float step = 1f / Mathf.Max(1f, fps);
+        float step = 1f / Mathf.Max(1f, currentFps);
         while (frameTimer >= step)
         {
             frameTimer -= step;
@@ -192,8 +278,10 @@ public class WitchFrames : MonoBehaviour
         Sprite[] frames = clips[currentClip];
         if (frames != null && frames.Length > 0)
         {
-            // 跳跃/下落都是一次性片段：播到最后停在最后一帧，落地再切回 idle/walk
-            bool holdLast = currentClip == "jump" || currentClip == "fall";
+            // 跳跃 / 下落 / 攻击都是一次性片段：播到最后停在最后一帧
+            bool holdLast = currentClip == "jump" || currentClip == "fall" || currentClip == "hurt"
+                || currentClip == "walljump"
+                || currentClip.StartsWith("attack") || currentClip == "airattack";
             int index = holdLast ? Mathf.Min(frameIndex, frames.Length - 1) : frameIndex % frames.Length;
             renderer.sprite = frames[index];
         }
@@ -205,7 +293,11 @@ public class WitchFrames : MonoBehaviour
         if (player.IsDefeated)
             deathT = Mathf.Min(1f, deathT + dt * 1.6f);
 
-        float angle = 6f * attack - 9f * dash - 7f * hurt + 78f * deathT;
+        // 攻击、冲刺、受击已经有完整帧，不再把整个人拧一个角度。
+        float attackTilt = UseAttackFrames ? 0f : 6f * attack;
+        float dashTilt = currentClip == "dash" ? 0f : -9f * dash;
+        float hurtTilt = currentClip == "hurt" ? 0f : -7f * hurt;
+        float angle = attackTilt + dashTilt + hurtTilt + 78f * deathT;
         spriteTransform.localRotation = Quaternion.Euler(0f, 0f, angle);
 
         // 死亡倒地时略微下沉，避免绕中心旋转后脚离地
@@ -214,7 +306,7 @@ public class WitchFrames : MonoBehaviour
         Color tint = Color.white;
         if (deathT > 0f)
             tint = new Color(1f, 0.85f, 0.9f, 1f - deathT);
-        else if (hurt > 0.01f)
+        else if (hurt > 0.01f && currentClip != "hurt")
             tint = Color.Lerp(Color.white, new Color(1f, 0.55f, 0.55f, 1f), hurt);
 
         renderer.color = tint;

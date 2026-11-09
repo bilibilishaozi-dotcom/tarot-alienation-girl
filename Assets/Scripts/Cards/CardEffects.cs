@@ -42,6 +42,10 @@ public static class CardEffects
                 return;
 
             loadout.ApplyFool(card.damageMultiplier, card.lungeMultiplier, card.reachMultiplier);
+            // 装备愚者牌时换成愚者形态的配色
+            TarotFormManager forms = TarotFormManager.Ensure(player);
+            if (forms != null)
+                forms.ChangeForm(TarotForm.Fool);
         }
 
         public void Detach(Player player)
@@ -49,6 +53,10 @@ public static class CardEffects
             PlayerCardLoadout loadout = player.GetComponent<PlayerCardLoadout>();
             if (loadout != null)
                 loadout.ClearFool();
+            // 卸下（含切场景）时只改回原版，不新加组件
+            TarotFormManager forms = player.GetComponent<TarotFormManager>();
+            if (forms != null)
+                forms.ChangeForm(TarotForm.Original);
         }
     }
 

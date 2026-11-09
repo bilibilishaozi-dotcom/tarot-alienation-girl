@@ -243,7 +243,7 @@ MonoBehaviour:
   - {x: 2.75, y: 1.75}
   jumpAttackVelocity: {x: 5, y: 6}
   attackVelocityDuration: 0.1
-  comboResetTime: 0.45
+  comboResetTime: 0.6
   baseAttackDamage: 1
   attackHitboxSize: {x: 1.25, y: 0.85}
   attackHitboxOffset: {x: 0.95, y: -0.1}

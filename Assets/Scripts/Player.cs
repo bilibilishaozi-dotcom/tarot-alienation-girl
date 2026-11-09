@@ -7,6 +7,7 @@ public class Player : MonoBehaviour
 {
 
     public Animator anim { get; private set; }
+    public TarotFormManager forms { get; private set; }
 
     public Rigidbody2D rb { get; private set; }
     public PlayerInputSet input { get; private set; }
@@ -51,8 +52,8 @@ public class Player : MonoBehaviour
     public float wallSlideSlowMultiplier = 0.7f;
     //[Space]:Inspector里加空行
     [Space]
-    public float dashDuration = 0.25f;
-    public float dashSpeed = 20;
+    public float dashDuration = 0.7f;
+    public float dashSpeed = 8;
     [SerializeField] private float collisionSkin = 0.05f;
 
 
@@ -124,8 +125,18 @@ public class Player : MonoBehaviour
     // 给骨骼动画区分「起跳上升」和「下落」
     public float VerticalSpeed => rb != null ? rb.linearVelocity.y : 0f;
     public bool IsHurtNow => invulnerableTimer > 0.35f;
+    // 受击帧要盖住整段无敌时间，播完停在最后一帧，而不是只闪 0.35 秒。
+    public bool IsHurtPose => invulnerableTimer > 0f && !IsDefeated;
     public bool IsAttacking => stateMachine != null &&
         (stateMachine.currentState == basicAttackState || stateMachine.currentState == jumpAttackState);
+    // 只有地面三段连击才播 attack1..3。跳跃攻击还没有自己的帧。
+    public bool IsGroundAttacking => stateMachine != null && stateMachine.currentState == basicAttackState;
+    // 贴墙下滑时播滑墙帧，不要落到空中的下落帧。
+    public bool IsWallSliding => stateMachine != null && stateMachine.currentState == wallSlideState;
+    // 蹬墙跳的上升段。SetVelocity 已经把朝向转到跳出方向。
+    public bool IsWallJumping => stateMachine != null && stateMachine.currentState == wallJumpState;
+    // 当前连击段数（1/2/3），给帧动画选 attack1..3 用
+    public int AttackComboIndex => basicAttackState != null ? basicAttackState.ComboIndex : 1;
 
     // 「现在能不能贴墙」= 真的贴着墙 + 不在脱墙冷却里 + 没有按离墙方向。
     // 状态机里判断贴墙请用这个，不要直接用 wallDetected。
@@ -194,6 +205,9 @@ public class Player : MonoBehaviour
                 renderers[i].enabled = false;
             }
         }
+
+        // 换塔罗形态不写在这个控制器里，只留一个引用。F 键和调色都在 TarotFormManager。
+        forms = TarotFormManager.Ensure(this);
 
         // 注意：Animator 不能关。
         // 攻击/受击等状态在等 CallAnimationTrigger()（动画事件）才结算，

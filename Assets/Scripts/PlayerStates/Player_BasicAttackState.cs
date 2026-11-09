@@ -2,8 +2,10 @@ using UnityEngine;
 
 public class Player_BasicAttackState : EntityState
 {
-    private static readonly float[] hitStart = { 0.12f, 0.08f, 0.16f };
-    private static readonly float[] hitDuration = { 0.14f, 0.12f, 0.16f };
+    private static readonly float[] hitStart = { 0.12f, 0.18f, 0.16f };
+    private static readonly float[] hitDuration = { 0.14f, 0.14f, 0.16f };
+    // 9 帧 / 20fps ≈ 0.45 秒。留到末帧出现再结束，避免旧的短事件把上挑掐断。
+    private static readonly float[] minPlayTime = { 0.48f, 0.48f, 0.48f };
     private const float FinisherRecoverTime = 0.28f;
 
     private float attackVelocityTimer;
@@ -17,6 +19,9 @@ public class Player_BasicAttackState : EntityState
     private int comboIndex = 1;
     private int comboLimit = 3;
     private const int FirstComboIndex = 1;
+
+    // 给帧动画读：当前是第几段连击（1/2/3）
+    public int ComboIndex => comboIndex;
 
     public Player_BasicAttackState(Player player, StateMachine stateMachine, string animBoolName) : base(player, stateMachine, animBoolName)
     {
@@ -60,7 +65,7 @@ public class Player_BasicAttackState : EntityState
 
         UpdateHitWindow();
 
-        if (triggerCalled)
+        if (triggerCalled && elapsed >= MinPlayTime())
             HandleStateExit();
     }
 
@@ -131,6 +136,12 @@ public class Player_BasicAttackState : EntityState
     {
         int step = Mathf.Clamp(comboIndex - 1, 0, hitStart.Length - 1);
         return Mathf.Max(0.05f, hitStart[step] - 0.04f);
+    }
+
+    private float MinPlayTime()
+    {
+        int step = Mathf.Clamp(comboIndex - 1, 0, minPlayTime.Length - 1);
+        return minPlayTime[step];
     }
 
     private void HandleAttackVelocity()
