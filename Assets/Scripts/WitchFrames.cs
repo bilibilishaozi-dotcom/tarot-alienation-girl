@@ -7,7 +7,8 @@ public class WitchFrames : MonoBehaviour
 {
     private const float PPU = 121f;      // 255px 人物 → 约 2.1 世界单位
     private const float IdleFps = 5f;    // 4 帧待机呼吸 ≈ 0.8 秒一个循环（按 GIF 原始 200ms/帧）
-    private const float FormFps = 5f;    // 形态待机、奔跑也是 GIF 的 200 毫秒一帧
+    private const float FormIdleFps = 8f;  // 形态 8 帧待机 = 1 秒一个呼吸循环
+    private const float FormRunFps = 16f;  // 形态 8 帧奔跑 = 0.5 秒一个步循环，接近原版奔跑
     private const float WalkFps = 9f;    // 8 帧 ≈ 0.9 秒一个步循环
     private const float JumpFps = 12f;   // 4 帧起跳 ≈ 0.33 秒
     private const float FallFps = 12f;   // 3 帧下落 ≈ 0.25 秒，播完停在末帧
@@ -195,9 +196,11 @@ public class WitchFrames : MonoBehaviour
     // 跳跃和下落仍按 Animator 时长铺帧。攻击用固定的较快帧率，不再跟着旧片段拉长。
     private float ResolveFps(string clip, int frameCount)
     {
-        // 形态片段叫 Fool_idle / Chariot_run，不走原版奔跑的 14fps。200 毫秒一帧。
-        if (clip.EndsWith("_idle") || clip.EndsWith("_run"))
-            return FormFps;
+        // 形态片段叫 Fool_idle / Chariot_run，待机 8fps、奔跑 16fps，单独设置。
+        if (clip.EndsWith("_idle"))
+            return FormIdleFps;
+        if (clip.EndsWith("_run"))
+            return FormRunFps;
 
         float baseFps = IdleFps;
         if (clip == "walk") baseFps = WalkFps;
