@@ -16,6 +16,9 @@ public class WitchFrames : MonoBehaviour
     private const float FallFps = 12f;   // 3 帧下落 ≈ 0.25 秒，播完停在末帧
     private const float RunFps = 14f;    // 6 帧奔跑 ≈ 0.43 秒
     private const float AttackFps = 20f; // 9 帧约 0.45 秒。不再被旧片段拉长，挥击更干脆。
+    // 空中攻击停在刀光朝下的那一帧。量过 airattack_0..8 的亮色刀光重心：
+    // 0 偏右，1 右下，2 几乎正在身体正下方（dx≈0，角度约 +92°），3 起转到左下，后面举过头顶。
+    private const int AirAttackHoldFrame = 2;
     private const float HurtFps = 16f;   // 9 帧受击约 0.56 秒，之后停在最后一帧
     private const float WallSlideFps = 5f; // 9 帧滑墙，按 GIF 的 200 毫秒一帧循环
     private const float WallJumpFps = 36f; // 9 帧约 0.25 秒，蹬出更快，剩下的上升停在最后一帧
@@ -353,8 +356,14 @@ public class WitchFrames : MonoBehaviour
             bool holdLast = currentClip == "jump" || currentClip == "fall" || currentClip == "hurt"
                 || currentClip == "walljump"
                 || currentClip.EndsWith("_jump") || currentClip.EndsWith("_fall")
-                || currentClip.StartsWith("attack") || currentClip == "airattack";
-            int index = holdLast ? Mathf.Min(frameIndex, frames.Length - 1) : frameIndex % frames.Length;
+                || currentClip.StartsWith("attack");
+            int index;
+            if (currentClip == "airattack")
+                index = Mathf.Min(frameIndex, AirAttackHoldFrame);
+            else if (holdLast)
+                index = Mathf.Min(frameIndex, frames.Length - 1);
+            else
+                index = frameIndex % frames.Length;
             renderer.sprite = frames[index];
         }
 

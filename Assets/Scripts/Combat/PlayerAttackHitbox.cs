@@ -73,6 +73,7 @@ public class PlayerAttackHitbox : MonoBehaviour
         bool empowered = player.AttackReachMultiplier > 1.01f || player.CurrentAttackDamage > 1;
         int damage = player.CurrentAttackDamage;
         damageable.TakeDamage(damage, player.transform.position);
+        player.NotifyAttackHit();
         AttackFeedback.Hit(other.bounds.center, empowered);
 
         // 打击感：弹刀和真命中给不同反馈

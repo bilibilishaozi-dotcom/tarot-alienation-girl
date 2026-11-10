@@ -6,6 +6,7 @@ public class Player_JumpAttackState : EntityState
 
     private bool touchedGround;
     private bool swingActive;
+    private bool hurtOnEnter;
     private float elapsed;
 
     public Player_JumpAttackState(Player player, StateMachine stateMachine, string animBoolName) : base(player, stateMachine, animBoolName)
@@ -16,6 +17,7 @@ public class Player_JumpAttackState : EntityState
         base.Enter();
         touchedGround = false;
         swingActive = false;
+        hurtOnEnter = player.IsHurtNow;
         elapsed = 0f;
         player.basicAttackState.ResetCombo();
 
@@ -31,21 +33,38 @@ public class Player_JumpAttackState : EntityState
         elapsed += Time.deltaTime;
         UpdateHitWindow();
 
-        // 碰地或踩到敌人/箱子都算「落地」，否则掉在怪物头上会一直卡在滞空状态。
-        bool landed = player.groundDetected || player.supportDetected;
+        // 死亡，或攻击过程中新挨的打，立刻离开，避免停在这个状态里出不去。
+        // 进状态时已经在受伤闪烁里的，不把这次攻击直接取消。
+        if (player.IsDefeated || (!hurtOnEnter && player.IsHurtNow))
+        {
+            ReleaseToMovement(false);
+            return;
+        }
 
+        // 打中就结束。判定框里同一目标只会记一次，不会在停住的姿势上每帧再打。
+        if (player.AttackHasHit)
+        {
+            ReleaseToMovement(false);
+            return;
+        }
+
+        // 碰地或踩到敌人/箱子都算落地。落地后回地面状态，不再等动画事件。
+        bool landed = player.groundDetected || player.supportDetected;
         if (landed && touchedGround == false)
         {
             touchedGround = true;
-            anim.SetTrigger("jumpAttackTrigger");
-            player.SetVelocity(0, rb.linearVelocity.y);
-            EndSwing();
             if (player.HasLandingSlam)
                 player.PlayLandingSlam();
+            ReleaseToMovement(true);
         }
+    }
 
-        if (triggerCalled && landed)
-            stateMachine.ChangeState(player.idleState);
+    // 还在空中就回下落（画面仍按竖直速度播 jump 或 fall）。着地回待机，待机里再切跑步。
+    private void ReleaseToMovement(bool landed)
+    {
+        EndSwing();
+        bool onGround = landed || player.groundDetected || player.supportDetected;
+        stateMachine.ChangeState(onGround ? player.idleState : player.fallState);
     }
 
     private void UpdateHitWindow()

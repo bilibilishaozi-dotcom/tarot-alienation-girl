@@ -343,9 +343,16 @@ public class Player : MonoBehaviour
     }
 
     public bool AttackSwingActive { get; private set; }
+    public bool AttackHasHit { get; private set; }
+
+    public void NotifyAttackHit()
+    {
+        AttackHasHit = true;
+    }
 
     public void BeginAttackSwing()
     {
+        AttackHasHit = false;
         AttackSwingActive = true;
         if (attackHitbox != null)
             attackHitbox.BeginSwing();
