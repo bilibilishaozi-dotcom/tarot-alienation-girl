@@ -546,12 +546,55 @@ def write_fool_attacks(attack1_path, attack2_path, attack3_path):
     info_path.write_text(json.dumps(info, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
 
 
+def write_chariot_attacks(attack1_path, attack2_path, attack3_path):
+    """战车地面普攻三段。缩放跟现有战车待机同一档，长枪和轮子不把人缩小。"""
+    specs = (
+        ("attack1", attack1_path),
+        ("attack2", attack2_path),
+        ("attack3", attack3_path),
+    )
+    out_dir = FORM_OUT / "Chariot"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    info_path = out_dir / "clip.json"
+    info = json.loads(info_path.read_text(encoding="utf-8")) if info_path.exists() else {"form": "Chariot"}
+    saved_dir = INCOMING / "战车"
+    saved_dir.mkdir(parents=True, exist_ok=True)
+    for clip_name, gif_path in specs:
+        source = Path(gif_path)
+        frames = composite_gif(source)
+        sheets, pivot_x, pivot_y, below, centers = place_clip(frames, SCALE)
+        for index, sheet in enumerate(sheets):
+            png_path = out_dir / f"{clip_name}_{index}.png"
+            Image.fromarray(sheet, "RGBA").save(png_path)
+            write_sprite_meta(png_path, pivot_x, pivot_y)
+        info[clip_name] = {
+            "canvas": [int(sheets[0].shape[1]), int(sheets[0].shape[0])],
+            "pivot": [round(pivot_x, 6), round(pivot_y, 6)],
+            "belowFeet": int(below),
+            "frames": len(sheets),
+            "scale": round(SCALE, 6),
+        }
+        saved = saved_dir / f"chariot_{clip_name}.gif"
+        saved.write_bytes(source.read_bytes())
+        span = max(centers) - min(centers)
+        print(
+            f"chariot {clip_name}: {len(sheets)} frames canvas {info[clip_name]['canvas'][0]}x{info[clip_name]['canvas'][1]} "
+            f"pivot {info[clip_name]['pivot']} below {below} cx span {span:.2f} bytes {source.stat().st_size}"
+        )
+    info_path.write_text(json.dumps(info, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+
+
 def main():
     import sys
     args = set(sys.argv[1:])
     if not args or "--check-original" in args:
         check_original()
-    if "--forms" in args or (not args and "--original-idle" not in args and "--fool-attack" not in args):
+    if "--forms" in args or (
+        not args
+        and "--original-idle" not in args
+        and "--fool-attack" not in args
+        and "--chariot-attack" not in args
+    ):
         write_forms()
     if "--original-idle" in args:
         source = ORIGINAL_DIR / "idle_new.gif"
@@ -560,6 +603,14 @@ def main():
         if not gif.exists():
             raise SystemExit("找不到初始形态的新待机 GIF")
         write_original_idle(gif)
+    if "--chariot-attack" in args:
+        uploads = Path("/home/ubuntu/.cursor/projects/workspace/uploads")
+        write_chariot_attacks(
+            uploads / "chariot-attack1_18d3.gif",
+            uploads / "chariot-attack2_0cdc.gif",
+            uploads / "chariot-attack3_6d0e.gif",
+        )
+        return
     if "--fool-attack" in args:
         uploads = Path("/home/ubuntu/.cursor/projects/workspace/uploads")
         write_fool_attacks(

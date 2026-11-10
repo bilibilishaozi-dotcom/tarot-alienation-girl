@@ -136,14 +136,15 @@ public class WitchFrames : MonoBehaviour
     }
 
     // 装备愚者 / 战车 / 力量时，待机、奔跑、起跳、下落用那一套。
-    // 愚者地面普攻三段各用自己的帧。别的牌仍用原版 attack1..3。
+    // 有自己普攻帧的形态按段取。没有的牌仍用原版 attack1..3。
     private string ResolveClip(string wanted)
     {
         if (wanted == "attack1" || wanted == "attack2" || wanted == "attack3")
         {
-            if (FormPrefix() == "Fool")
+            string prefix = FormPrefix();
+            if (prefix != null)
             {
-                string own = "Fool_" + wanted;
+                string own = prefix + "_" + wanted;
                 if (clips.ContainsKey(own))
                     return own;
             }
@@ -241,8 +242,8 @@ public class WitchFrames : MonoBehaviour
             return FormFallFps;
         // 一二段：动画事件和最短时间都是 0.48 秒，没有额外收招。9 帧用 20fps，约 0.45 秒播完。
         // 第三段：事件在 0.48 秒，Player_BasicAttack_3 之后还有 0.28 秒收招，一共约 0.76 秒才回待机。
-        // 第三段若也用 20fps，0.40 秒就到末帧，收招里会停大约 0.36 秒。只把这一段的显示放慢。
-        if (clip == "Fool_attack3")
+        // 9 帧若用 20fps，0.40 秒就到末帧，收招里会停大约 0.36 秒。有自己第三段的形态才放慢显示。
+        if (clip.EndsWith("_attack3"))
             return 11.5f;
         if (clip.Contains("_attack"))
             return AttackFps;

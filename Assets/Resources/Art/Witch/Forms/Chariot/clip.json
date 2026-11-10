@@ -50,5 +50,44 @@
   ],
   "belowFeet": 12,
   "frames": 9
+ },
+ "attack1": {
+  "canvas": [
+   277,
+   222
+  ],
+  "pivot": [
+   0.5,
+   0.558559
+  ],
+  "belowFeet": 16,
+  "frames": 9,
+  "scale": 0.903084
+ },
+ "attack2": {
+  "canvas": [
+   283,
+   221
+  ],
+  "pivot": [
+   0.5,
+   0.561086
+  ],
+  "belowFeet": 16,
+  "frames": 9,
+  "scale": 0.903084
+ },
+ "attack3": {
+  "canvas": [
+   259,
+   221
+  ],
+  "pivot": [
+   0.5,
+   0.556561
+  ],
+  "belowFeet": 15,
+  "frames": 9,
+  "scale": 0.903084
  }
 }
