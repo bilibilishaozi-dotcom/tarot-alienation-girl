@@ -291,8 +291,8 @@ public class WitchFrames : MonoBehaviour
             return WallJumpFps;
         else if ((clip == "dash" || clip.EndsWith("_dash")) && player != null)
         {
-            // 场景里冲刺是 0.25 秒。原版以前卡在 32fps，8 帧刚好铺满；换成 9 帧后第 9 帧会卡在结束线上。
-            // 现在和卡牌形态一样：末帧放在时长的 90%，0.25 秒时大约 35.6fps，第 9 帧在 0.225 秒出现。
+            // 读角色上的 dashDuration，不写死秒数。末帧放在时长的 90%。
+            // 场景里现在是 0.35 秒，9 帧大约 25.4fps，第 9 帧在 0.315 秒出现。
             float duration = Mathf.Max(0.12f, player.dashDuration);
             return (frameCount - 1) / (duration * 0.9f);
         }

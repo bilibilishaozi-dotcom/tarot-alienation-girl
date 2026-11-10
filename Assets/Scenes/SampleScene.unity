@@ -252,8 +252,8 @@ MonoBehaviour:
   wallJumpForce: {x: 6, y: 12}
   inAirMoveMultiplier: 0.8
   wallSlideSlowMultiplier: 0.4
-  dashDuration: 0.25
-  dashSpeed: 20
+  dashDuration: 0.35
+  dashSpeed: 10.71
   collisionSkin: 0.05
   maxHealth: 5
   groundCheckDistance: 1.4
