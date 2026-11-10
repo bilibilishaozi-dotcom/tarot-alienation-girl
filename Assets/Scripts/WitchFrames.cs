@@ -1,12 +1,12 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 冰蓝星辉魔法少女：帧动画（idle 4 帧呼吸 / walk 8 帧行走）。
+// 冰蓝星辉魔法少女：帧动画（初始待机 8 帧 / walk 8 帧行走）。
 // 朝向由 Player.Flip() 的 Y 旋转负责，这里不做镜像。
 public class WitchFrames : MonoBehaviour
 {
     private const float PPU = 121f;      // 255px 人物 → 约 2.1 世界单位
-    private const float IdleFps = 5f;    // 4 帧待机呼吸 ≈ 0.8 秒一个循环（按 GIF 原始 200ms/帧）
+    private const float IdleFps = 5f;    // 初始待机 8 帧，每帧 200ms，和 GIF 时长一致。形态待机仍是 8fps。
     private const float FormIdleFps = 8f;  // 形态 8 帧待机 = 1 秒一个呼吸循环
     private const float FormRunFps = 16f;  // 形态 8 帧奔跑 = 0.5 秒一个步循环，接近原版奔跑
     private const float FormJumpFps = 22.5f; // 形态 9 帧起跳 ≈ 0.40 秒，播完停在末帧

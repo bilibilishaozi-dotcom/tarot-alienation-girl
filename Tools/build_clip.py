@@ -70,6 +70,25 @@ def gif_frames(path):
     return frames
 
 
+def composite_gif(path):
+    """按每帧的 disposal 合成。2 = 画完后清回透明，不把上一帧叠上来。"""
+    image = Image.open(path)
+    canvas = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    composed = []
+    for index in range(image.n_frames):
+        image.seek(index)
+        disposal = int(getattr(image, "disposal_method", 0) or 0)
+        frame = image.convert("RGBA")
+        shown = canvas.copy()
+        shown.alpha_composite(frame)
+        composed.append(shown)
+        if disposal == 2:
+            canvas = Image.new("RGBA", image.size, (0, 0, 0, 0))
+        elif disposal != 3:
+            canvas = shown
+    return composed
+
+
 def key_background(rgba):
     rgb = rgba[:, :, :3].astype(np.int16)
     alpha = rgba[:, :, 3]
@@ -113,12 +132,12 @@ def keep_parts(mask):
     return keep
 
 
-def prepare(frame):
+def prepare(frame, scale=SCALE):
     keyed = key_background(np.array(frame))
     keep = keep_parts(keyed[:, :, 3] > 20)
     keyed[:, :, 3] = np.where(keep, keyed[:, :, 3], 0)
     image = Image.fromarray(keyed, "RGBA")
-    size = (max(1, round(image.width * SCALE)), max(1, round(image.height * SCALE)))
+    size = (max(1, round(image.width * scale)), max(1, round(image.height * scale)))
     return np.array(image.resize(size, Image.Resampling.NEAREST))
 
 
@@ -173,9 +192,9 @@ def check_original():
     print("初始形态路径可用。已导入的 Anim 帧不会重写。")
 
 
-def place_clip(frames):
+def place_clip(frames, scale=SCALE):
     """一个片段共用一个裁切框和同一个偏移，帧与帧的相对位置跟 GIF 一样。"""
-    images = [prepare(frame) for frame in frames]
+    images = [prepare(frame, scale) for frame in frames]
     boxes = []
     centers = []
     feet = []
@@ -433,13 +452,70 @@ def write_forms():
         info_path.write_text(json.dumps(info, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
 
 
+def write_original_idle(gif_path):
+    """只换初始形态待机。源文件另存为 idle_new.gif，不占用用户本地的 新待机.gif。"""
+    source = Path(gif_path)
+    frames = composite_gif(source)
+    heights = []
+    for frame in frames:
+        mask = np.array(frame)[:, :, 3] > 20
+        ys, _ = np.where(mask)
+        heights.append(int(ys.max() - ys.min() + 1))
+    # 现有跑步/跳跃人物高约 205。按这套新待机的内容高缩放，换动作时人不变大变小。
+    target_height = 205
+    source_height = int(round(float(np.median(heights))))
+    scale = target_height / float(source_height)
+    sheets, pivot_x, pivot_y, below, centers = place_clip(frames, scale)
+    out_dir = ROOT / "Assets" / "Resources" / "Art" / "Witch" / "Anim"
+    for index, sheet in enumerate(sheets):
+        png_path = out_dir / f"idle_{index}.png"
+        Image.fromarray(sheet, "RGBA").save(png_path)
+        write_sprite_meta(png_path, pivot_x, pivot_y)
+    # 旧待机只有 4 帧。多出来的帧是新文件；少掉的旧帧不留，避免播到旧图。
+    for stale in out_dir.glob("idle_*.png"):
+        number = stale.stem.split("_")[-1]
+        if number.isdigit() and int(number) >= len(sheets):
+            stale.unlink()
+            meta = Path(str(stale) + ".meta")
+            if meta.exists():
+                meta.unlink()
+    info = {
+        "clip": "idle",
+        "canvas": [int(sheets[0].shape[1]), int(sheets[0].shape[0])],
+        "feetY": int(sheets[0].shape[0] - below),
+        "frames": len(sheets),
+        "pivot": [round(pivot_x, 6), round(pivot_y, 6)],
+        "source": "idle_new.gif",
+        "sourceFrames": len(frames),
+        "sourceHeight": source_height,
+        "scale": round(scale, 6),
+    }
+    (out_dir / "idle.json").write_text(json.dumps(info, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    saved = ORIGINAL_DIR / "idle_new.gif"
+    saved.write_bytes(source.read_bytes())
+    span = max(centers) - min(centers)
+    print(
+        f"original idle: {len(sheets)} frames canvas {info['canvas'][0]}x{info['canvas'][1]} "
+        f"pivot {info['pivot']} below {below} scale {scale:.4f} from height {source_height} "
+        f"cx span {span:.2f}"
+    )
+    return sheets, centers
+
+
 def main():
     import sys
     args = set(sys.argv[1:])
     if not args or "--check-original" in args:
         check_original()
-    if "--forms" in args or not args:
+    if "--forms" in args or (not args and "--original-idle" not in args):
         write_forms()
+    if "--original-idle" in args:
+        source = ORIGINAL_DIR / "idle_new.gif"
+        uploaded = Path("/home/ubuntu/.cursor/projects/workspace/uploads/new-original-idle_6606.gif")
+        gif = source if source.exists() else uploaded
+        if not gif.exists():
+            raise SystemExit("找不到初始形态的新待机 GIF")
+        write_original_idle(gif)
 
 
 if __name__ == "__main__":
