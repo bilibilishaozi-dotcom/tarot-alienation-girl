@@ -502,6 +502,50 @@ def write_original_idle(gif_path):
     return sheets, centers
 
 
+def write_original_dash(gif_path):
+    """只换初始形态冲刺。缩放跟现有 8 帧待机同一档，法杖和拖影不把人缩小。"""
+    source = Path(gif_path)
+    frames = composite_gif(source)
+    idle_info_path = ROOT / "Assets" / "Resources" / "Art" / "Witch" / "Anim" / "idle.json"
+    if idle_info_path.exists():
+        scale = float(json.loads(idle_info_path.read_text(encoding="utf-8"))["scale"])
+    else:
+        scale = 205 / 223
+    sheets, pivot_x, pivot_y, below, centers = place_clip(frames, scale)
+    out_dir = ROOT / "Assets" / "Resources" / "Art" / "Witch" / "Anim"
+    for index, sheet in enumerate(sheets):
+        png_path = out_dir / f"dash_{index}.png"
+        Image.fromarray(sheet, "RGBA").save(png_path)
+        write_sprite_meta(png_path, pivot_x, pivot_y)
+    for stale in out_dir.glob("dash_*.png"):
+        number = stale.stem.split("_")[-1]
+        if number.isdigit() and int(number) >= len(sheets):
+            stale.unlink()
+            meta = Path(str(stale) + ".meta")
+            if meta.exists():
+                meta.unlink()
+    info = {
+        "clip": "dash",
+        "canvas": [int(sheets[0].shape[1]), int(sheets[0].shape[0])],
+        "feetY": int(sheets[0].shape[0] - below),
+        "frames": len(sheets),
+        "pivot": [round(pivot_x, 6), round(pivot_y, 6)],
+        "source": "original_dash.gif",
+        "sourceFrames": len(frames),
+        "scale": round(scale, 6),
+    }
+    (out_dir / "dash.json").write_text(json.dumps(info, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    saved_dir = ORIGINAL_DIR
+    saved_dir.mkdir(parents=True, exist_ok=True)
+    saved = saved_dir / "original_dash.gif"
+    saved.write_bytes(source.read_bytes())
+    span = max(centers) - min(centers)
+    print(
+        f"original dash: {len(sheets)} frames canvas {info['canvas'][0]}x{info['canvas'][1]} "
+        f"pivot {info['pivot']} below {below} scale {scale:.4f} cx span {span:.2f} bytes {source.stat().st_size}"
+    )
+
+
 def write_fool_attacks(attack1_path, attack2_path, attack3_path):
     """愚者地面普攻三段各一套。缩放跟现有愚者待机同一档，不被刀光撑大。"""
     specs = (
@@ -765,6 +809,7 @@ def main():
         and "--fool-dash" not in args
         and "--chariot-dash" not in args
         and "--strength-dash" not in args
+        and "--original-dash" not in args
     ):
         write_forms()
     if "--original-idle" in args:
@@ -774,6 +819,16 @@ def main():
         if not gif.exists():
             raise SystemExit("找不到初始形态的新待机 GIF")
         write_original_idle(gif)
+    if "--original-dash" in args:
+        import zipfile
+        uploads = Path("/home/ubuntu/.cursor/projects/workspace/uploads")
+        archive = uploads / "original-dash_5d72.zip"
+        extracted = uploads / "original-dash.gif"
+        if not extracted.exists():
+            with zipfile.ZipFile(archive) as bundle:
+                extracted.write_bytes(bundle.read("original-dash.gif"))
+        write_original_dash(extracted)
+        return
     if "--strength-dash" in args:
         import zipfile
         uploads = Path("/home/ubuntu/.cursor/projects/workspace/uploads")

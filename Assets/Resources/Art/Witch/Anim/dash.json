@@ -1,8 +1,16 @@
 {
  "clip": "dash",
  "canvas": [
-  210,
-  230
+  255,
+  210
  ],
- "frames": 8
+ "feetY": 206,
+ "frames": 9,
+ "pivot": [
+  0.5,
+  0.533333
+ ],
+ "source": "original_dash.gif",
+ "sourceFrames": 9,
+ "scale": 0.919283
 }

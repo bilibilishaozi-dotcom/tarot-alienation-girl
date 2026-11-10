@@ -289,12 +289,10 @@ public class WitchFrames : MonoBehaviour
             return WallSlideFps;
         else if (clip == "walljump")
             return WallJumpFps;
-        else if (clip == "dash" && player != null)
-            return Mathf.Clamp(frameCount / Mathf.Max(0.12f, player.dashDuration), 12f, 32f);
-        else if (clip.EndsWith("_dash") && player != null)
+        else if ((clip == "dash" || clip.EndsWith("_dash")) && player != null)
         {
-            // 场景里冲刺是 0.25 秒。9 帧若卡在原版 32fps 上限，第 9 帧要到 0.25 秒才出现，结束时刚好被掐掉。
-            // 末帧放在时长的 90%：0.25 秒时大约 35.6fps，第 9 帧在 0.225 秒出现，末尾只停大约 0.025 秒。
+            // 场景里冲刺是 0.25 秒。原版以前卡在 32fps，8 帧刚好铺满；换成 9 帧后第 9 帧会卡在结束线上。
+            // 现在和卡牌形态一样：末帧放在时长的 90%，0.25 秒时大约 35.6fps，第 9 帧在 0.225 秒出现。
             float duration = Mathf.Max(0.12f, player.dashDuration);
             return (frameCount - 1) / (duration * 0.9f);
         }
@@ -440,7 +438,7 @@ public class WitchFrames : MonoBehaviour
                 || currentClip == "walljump"
                 || currentClip.EndsWith("_jump") || currentClip.EndsWith("_fall")
                 || currentClip.StartsWith("attack") || currentClip.Contains("_attack")
-                || currentClip.EndsWith("_dash");
+                || currentClip == "dash" || currentClip.EndsWith("_dash");
             int index;
             int airHold = AirHoldIndex(currentClip);
             if (airHold >= 0)
