@@ -139,7 +139,7 @@ public class WitchFrames : MonoBehaviour
     // 有自己普攻帧的形态按段取。没有的牌仍用原版 attack1..3。
     private string ResolveClip(string wanted)
     {
-        if (wanted == "attack1" || wanted == "attack2" || wanted == "attack3" || wanted == "airattack")
+        if (wanted == "attack1" || wanted == "attack2" || wanted == "attack3" || wanted == "airattack" || wanted == "dash")
         {
             string prefix = FormPrefix();
             if (prefix != null)
@@ -291,6 +291,13 @@ public class WitchFrames : MonoBehaviour
             return WallJumpFps;
         else if (clip == "dash" && player != null)
             return Mathf.Clamp(frameCount / Mathf.Max(0.12f, player.dashDuration), 12f, 32f);
+        else if (clip.EndsWith("_dash") && player != null)
+        {
+            // 场景里冲刺是 0.25 秒。9 帧若卡在原版 32fps 上限，第 9 帧要到 0.25 秒才出现，结束时刚好被掐掉。
+            // 末帧放在时长的 90%：0.25 秒时大约 35.6fps，第 9 帧在 0.225 秒出现，末尾只停大约 0.025 秒。
+            float duration = Mathf.Max(0.12f, player.dashDuration);
+            return (frameCount - 1) / (duration * 0.9f);
+        }
 
         bool oneShot = clip == "jump" || clip == "fall";
         if (!oneShot || player == null || player.anim == null)
@@ -432,7 +439,8 @@ public class WitchFrames : MonoBehaviour
             bool holdLast = currentClip == "jump" || currentClip == "fall" || currentClip == "hurt"
                 || currentClip == "walljump"
                 || currentClip.EndsWith("_jump") || currentClip.EndsWith("_fall")
-                || currentClip.StartsWith("attack") || currentClip.Contains("_attack");
+                || currentClip.StartsWith("attack") || currentClip.Contains("_attack")
+                || currentClip.EndsWith("_dash");
             int index;
             int airHold = AirHoldIndex(currentClip);
             if (airHold >= 0)
@@ -459,7 +467,7 @@ public class WitchFrames : MonoBehaviour
 
         // 攻击、冲刺、受击已经有完整帧，不再把整个人拧一个角度。
         float attackTilt = UseAttackFrames ? 0f : 6f * attack;
-        float dashTilt = currentClip == "dash" ? 0f : -9f * dash;
+        float dashTilt = currentClip == "dash" || currentClip.EndsWith("_dash") ? 0f : -9f * dash;
         float hurtTilt = currentClip == "hurt" ? 0f : -7f * hurt;
         float angle = attackTilt + dashTilt + hurtTilt + 78f * deathT;
         spriteTransform.localRotation = Quaternion.Euler(0f, 0f, angle);
