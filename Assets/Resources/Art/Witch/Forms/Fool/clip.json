@@ -50,5 +50,31 @@
   ],
   "belowFeet": 4,
   "frames": 9
+ },
+ "attack12": {
+  "canvas": [
+   253,
+   220
+  ],
+  "pivot": [
+   0.5,
+   0.522727
+  ],
+  "belowFeet": 7,
+  "frames": 9,
+  "scale": 0.903084
+ },
+ "attack3": {
+  "canvas": [
+   255,
+   225
+  ],
+  "pivot": [
+   0.5,
+   0.533333
+  ],
+  "belowFeet": 12,
+  "frames": 9,
+  "scale": 0.903084
  }
 }

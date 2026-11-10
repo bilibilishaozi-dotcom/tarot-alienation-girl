@@ -52,6 +52,7 @@ public class WitchFrames : MonoBehaviour
     private float hurt;
     private float deathT;
     private int airPhase;    // 0 未在空中 / 1 上升 / 2 下落
+    private int shownCombo = -1;
     private float lastVerticalSpeed;
     private bool running;    // 当前是否在播奔跑
     private float currentFps = 5f;
@@ -134,9 +135,21 @@ public class WitchFrames : MonoBehaviour
         }
     }
 
-    // 装备愚者 / 战车 / 力量时，待机、奔跑、起跳、下落用那一套。别的动作没有新帧，继续用原版。
+    // 装备愚者 / 战车 / 力量时，待机、奔跑、起跳、下落用那一套。
+    // 愚者地面普攻一二段共用 Fool_attack12，第三段用 Fool_attack3。别的牌仍用原版 attack1..3。
     private string ResolveClip(string wanted)
     {
+        if (wanted == "attack1" || wanted == "attack2" || wanted == "attack3")
+        {
+            if (FormPrefix() == "Fool")
+            {
+                string shared = wanted == "attack3" ? "Fool_attack3" : "Fool_attack12";
+                if (clips.ContainsKey(shared))
+                    return shared;
+            }
+            return wanted;
+        }
+
         if (wanted != "idle" && wanted != "run" && wanted != "jump" && wanted != "fall")
             return wanted;
 
@@ -144,6 +157,24 @@ public class WitchFrames : MonoBehaviour
         if (formKey != null && clips.ContainsKey(formKey))
             return formKey;
         return wanted;
+    }
+
+    private string FormPrefix()
+    {
+        if (player == null)
+            return null;
+
+        PlayerCardLoadout loadout = player.GetComponent<PlayerCardLoadout>();
+        if (loadout == null || loadout.EquippedCard == null)
+            return null;
+
+        if (loadout.EquippedCard.effectType == CardEffectType.FoolLunge)
+            return "Fool";
+        if (loadout.EquippedCard.effectType == CardEffectType.ChariotDash)
+            return "Chariot";
+        if (loadout.EquippedCard.effectType == CardEffectType.StrengthSlam)
+            return "Strength";
+        return null;
     }
 
     private string FormClip(string action)
@@ -155,13 +186,7 @@ public class WitchFrames : MonoBehaviour
         if (loadout == null || loadout.EquippedCard == null)
             return null;
 
-        string prefix = null;
-        if (loadout.EquippedCard.effectType == CardEffectType.FoolLunge)
-            prefix = "Fool";
-        else if (loadout.EquippedCard.effectType == CardEffectType.ChariotDash)
-            prefix = "Chariot";
-        else if (loadout.EquippedCard.effectType == CardEffectType.StrengthSlam)
-            prefix = "Strength";
+        string prefix = FormPrefix();
         if (prefix == null)
             return null;
         return prefix + "_" + action;
@@ -214,6 +239,9 @@ public class WitchFrames : MonoBehaviour
             return FormJumpFps;
         if (clip.EndsWith("_fall"))
             return FormFallFps;
+        // 愚者地面三段也是 9 帧。沿用 20fps，约 0.45 秒播完，赶在 0.48 秒的连击结束前。
+        if (clip.Contains("_attack"))
+            return AttackFps;
 
         float baseFps = IdleFps;
         if (clip == "walk") baseFps = WalkFps;
@@ -343,7 +371,18 @@ public class WitchFrames : MonoBehaviour
 
         string clipName = ResolveClip(wanted);
         bool replayJump = newHop && (clipName == "jump" || clipName.EndsWith("_jump"));
-        ApplyClip(clipName, replayJump);
+        // 一二段是同一套帧。段数变了也要从第 0 帧再播，不能接着上一段的时间。
+        bool restartCombo = false;
+        if (player.IsGroundAttacking)
+        {
+            restartCombo = player.AttackComboIndex != shownCombo;
+            shownCombo = player.AttackComboIndex;
+        }
+        else
+        {
+            shownCombo = -1;
+        }
+        ApplyClip(clipName, replayJump || restartCombo);
 
         frameTimer += dt;
         float step = 1f / Mathf.Max(1f, currentFps);
@@ -360,7 +399,7 @@ public class WitchFrames : MonoBehaviour
             bool holdLast = currentClip == "jump" || currentClip == "fall" || currentClip == "hurt"
                 || currentClip == "walljump"
                 || currentClip.EndsWith("_jump") || currentClip.EndsWith("_fall")
-                || currentClip.StartsWith("attack");
+                || currentClip.StartsWith("attack") || currentClip.Contains("_attack");
             int index;
             if (currentClip == "airattack")
                 index = Mathf.Min(frameIndex, AirAttackHoldFrame);
