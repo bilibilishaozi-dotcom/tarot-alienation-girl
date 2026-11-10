@@ -16,8 +16,8 @@ public class WitchFrames : MonoBehaviour
     private const float FallFps = 12f;   // 3 帧下落 ≈ 0.25 秒，播完停在末帧
     private const float RunFps = 14f;    // 6 帧奔跑 ≈ 0.43 秒
     private const float AttackFps = 20f; // 9 帧约 0.45 秒。不再被旧片段拉长，挥击更干脆。
-    // 空中攻击停在 airattack_1。对照目标图：一手在脸侧/胸前，杖杆接近竖直，刀光底部向右伸出。
-    // airattack_2 是杖斜横在身前、另一手垂下，不是这一帧。朝左时由角色 Y 轴翻转，不另换帧。
+    // 原版空中攻击停在 airattack_1：杖接近竖直，刀光在脚下。形态各看自己的下攻姿势，不共用这个帧号。
+    // 朝左时由角色 Y 轴翻转，不另换帧。
     private const int AirAttackHoldFrame = 1;
 
     // LateUpdate 真正画出这一帧之后才为真。状态机的 Update 在它前面，不能拿同一帧的判断去退状态。
@@ -139,7 +139,7 @@ public class WitchFrames : MonoBehaviour
     // 有自己普攻帧的形态按段取。没有的牌仍用原版 attack1..3。
     private string ResolveClip(string wanted)
     {
-        if (wanted == "attack1" || wanted == "attack2" || wanted == "attack3")
+        if (wanted == "attack1" || wanted == "attack2" || wanted == "attack3" || wanted == "airattack")
         {
             string prefix = FormPrefix();
             if (prefix != null)
@@ -193,6 +193,31 @@ public class WitchFrames : MonoBehaviour
         return prefix + "_" + action;
     }
 
+    private bool HasAirAttackClip()
+    {
+        if (clips.ContainsKey("airattack"))
+            return true;
+        string prefix = FormPrefix();
+        return prefix != null && clips.ContainsKey(prefix + "_airattack");
+    }
+
+    // 不是空中攻击片段时返回 -1。帧号是对着合成后的角色姿势定的，不是沿用原版的 1。
+    // 愚者 1：金白色下弧已经兜到身前，法杖斜指向下。第 2 帧是爆开的星光，不拿来停。
+    // 战车 4：枪尖压到最下，蓝色月弧贴着枪身。第 5 帧枪身抬平，是跟着出去的那一下。
+    // 力量 3：双爪带着三道爪痕挥向下方。第 4 帧爪已经收到身前，爪痕在收。
+    private int AirHoldIndex(string clip)
+    {
+        if (clip == "Fool_airattack")
+            return 1;
+        if (clip == "Chariot_airattack")
+            return 4;
+        if (clip == "Strength_airattack")
+            return 3;
+        if (clip == "airattack")
+            return AirAttackHoldFrame;
+        return -1;
+    }
+
     // 重开本关、牌装回来之后调用。脚底已经按原版待机吸过一次，这里只换图。
     public void SyncForm()
     {
@@ -240,6 +265,9 @@ public class WitchFrames : MonoBehaviour
             return FormJumpFps;
         if (clip.EndsWith("_fall"))
             return FormFallFps;
+        // 空中攻击只播到各自的下攻帧就停。20fps 下愚者约 0.05 秒、力量约 0.15 秒、战车约 0.20 秒到保持帧。
+        if (clip == "airattack" || clip.EndsWith("_airattack"))
+            return AttackFps;
         // 一二段：动画事件和最短时间都是 0.48 秒，没有额外收招。9 帧用 20fps，约 0.45 秒播完。
         // 第三段：事件在 0.48 秒，Player_BasicAttack_3 之后还有 0.28 秒收招，一共约 0.76 秒才回待机。
         // 9 帧若用 20fps，0.40 秒就到末帧，收招里会停大约 0.36 秒。有自己第三段的形态才放慢显示。
@@ -340,7 +368,7 @@ public class WitchFrames : MonoBehaviour
                 playingAttack = true;
             }
         }
-        else if (UseAttackFrames && !player.IsDefeated && player.IsAirAttack && clips.ContainsKey("airattack")
+        else if (UseAttackFrames && !player.IsDefeated && player.IsAirAttack && HasAirAttackClip()
             && !player.groundDetected && !player.supportDetected)
         {
             // 只在还没落地时播。落地后状态还要等动画事件才退出，画面应立刻回到待机。
@@ -406,14 +434,16 @@ public class WitchFrames : MonoBehaviour
                 || currentClip.EndsWith("_jump") || currentClip.EndsWith("_fall")
                 || currentClip.StartsWith("attack") || currentClip.Contains("_attack");
             int index;
-            if (currentClip == "airattack")
-                index = Mathf.Min(frameIndex, AirAttackHoldFrame);
+            int airHold = AirHoldIndex(currentClip);
+            if (airHold >= 0)
+                index = Mathf.Min(frameIndex, airHold);
             else if (holdLast)
                 index = Mathf.Min(frameIndex, frames.Length - 1);
             else
                 index = frameIndex % frames.Length;
             renderer.sprite = frames[index];
-            AirAttackHoldVisible = currentClip == "airattack" && index >= AirAttackHoldFrame;
+            // 画到这一形态自己的下攻帧之后才算保持姿势。判定框要等这个标记，不能看片段名是否正好叫 airattack。
+            AirAttackHoldVisible = airHold >= 0 && index >= airHold;
         }
         else
         {

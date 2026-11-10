@@ -622,6 +622,38 @@ def write_strength_attacks(attack1_path, attack2_path, attack3_path):
     info_path.write_text(json.dumps(info, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
 
 
+def write_form_airattack(form, folder_name, gif_path, saved_name):
+    """一个形态的空中攻击。缩放跟该形态待机同一档，武器和刀光不把人缩小。"""
+    out_dir = FORM_OUT / form
+    out_dir.mkdir(parents=True, exist_ok=True)
+    info_path = out_dir / "clip.json"
+    info = json.loads(info_path.read_text(encoding="utf-8")) if info_path.exists() else {"form": form}
+    source = Path(gif_path)
+    frames = composite_gif(source)
+    sheets, pivot_x, pivot_y, below, centers = place_clip(frames, SCALE)
+    for index, sheet in enumerate(sheets):
+        png_path = out_dir / f"airattack_{index}.png"
+        Image.fromarray(sheet, "RGBA").save(png_path)
+        write_sprite_meta(png_path, pivot_x, pivot_y)
+    info["airattack"] = {
+        "canvas": [int(sheets[0].shape[1]), int(sheets[0].shape[0])],
+        "pivot": [round(pivot_x, 6), round(pivot_y, 6)],
+        "belowFeet": int(below),
+        "frames": len(sheets),
+        "scale": round(SCALE, 6),
+    }
+    saved_dir = INCOMING / folder_name
+    saved_dir.mkdir(parents=True, exist_ok=True)
+    saved = saved_dir / saved_name
+    saved.write_bytes(source.read_bytes())
+    span = max(centers) - min(centers)
+    print(
+        f"{form} airattack: {len(sheets)} frames canvas {info['airattack']['canvas'][0]}x{info['airattack']['canvas'][1]} "
+        f"pivot {info['airattack']['pivot']} below {below} cx span {span:.2f} bytes {source.stat().st_size}"
+    )
+    info_path.write_text(json.dumps(info, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+
+
 def main():
     import sys
     args = set(sys.argv[1:])
@@ -633,6 +665,7 @@ def main():
         and "--fool-attack" not in args
         and "--chariot-attack" not in args
         and "--strength-attack" not in args
+        and "--form-airattack" not in args
     ):
         write_forms()
     if "--original-idle" in args:
@@ -642,6 +675,12 @@ def main():
         if not gif.exists():
             raise SystemExit("找不到初始形态的新待机 GIF")
         write_original_idle(gif)
+    if "--form-airattack" in args:
+        uploads = Path("/home/ubuntu/.cursor/projects/workspace/uploads")
+        write_form_airattack("Fool", "愚者", uploads / "fool-airattack_e8f1.gif", "fool_airattack.gif")
+        write_form_airattack("Chariot", "战车", uploads / "chariot-airattack_c798.gif", "chariot_airattack.gif")
+        write_form_airattack("Strength", "力量", uploads / "strength-airattack_c152.gif", "strength_airattack.gif")
+        return
     if "--strength-attack" in args:
         uploads = Path("/home/ubuntu/.cursor/projects/workspace/uploads")
         write_strength_attacks(

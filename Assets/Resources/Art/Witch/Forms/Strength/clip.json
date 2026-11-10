@@ -89,5 +89,18 @@
   "belowFeet": 4,
   "frames": 9,
   "scale": 0.903084
+ },
+ "airattack": {
+  "canvas": [
+   243,
+   225
+  ],
+  "pivot": [
+   0.5,
+   0.568889
+  ],
+  "belowFeet": 20,
+  "frames": 9,
+  "scale": 0.903084
  }
 }
