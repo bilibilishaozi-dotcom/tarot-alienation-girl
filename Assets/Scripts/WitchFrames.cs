@@ -16,9 +16,9 @@ public class WitchFrames : MonoBehaviour
     private const float FallFps = 12f;   // 3 帧下落 ≈ 0.25 秒，播完停在末帧
     private const float RunFps = 14f;    // 6 帧奔跑 ≈ 0.43 秒
     private const float AttackFps = 20f; // 9 帧约 0.45 秒。不再被旧片段拉长，挥击更干脆。
-    // 空中攻击停在刀光朝下的那一帧。量过 airattack_0..8 的亮色刀光重心：
-    // 0 偏右，1 右下，2 几乎正在身体正下方（dx≈0，角度约 +92°），3 起转到左下，后面举过头顶。
-    private const int AirAttackHoldFrame = 2;
+    // 空中攻击停在 airattack_1。对照目标图：一手在脸侧/胸前，杖杆接近竖直，刀光底部向右伸出。
+    // airattack_2 是杖斜横在身前、另一手垂下，不是这一帧。朝左时由角色 Y 轴翻转，不另换帧。
+    private const int AirAttackHoldFrame = 1;
     private const float HurtFps = 16f;   // 9 帧受击约 0.56 秒，之后停在最后一帧
     private const float WallSlideFps = 5f; // 9 帧滑墙，按 GIF 的 200 毫秒一帧循环
     private const float WallJumpFps = 36f; // 9 帧约 0.25 秒，蹬出更快，剩下的上升停在最后一帧
