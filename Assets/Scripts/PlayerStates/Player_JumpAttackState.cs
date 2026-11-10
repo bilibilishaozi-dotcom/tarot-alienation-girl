@@ -48,8 +48,9 @@ public class Player_JumpAttackState : EntityState
             return;
         }
 
-        // 碰地或踩到敌人/箱子都算落地。落地后回地面状态，不再等动画事件。
-        bool landed = player.groundDetected || player.supportDetected;
+        // 上升时擦到敌人头顶不算落地，否则贴着敌人跳攻会立刻被判着地而退出。
+        // 和坠落落地同一条：地面，或已经向下并且踩到能站住的东西。
+        bool landed = player.groundDetected || (player.supportDetected && rb.linearVelocity.y <= 0.05f);
         if (landed && touchedGround == false)
         {
             touchedGround = true;

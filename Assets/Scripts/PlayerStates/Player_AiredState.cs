@@ -19,15 +19,26 @@ public class Player_AiredState : EntityState
             return;
         }
 
-        // 按下沿只在按下的那一帧为真，按住不会连进。同一滞空用掉后，再按也不再进。
-        if (input.Player.Attack.WasPressedThisFrame())
+        if (player.AttackPressedRecently)
+            player.ArmAirAttack();
+
+        // 还贴着地时只挂起，不消耗次数。离地后才进入一次。按住不会连进。
+        if (!player.AirAttackArmed)
+            return;
+
+        if (!player.CanAirAttack)
         {
-            if (player.CanAirAttack)
-            {
-                player.SpendAirAttack();
-                stateMachine.ChangeState(player.jumpAttackState);
-            }
+            player.ClearAirAttackArm();
+            player.ConsumeAttackPress();
             return;
         }
+
+        if (player.groundDetected)
+            return;
+
+        player.ClearAirAttackArm();
+        player.ConsumeAttackPress();
+        player.SpendAirAttack();
+        stateMachine.ChangeState(player.jumpAttackState);
     }
 }

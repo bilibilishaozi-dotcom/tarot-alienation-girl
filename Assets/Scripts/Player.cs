@@ -293,6 +293,8 @@ public class Player : MonoBehaviour
             RestoreFullHealth();
         }
 
+        // 先记下这一帧的跳和攻击，地面和空中用同一份，避免同帧只处理跳把攻击丢掉。
+        NoteCombatPresses();
         //每帧检测地面、墙壁
         TickHurtTimers();
         HandleCollisionDetection();
@@ -347,7 +349,47 @@ public class Player : MonoBehaviour
 
     // 一次离开地面只允许一次空中攻击。落地进地面状态才恢复，下落和二段跳不恢复。
     private bool airAttackSpent;
+    private bool airAttackArmed;
+    private int jumpPressFrame = -1;
+    private int attackPressFrame = -1;
+    private const int CoupleFrames = 1;
+
     public bool CanAirAttack => !airAttackSpent;
+    public bool AirAttackArmed => airAttackArmed;
+    public bool JumpPressedRecently => jumpPressFrame >= 0 && Time.frameCount - jumpPressFrame <= CoupleFrames;
+    public bool AttackPressedRecently => attackPressFrame >= 0 && Time.frameCount - attackPressFrame <= CoupleFrames;
+    public int AttackPressAge => attackPressFrame < 0 ? 999 : Time.frameCount - attackPressFrame;
+
+    private void NoteCombatPresses()
+    {
+        if (input == null)
+            return;
+
+        if (input.Player.Jump.WasPressedThisFrame())
+            jumpPressFrame = Time.frameCount;
+        if (input.Player.Attack.WasPressedThisFrame())
+            attackPressFrame = Time.frameCount;
+    }
+
+    public void ConsumeJumpPress()
+    {
+        jumpPressFrame = -1;
+    }
+
+    public void ConsumeAttackPress()
+    {
+        attackPressFrame = -1;
+    }
+
+    public void ArmAirAttack()
+    {
+        airAttackArmed = true;
+    }
+
+    public void ClearAirAttackArm()
+    {
+        airAttackArmed = false;
+    }
 
     public void SpendAirAttack()
     {

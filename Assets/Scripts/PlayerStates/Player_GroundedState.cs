@@ -12,6 +12,7 @@ public class Player_GroundedState : EntityState
         player.RestoreFoolLeap();
         // 真正落地才把空中攻击还回来。下落、二段跳、贴墙都不走这里。
         player.RestoreAirAttack();
+        player.ClearAirAttackArm();
     }
 
     public override void Update()
@@ -28,13 +29,21 @@ public class Player_GroundedState : EntityState
             return;
         }
 
-        if ((player.groundDetected || player.supportDetected) && input.Player.Jump.WasPerformedThisFrame())
+        // 跳和攻击同一帧或紧邻的一帧：先跳，攻击留到离地后打。不要在地上把这次攻击打出去。
+        if ((player.groundDetected || player.supportDetected) && player.JumpPressedRecently)
         {
+            if (player.AttackPressedRecently)
+                player.ArmAirAttack();
+            player.ConsumeJumpPress();
             stateMachine.ChangeState(player.jumpState);
             return;
         }
 
-        if (input.Player.Attack.WasPerformedThisFrame())
+        // 按下的这一帧先等跳跃。下一帧还没有跳，才是地面攻击。
+        if (player.AttackPressedRecently && player.AttackPressAge >= 1)
+        {
+            player.ConsumeAttackPress();
             stateMachine.ChangeState(player.basicAttackState);
+        }
     }
 }
