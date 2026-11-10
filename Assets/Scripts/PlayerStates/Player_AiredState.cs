@@ -19,7 +19,15 @@ public class Player_AiredState : EntityState
             return;
         }
 
+        // 按下沿只在按下的那一帧为真，按住不会连进。同一滞空用掉后，再按也不再进。
         if (input.Player.Attack.WasPressedThisFrame())
-            stateMachine.ChangeState(player.jumpAttackState);
+        {
+            if (player.CanAirAttack)
+            {
+                player.SpendAirAttack();
+                stateMachine.ChangeState(player.jumpAttackState);
+            }
+            return;
+        }
     }
 }

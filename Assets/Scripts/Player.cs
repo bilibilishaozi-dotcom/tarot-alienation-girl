@@ -345,6 +345,20 @@ public class Player : MonoBehaviour
     public bool AttackSwingActive { get; private set; }
     public bool AttackHasHit { get; private set; }
 
+    // 一次离开地面只允许一次空中攻击。落地进地面状态才恢复，下落和二段跳不恢复。
+    private bool airAttackSpent;
+    public bool CanAirAttack => !airAttackSpent;
+
+    public void SpendAirAttack()
+    {
+        airAttackSpent = true;
+    }
+
+    public void RestoreAirAttack()
+    {
+        airAttackSpent = false;
+    }
+
     public void NotifyAttackHit()
     {
         AttackHasHit = true;

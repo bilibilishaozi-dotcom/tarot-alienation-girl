@@ -10,6 +10,8 @@ public class Player_GroundedState : EntityState
     {
         base.Enter();
         player.RestoreFoolLeap();
+        // 真正落地才把空中攻击还回来。下落、二段跳、贴墙都不走这里。
+        player.RestoreAirAttack();
     }
 
     public override void Update()
