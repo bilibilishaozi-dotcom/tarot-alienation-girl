@@ -19,6 +19,9 @@ public class WitchFrames : MonoBehaviour
     // 空中攻击停在 airattack_1。对照目标图：一手在脸侧/胸前，杖杆接近竖直，刀光底部向右伸出。
     // airattack_2 是杖斜横在身前、另一手垂下，不是这一帧。朝左时由角色 Y 轴翻转，不另换帧。
     private const int AirAttackHoldFrame = 1;
+
+    // LateUpdate 真正画出这一帧之后才为真。状态机的 Update 在它前面，不能拿同一帧的判断去退状态。
+    public bool AirAttackHoldVisible { get; private set; }
     private const float HurtFps = 16f;   // 9 帧受击约 0.56 秒，之后停在最后一帧
     private const float WallSlideFps = 5f; // 9 帧滑墙，按 GIF 的 200 毫秒一帧循环
     private const float WallJumpFps = 36f; // 9 帧约 0.25 秒，蹬出更快，剩下的上升停在最后一帧
@@ -244,6 +247,7 @@ public class WitchFrames : MonoBehaviour
         if (player == null || renderer == null || spriteTransform == null)
             return;
 
+        AirAttackHoldVisible = false;
         float dt = Time.deltaTime;
 
         bool moving = player.IsMoving && player.groundDetected && !player.IsDefeated;
@@ -365,6 +369,11 @@ public class WitchFrames : MonoBehaviour
             else
                 index = frameIndex % frames.Length;
             renderer.sprite = frames[index];
+            AirAttackHoldVisible = currentClip == "airattack" && index >= AirAttackHoldFrame;
+        }
+        else
+        {
+            AirAttackHoldVisible = false;
         }
 
         attack = Mathf.MoveTowards(attack, player.IsAttacking ? 1f : 0f, dt * (player.IsAttacking ? 18f : 8f));

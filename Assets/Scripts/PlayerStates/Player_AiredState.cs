@@ -28,6 +28,7 @@ public class Player_AiredState : EntityState
 
         if (!player.CanAirAttack)
         {
+            AirAttackTrace.Log("拒绝空中攻击 这一跳已经用过");
             player.ClearAirAttackArm();
             player.ConsumeAttackPress();
             return;
@@ -39,6 +40,7 @@ public class Player_AiredState : EntityState
         player.ClearAirAttackArm();
         player.ConsumeAttackPress();
         player.SpendAirAttack();
+        AirAttackTrace.Log("接受空中攻击");
         stateMachine.ChangeState(player.jumpAttackState);
     }
 }

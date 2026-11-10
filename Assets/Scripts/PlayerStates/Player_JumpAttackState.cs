@@ -2,12 +2,9 @@ using UnityEngine;
 
 public class Player_JumpAttackState : EntityState
 {
-    private const float HitStart = 0.06f;
-
     private bool touchedGround;
     private bool swingActive;
     private bool hurtOnEnter;
-    private float elapsed;
 
     public Player_JumpAttackState(Player player, StateMachine stateMachine, string animBoolName) : base(player, stateMachine, animBoolName)
     {
@@ -18,8 +15,10 @@ public class Player_JumpAttackState : EntityState
         touchedGround = false;
         swingActive = false;
         hurtOnEnter = player.IsHurtNow;
-        elapsed = 0f;
+        // 上一次打中留下的标记不能带到这次。否则一进状态、刀光还没画出来就被判成已经命中。
+        player.ClearAttackHit();
         player.basicAttackState.ResetCombo();
+        AirAttackTrace.Log("进入跳跃攻击");
 
         float drop = player.HasLandingSlam ? -15f : player.jumpAttackVelocity.y;
         player.SetVelocity(player.jumpAttackVelocity.x * player.AttackLungeMultiplier * player.facingDir, drop);
@@ -30,47 +29,65 @@ public class Player_JumpAttackState : EntityState
         if (stateMachine.currentState != this)
             return;
 
-        elapsed += Time.deltaTime;
-        UpdateHitWindow();
+        bool poseVisible = AirAttackPoseVisible();
+        UpdateHitWindow(poseVisible);
 
         // 死亡，或攻击过程中新挨的打，立刻离开，避免停在这个状态里出不去。
         // 进状态时已经在受伤闪烁里的，不把这次攻击直接取消。
-        if (player.IsDefeated || (!hurtOnEnter && player.IsHurtNow))
+        if (player.IsDefeated)
         {
-            ReleaseToMovement(false);
+            ReleaseToMovement(false, "死亡");
             return;
         }
 
-        // 打中就结束。判定框里同一目标只会记一次，不会在停住的姿势上每帧再打。
-        if (player.AttackHasHit)
+        if (!hurtOnEnter && player.IsHurtNow)
         {
-            ReleaseToMovement(false);
+            ReleaseToMovement(false, "受伤");
             return;
         }
 
-        // 上升时擦到敌人头顶不算落地，否则贴着敌人跳攻会立刻被判着地而退出。
-        // 和坠落落地同一条：地面，或已经向下并且踩到能站住的东西。
-        bool landed = player.groundDetected || (player.supportDetected && rb.linearVelocity.y <= 0.05f);
-        if (landed && touchedGround == false)
+        // 刀光帧已经画出来之后的命中才算这次攻击打中。判定框也是到这一帧才打开。
+        if (poseVisible && player.AttackHasHit)
+        {
+            ReleaseToMovement(false, "命中 " + player.LastAttackHitName);
+            return;
+        }
+
+        // 真正踩到地面可以马上结束。脚下的敌人要等刀光帧出来、并且人已经往下，才算落地。
+        // 否则贴着敌人起跳，刀光还没画出来就被判成着地退出。
+        bool onFloor = player.groundDetected;
+        bool onSupport = poseVisible && player.supportDetected && rb.linearVelocity.y <= 0.05f;
+        if ((onFloor || onSupport) && touchedGround == false)
         {
             touchedGround = true;
             if (player.HasLandingSlam)
                 player.PlayLandingSlam();
-            ReleaseToMovement(true);
+            ReleaseToMovement(true, onFloor ? "落地" : "踩到支撑");
         }
     }
 
-    // 还在空中就回下落（画面仍按竖直速度播 jump 或 fall）。着地回待机，待机里再切跑步。
-    private void ReleaseToMovement(bool landed)
+    // WitchFrames 在 LateUpdate 里画。这里读到的是上一帧已经画出来的结果。
+    private bool AirAttackPoseVisible()
     {
+        WitchFrames frames = player.GetComponentInChildren<WitchFrames>(true);
+        return frames != null && frames.AirAttackHoldVisible;
+    }
+
+    // 还在空中就回下落（画面仍按竖直速度播 jump 或 fall）。着地回待机，待机里再切跑步。
+    private void ReleaseToMovement(bool landed, string reason)
+    {
+        AirAttackTrace.Log("退出跳跃攻击 " + reason
+            + " 地面=" + player.groundDetected
+            + " 支撑=" + player.supportDetected
+            + " vy=" + rb.linearVelocity.y.ToString("0.00"));
         EndSwing();
         bool onGround = landed || player.groundDetected || player.supportDetected;
         stateMachine.ChangeState(onGround ? player.idleState : player.fallState);
     }
 
-    private void UpdateHitWindow()
+    private void UpdateHitWindow(bool poseVisible)
     {
-        bool inWindow = !touchedGround && elapsed >= HitStart;
+        bool inWindow = !touchedGround && poseVisible;
         if (inWindow && !swingActive)
         {
             swingActive = true;

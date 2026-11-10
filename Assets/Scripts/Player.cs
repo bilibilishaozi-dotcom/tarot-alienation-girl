@@ -401,9 +401,18 @@ public class Player : MonoBehaviour
         airAttackSpent = false;
     }
 
-    public void NotifyAttackHit()
+    public string LastAttackHitName { get; private set; }
+
+    public void NotifyAttackHit(string targetName)
     {
         AttackHasHit = true;
+        LastAttackHitName = targetName;
+    }
+
+    public void ClearAttackHit()
+    {
+        AttackHasHit = false;
+        LastAttackHitName = "";
     }
 
     public void BeginAttackSwing()
