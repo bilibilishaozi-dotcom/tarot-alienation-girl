@@ -42,7 +42,6 @@ MIN_PART = 24
 # 初始形态/ 里的 GIF。帧数和已经导入的 Anim 一致。攻击重砸那张朝西，当初是水平翻转后才入库的。
 ORIGINAL_CLIPS = (
     ("idle", "Idle_breathing-idle_south-east.gif", 4, False),
-    ("walk", "Idle_v3_walking_east.gif", 8, False),
     ("run", "Idle_running-6-frames_south-east.gif", 6, False),
     ("jump", "Idle_two-footed-jump_south-east.gif", 7, False),
     ("dash", "Idle_v3_full_sprinting_east.gif", 8, False),

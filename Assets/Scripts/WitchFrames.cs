@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 冰蓝星辉魔法少女：帧动画（初始待机 8 帧 / walk 8 帧行走）。
+// 冰蓝星辉魔法少女：帧动画（初始待机 8 帧，地面移动用奔跑）。
 // 朝向由 Player.Flip() 的 Y 旋转负责，这里不做镜像。
 public class WitchFrames : MonoBehaviour
 {
@@ -11,7 +11,6 @@ public class WitchFrames : MonoBehaviour
     private const float FormRunFps = 16f;  // 形态 8 帧奔跑 = 0.5 秒一个步循环，接近原版奔跑
     private const float FormJumpFps = 22.5f; // 形态 9 帧起跳 ≈ 0.40 秒，播完停在末帧
     private const float FormFallFps = 20f;   // 形态 9 帧下落 ≈ 0.45 秒，播完停在末帧
-    private const float WalkFps = 9f;    // 8 帧 ≈ 0.9 秒一个步循环
     private const float JumpFps = 12f;   // 4 帧起跳 ≈ 0.33 秒
     private const float FallFps = 12f;   // 3 帧下落 ≈ 0.25 秒，播完停在末帧
     private const float RunFps = 14f;    // 6 帧奔跑 ≈ 0.43 秒
@@ -29,10 +28,6 @@ public class WitchFrames : MonoBehaviour
     private const bool UseAttackFrames = true;
     // 视觉上让脚「压进」地面一点点（像素靴底有描边，贴齐反而显浮）
     private const float GroundSink = 0.03f;
-    // 走路/奔跑的切换速度（玩家 moveSpeed = 8，冲刺另算）
-    private const float RunEnterSpeed = 5f;
-    private const float RunExitSpeed = 3.5f;
-
     [SerializeField] private int sortingOrder = 10;
     [SerializeField] private string sortingLayer = "Player";
     [SerializeField] private float feetLocalY = -1.33f;
@@ -54,7 +49,6 @@ public class WitchFrames : MonoBehaviour
     private int airPhase;    // 0 未在空中 / 1 上升 / 2 下落
     private int shownCombo = -1;
     private float lastVerticalSpeed;
-    private bool running;    // 当前是否在播奔跑
     private float currentFps = 5f;
 
     public static WitchFrames Attach(Player owner, float feetY)
@@ -277,8 +271,7 @@ public class WitchFrames : MonoBehaviour
             return AttackFps;
 
         float baseFps = IdleFps;
-        if (clip == "walk") baseFps = WalkFps;
-        else if (clip == "run") baseFps = RunFps;
+        if (clip == "run") baseFps = RunFps;
         else if (clip == "jump") baseFps = JumpFps;
         else if (clip == "fall") baseFps = FallFps;
         else if (clip.StartsWith("attack") || clip == "airattack")
@@ -383,28 +376,20 @@ public class WitchFrames : MonoBehaviour
 
         bool jumpStrikeLanded = player.IsAirAttack && (player.groundDetected || player.supportDetected);
 
-        if (playingAttack || playingSpecial || jumpStrikeLanded)
+        if (!playingAttack && !playingSpecial && !jumpStrikeLanded)
         {
-            running = false;
-        }
-        else if (airborne)
-        {
-            // 上升用「向上发力」那几帧，下落用「向下发力」那几帧，各播一次停在末帧
-            if (airPhase == 1 && clips.ContainsKey("jump")) wanted = "jump";
-            else if (airPhase == 2 && clips.ContainsKey("fall")) wanted = "fall";
-            else if (clips.ContainsKey("jump")) wanted = "jump";
-        }
-        else if (moving)
-        {
-            // 慢走 / 快跑：带一点迟滞，避免在阈值附近来回切
-            float speed = player.HorizontalSpeed;
-            float threshold = running ? RunExitSpeed : RunEnterSpeed;
-            running = speed > threshold;
-            wanted = running && clips.ContainsKey("run") ? "run" : "walk";
-        }
-        else
-        {
-            running = false;
+            if (airborne)
+            {
+                // 上升用「向上发力」那几帧，下落用「向下发力」那几帧，各播一次停在末帧
+                if (airPhase == 1 && clips.ContainsKey("jump")) wanted = "jump";
+                else if (airPhase == 2 && clips.ContainsKey("fall")) wanted = "fall";
+                else if (clips.ContainsKey("jump")) wanted = "jump";
+            }
+            else if (moving)
+            {
+                // 地面上只要在移动就播奔跑。慢走和快跑不再分两套图。
+                wanted = clips.ContainsKey("run") ? "run" : "idle";
+            }
         }
 
         string clipName = ResolveClip(wanted);
