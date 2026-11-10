@@ -51,7 +51,33 @@
   "belowFeet": 4,
   "frames": 9
  },
- "attack12": {
+ "attack3": {
+  "canvas": [
+   251,
+   235
+  ],
+  "pivot": [
+   0.5,
+   0.540426
+  ],
+  "belowFeet": 19,
+  "frames": 9,
+  "scale": 0.903084
+ },
+ "attack1": {
+  "canvas": [
+   241,
+   212
+  ],
+  "pivot": [
+   0.5,
+   0.518868
+  ],
+  "belowFeet": 2,
+  "frames": 9,
+  "scale": 0.903084
+ },
+ "attack2": {
   "canvas": [
    253,
    220
@@ -61,19 +87,6 @@
    0.522727
   ],
   "belowFeet": 7,
-  "frames": 9,
-  "scale": 0.903084
- },
- "attack3": {
-  "canvas": [
-   255,
-   225
-  ],
-  "pivot": [
-   0.5,
-   0.533333
-  ],
-  "belowFeet": 12,
   "frames": 9,
   "scale": 0.903084
  }

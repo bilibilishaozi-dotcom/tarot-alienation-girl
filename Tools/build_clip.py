@@ -502,16 +502,23 @@ def write_original_idle(gif_path):
     return sheets, centers
 
 
-def write_fool_attacks(attack12_path, attack3_path):
-    """愚者地面普攻。一二段共用一套帧，第三段另一套。缩放跟现有愚者待机同一档，不被刀光撑大。"""
+def write_fool_attacks(attack1_path, attack2_path, attack3_path):
+    """愚者地面普攻三段各一套。缩放跟现有愚者待机同一档，不被刀光撑大。"""
     specs = (
-        ("attack12", attack12_path),
+        ("attack1", attack1_path),
+        ("attack2", attack2_path),
         ("attack3", attack3_path),
     )
     out_dir = FORM_OUT / "Fool"
     out_dir.mkdir(parents=True, exist_ok=True)
     info_path = out_dir / "clip.json"
     info = json.loads(info_path.read_text(encoding="utf-8")) if info_path.exists() else {"form": "Fool"}
+    info.pop("attack12", None)
+    for stale in out_dir.glob("attack12_*.png"):
+        stale.unlink()
+        meta = Path(str(stale) + ".meta")
+        if meta.exists():
+            meta.unlink()
     saved_dir = INCOMING / "愚者"
     saved_dir.mkdir(parents=True, exist_ok=True)
     for clip_name, gif_path in specs:
@@ -556,8 +563,9 @@ def main():
     if "--fool-attack" in args:
         uploads = Path("/home/ubuntu/.cursor/projects/workspace/uploads")
         write_fool_attacks(
-            uploads / "fool-attack12_ec64.gif",
-            uploads / "fool-attack3_ba40.gif",
+            uploads / "fool-attack1-v2_83b0.gif",
+            uploads / "fool-attack2-v2_f380.gif",
+            uploads / "fool-attack3-v2_c17a.gif",
         )
 
 
