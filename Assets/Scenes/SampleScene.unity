@@ -253,7 +253,7 @@ MonoBehaviour:
   inAirMoveMultiplier: 0.8
   wallSlideSlowMultiplier: 0.4
   dashDuration: 0.35
-  dashSpeed: 10.71
+  dashSpeed: 13
   collisionSkin: 0.05
   maxHealth: 5
   groundCheckDistance: 1.4
