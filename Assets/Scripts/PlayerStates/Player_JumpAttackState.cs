@@ -2,9 +2,18 @@ using UnityEngine;
 
 public class Player_JumpAttackState : EntityState
 {
+    // 力量原来一进状态就把竖直速度设成 -15。挥到第 3 帧要大约 0.15 秒，这段时间能掉下去大约两个身位，爪击还没画出来人已经落地。
+    private const float StrengthSlamSpeed = -15f;
+    // 正常大约 0.15 秒就画出爪击。到点还没画出来也要下砸，不能一直停在空中。
+    private const float StrengthWindupLimit = 0.35f;
+
     private bool touchedGround;
     private bool swingActive;
     private bool hurtOnEnter;
+    private bool strengthDropWaiting;
+    private bool strengthGravityHeld;
+    private float strengthSavedGravity;
+    private float strengthWindupTime;
 
     public Player_JumpAttackState(Player player, StateMachine stateMachine, string animBoolName) : base(player, stateMachine, animBoolName)
     {
@@ -20,7 +29,19 @@ public class Player_JumpAttackState : EntityState
         player.basicAttackState.ResetCombo();
         AirAttackTrace.Log("进入跳跃攻击");
 
-        float drop = player.HasLandingSlam ? -15f : player.jumpAttackVelocity.y;
+        strengthDropWaiting = false;
+        strengthGravityHeld = false;
+        float drop = player.jumpAttackVelocity.y;
+        if (player.HasLandingSlam)
+        {
+            // 只停力量这一下的起手。爪击帧画出来之后再按原来的 -15 下砸。重力先关掉，避免这 0.15 秒被拽到地上。
+            strengthDropWaiting = true;
+            strengthWindupTime = 0f;
+            strengthSavedGravity = rb.gravityScale;
+            rb.gravityScale = 0f;
+            strengthGravityHeld = true;
+            drop = 0f;
+        }
         player.SetVelocity(player.jumpAttackVelocity.x * player.AttackLungeMultiplier * player.facingDir, drop);
     }
     public override void Update()
@@ -30,6 +51,7 @@ public class Player_JumpAttackState : EntityState
             return;
 
         bool poseVisible = AirAttackPoseVisible();
+        UpdateStrengthDrop(poseVisible);
         UpdateHitWindow(poseVisible);
 
         // 死亡，或攻击过程中新挨的打，立刻离开，避免停在这个状态里出不去。
@@ -64,6 +86,34 @@ public class Player_JumpAttackState : EntityState
                 player.PlayLandingSlam();
             ReleaseToMovement(true, onFloor ? "落地" : "踩到支撑");
         }
+    }
+
+    // 力量起手悬着。WitchFrames 画出第 3 帧之后的下一帧，这里才看到，然后恢复重力并下砸。
+    private void UpdateStrengthDrop(bool poseVisible)
+    {
+        if (!strengthDropWaiting)
+            return;
+
+        strengthWindupTime += Time.deltaTime;
+        if (!poseVisible && strengthWindupTime < StrengthWindupLimit)
+        {
+            player.SetVelocity(rb.linearVelocity.x, 0f);
+            return;
+        }
+
+        strengthDropWaiting = false;
+        RestoreStrengthGravity();
+        player.SetVelocity(rb.linearVelocity.x, StrengthSlamSpeed);
+        AirAttackTrace.Log(poseVisible ? "力量挥爪已画出，开始下砸" : "力量起手超时，开始下砸");
+    }
+
+    private void RestoreStrengthGravity()
+    {
+        if (!strengthGravityHeld)
+            return;
+
+        rb.gravityScale = strengthSavedGravity;
+        strengthGravityHeld = false;
     }
 
     // WitchFrames 在 LateUpdate 里画。这里读到的是上一帧已经画出来的结果。
@@ -108,6 +158,9 @@ public class Player_JumpAttackState : EntityState
     public override void Exit()
     {
         base.Exit();
+        // 受伤、死亡、落地、冲刺打断都走这里。没下砸也要把重力还回去。
+        strengthDropWaiting = false;
+        RestoreStrengthGravity();
         player.EndAttackSwing();
     }
 }
