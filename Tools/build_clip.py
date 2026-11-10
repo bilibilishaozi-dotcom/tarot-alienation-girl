@@ -718,6 +718,38 @@ def write_chariot_dash(gif_path):
     info_path.write_text(json.dumps(info, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
 
 
+def write_strength_dash(gif_path):
+    """力量冲刺。缩放跟现有力量待机同一档，拳甲和披风不把人缩小。"""
+    out_dir = FORM_OUT / "Strength"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    info_path = out_dir / "clip.json"
+    info = json.loads(info_path.read_text(encoding="utf-8")) if info_path.exists() else {"form": "Strength"}
+    source = Path(gif_path)
+    frames = composite_gif(source)
+    sheets, pivot_x, pivot_y, below, centers = place_clip(frames, SCALE)
+    for index, sheet in enumerate(sheets):
+        png_path = out_dir / f"dash_{index}.png"
+        Image.fromarray(sheet, "RGBA").save(png_path)
+        write_sprite_meta(png_path, pivot_x, pivot_y)
+    info["dash"] = {
+        "canvas": [int(sheets[0].shape[1]), int(sheets[0].shape[0])],
+        "pivot": [round(pivot_x, 6), round(pivot_y, 6)],
+        "belowFeet": int(below),
+        "frames": len(sheets),
+        "scale": round(SCALE, 6),
+    }
+    saved_dir = INCOMING / "力量"
+    saved_dir.mkdir(parents=True, exist_ok=True)
+    saved = saved_dir / "strength_dash.gif"
+    saved.write_bytes(source.read_bytes())
+    span = max(centers) - min(centers)
+    print(
+        f"strength dash: {len(sheets)} frames canvas {info['dash']['canvas'][0]}x{info['dash']['canvas'][1]} "
+        f"pivot {info['dash']['pivot']} below {below} cx span {span:.2f} bytes {source.stat().st_size}"
+    )
+    info_path.write_text(json.dumps(info, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+
+
 def main():
     import sys
     args = set(sys.argv[1:])
@@ -732,6 +764,7 @@ def main():
         and "--form-airattack" not in args
         and "--fool-dash" not in args
         and "--chariot-dash" not in args
+        and "--strength-dash" not in args
     ):
         write_forms()
     if "--original-idle" in args:
@@ -741,6 +774,16 @@ def main():
         if not gif.exists():
             raise SystemExit("找不到初始形态的新待机 GIF")
         write_original_idle(gif)
+    if "--strength-dash" in args:
+        import zipfile
+        uploads = Path("/home/ubuntu/.cursor/projects/workspace/uploads")
+        archive = uploads / "strength-dash_09bc.zip"
+        extracted = uploads / "strength-dash.gif"
+        if not extracted.exists():
+            with zipfile.ZipFile(archive) as bundle:
+                extracted.write_bytes(bundle.read("strength-dash.gif"))
+        write_strength_dash(extracted)
+        return
     if "--chariot-dash" in args:
         import zipfile
         uploads = Path("/home/ubuntu/.cursor/projects/workspace/uploads")
