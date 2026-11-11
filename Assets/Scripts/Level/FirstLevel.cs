@@ -1807,13 +1807,20 @@ public class FirstLevel : MonoBehaviour
 
     private static Sprite[] stoneTiles;
     private static Sprite[] dirtTiles;
-    // 每块地面用自己的排序号，遮罩才不会把旁边那块的瓦片也裁进来。负数停在 Ground 层已有标记的后面。
+    // 每块地面用自己的排序号。遮罩范围是 (back, front]，back 不含在内，所以 back 必须是 order - 1。
+    // 每块只减 1，范围是 (-2,-1]、(-3,-2]……互不重叠，也不会裁到旁边那块。
     private int groundTileOrder = -1;
+    private static bool tileLoadWarned;
+
+    private static bool tilesReady;
+    private static bool tilesFailed;
 
     private static bool LoadGroundTiles()
     {
-        if (stoneTiles != null && dirtTiles != null)
-            return stoneTiles[0] != null && dirtTiles[0] != null;
+        if (tilesReady)
+            return true;
+        if (tilesFailed)
+            return false;
 
         stoneTiles = new Sprite[16];
         dirtTiles = new Sprite[16];
@@ -1822,9 +1829,13 @@ public class FirstLevel : MonoBehaviour
             stoneTiles[i] = Resources.Load<Sprite>("Art/Tiles/stone_" + i);
             dirtTiles[i] = Resources.Load<Sprite>("Art/Tiles/dirt_" + i);
             if (stoneTiles[i] == null || dirtTiles[i] == null)
+            {
+                tilesFailed = true;
                 return false;
+            }
         }
 
+        tilesReady = true;
         return true;
     }
 
@@ -1848,7 +1859,14 @@ public class FirstLevel : MonoBehaviour
     private void ApplyGroundTiles(GameObject block, SpriteRenderer colorSprite, string name, Vector2 center, Vector2 size)
     {
         if (size.x < 0.01f || size.y < 0.01f || !LoadGroundTiles())
+        {
+            if (!tileLoadWarned && (size.x >= 0.01f && size.y >= 0.01f))
+            {
+                tileLoadWarned = true;
+                Debug.LogWarning("地面瓦片没加载到，这些方块继续用纯色。");
+            }
             return;
+        }
 
         Sprite stone = stoneTiles[0];
         Sprite dirt = dirtTiles[0];
@@ -1859,27 +1877,18 @@ public class FirstLevel : MonoBehaviour
         if (stoneW < 0.01f || stoneH < 0.01f || dirtH < 0.01f)
             return;
 
-        // 父物体已经被拉成碰撞盒的尺寸。遮罩用原来的 1x1 白块，正好盖住碰撞范围。
-        colorSprite.enabled = false;
         int order = groundTileOrder;
         groundTileOrder--;
-        SpriteMask mask = block.AddComponent<SpriteMask>();
-        mask.sprite = PixelSprite();
-        mask.isCustomRangeActive = true;
-        int groundLayer = SortingLayer.NameToID("Ground");
-        mask.frontSortingLayerID = groundLayer;
-        mask.backSortingLayerID = groundLayer;
-        mask.frontSortingOrder = order;
-        mask.backSortingOrder = order;
-
         float left = -size.x * 0.5f;
         float top = size.y * 0.5f;
         float bottom = -size.y * 0.5f;
+        int placed = 0;
         int columns = Mathf.Max(1, Mathf.CeilToInt(size.x / stoneW - 0.0001f));
         for (int col = 0; col < columns; col++)
         {
             float x = left + col * stoneW;
-            PlaceGroundTile(block.transform, stoneTiles[TileVariant(name, center, col, 0, 1)], x, top - stoneH, size, order);
+            if (PlaceGroundTile(block.transform, stoneTiles[TileVariant(name, center, col, 0, 1)], x, top - stoneH, size, order))
+                placed++;
         }
 
         // 比一格石壁还薄的平台，下面没有泥土，多出来的石壁被遮罩裁掉。
@@ -1891,18 +1900,34 @@ public class FirstLevel : MonoBehaviour
             for (int col = 0; col < dirtColumns; col++)
             {
                 float x = left + col * dirtW;
-                PlaceGroundTile(block.transform, dirtTiles[TileVariant(name, center, col, row, 2)], x, rowTop - dirtH, size, order);
+                if (PlaceGroundTile(block.transform, dirtTiles[TileVariant(name, center, col, row, 2)], x, rowTop - dirtH, size, order))
+                    placed++;
             }
 
             rowTop -= dirtH;
             row++;
         }
+
+        // 一格都没铺上就留着原来的纯色，不要变成透明。
+        if (placed == 0)
+            return;
+
+        colorSprite.enabled = false;
+        // 父物体已经被拉成碰撞盒的尺寸。遮罩用原来的 1x1 白块，正好盖住碰撞范围。
+        SpriteMask mask = block.AddComponent<SpriteMask>();
+        mask.sprite = PixelSprite();
+        mask.isCustomRangeActive = true;
+        int groundLayer = SortingLayer.NameToID("Ground");
+        mask.frontSortingLayerID = groundLayer;
+        mask.backSortingLayerID = groundLayer;
+        mask.frontSortingOrder = order;
+        mask.backSortingOrder = order - 1;
     }
 
-    private static void PlaceGroundTile(Transform block, Sprite sprite, float offsetX, float offsetY, Vector2 size, int sortingOrder)
+    private static bool PlaceGroundTile(Transform block, Sprite sprite, float offsetX, float offsetY, Vector2 size, int sortingOrder)
     {
         if (sprite == null)
-            return;
+            return false;
 
         GameObject tile = new GameObject(sprite.name);
         tile.transform.SetParent(block, false);
@@ -1915,6 +1940,7 @@ public class FirstLevel : MonoBehaviour
         renderer.sortingLayerName = "Ground";
         renderer.sortingOrder = sortingOrder;
         renderer.maskInteraction = SpriteMaskInteraction.VisibleInsideMask;
+        return true;
     }
 
     private void Decor(string name, Vector2 center, Vector2 size, Color color, int sortingOrder)
