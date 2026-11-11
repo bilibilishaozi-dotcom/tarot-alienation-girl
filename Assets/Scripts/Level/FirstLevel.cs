@@ -1800,9 +1800,26 @@ public class FirstLevel : MonoBehaviour
         sprite.sortingOrder = sortingOrder;
         BoxCollider2D box = block.AddComponent<BoxCollider2D>();
         box.size = Vector2.one;
-        if (!KeepSolidColor(name))
+        if (KeepSolidColor(name))
+            AddMarkerRim(block, color, sortingOrder);
+        else
             ApplyGroundTiles(block, sprite, name, center, size);
         return block;
+    }
+
+    // 描边跟在原色后面，碰撞盒不变。玩家仍然靠这块的颜色认出它。
+    private static void AddMarkerRim(GameObject block, Color fill, int sortingOrder)
+    {
+        Vector3 scale = block.transform.localScale;
+        float pad = 0.08f;
+        GameObject rim = new GameObject("Rim");
+        rim.transform.SetParent(block.transform, false);
+        rim.transform.localScale = new Vector3((scale.x + pad * 2f) / Mathf.Max(0.01f, scale.x), (scale.y + pad * 2f) / Mathf.Max(0.01f, scale.y), 1f);
+        SpriteRenderer sprite = rim.AddComponent<SpriteRenderer>();
+        sprite.sprite = PixelSprite();
+        sprite.color = new Color(fill.r * 0.28f, fill.g * 0.28f, fill.b * 0.28f, 1f);
+        sprite.sortingLayerName = "Ground";
+        sprite.sortingOrder = sortingOrder - 1;
     }
 
     private static Sprite[] stoneTiles;
@@ -1840,7 +1857,8 @@ public class FirstLevel : MonoBehaviour
     }
 
     // 名字和位置一起做种子，同一块每次进游戏都是同一套格子。不用字符串的 GetHashCode，那个每次运行会变。
-    private static int TileVariant(string blockName, Vector2 center, int col, int row, int kind)
+    // avoid 是左边或上边已经用过的变体，相邻格尽量不重复。
+    private static int TileVariant(string blockName, Vector2 center, int col, int row, int kind, int avoid)
     {
         unchecked
         {
@@ -1852,7 +1870,10 @@ public class FirstLevel : MonoBehaviour
             hash = (hash * 16777619) ^ (col * 13);
             hash = (hash * 16777619) ^ (row * 29);
             hash = (hash * 16777619) ^ kind;
-            return (hash & 0x7fffffff) % 16;
+            int index = (hash & 0x7fffffff) % 16;
+            if (index == avoid)
+                index = (index + 1 + ((hash >> 4) & 7)) % 16;
+            return index;
         }
     }
 
@@ -1883,29 +1904,49 @@ public class FirstLevel : MonoBehaviour
         float top = size.y * 0.5f;
         float bottom = -size.y * 0.5f;
         int placed = 0;
+        // 窄而高的墙、拱门只用石壁往下铺。宽地面才是石顶加泥土。
+        bool stoneColumn = size.x <= stoneW * 1.15f && size.y > stoneH;
         int columns = Mathf.Max(1, Mathf.CeilToInt(size.x / stoneW - 0.0001f));
-        for (int col = 0; col < columns; col++)
-        {
-            float x = left + col * stoneW;
-            if (PlaceGroundTile(block.transform, stoneTiles[TileVariant(name, center, col, 0, 1)], x, top - stoneH, size, order))
-                placed++;
-        }
-
-        // 比一格石壁还薄的平台，下面没有泥土，多出来的石壁被遮罩裁掉。
-        float rowTop = top - stoneH;
+        int previous = -1;
         int row = 0;
-        while (rowTop > bottom + 0.0001f && row < 64)
+        float rowTop = top;
+        int rowLimit = stoneColumn ? 64 : 1;
+        while (row < rowLimit && rowTop > bottom + 0.0001f)
         {
-            int dirtColumns = Mathf.Max(1, Mathf.CeilToInt(size.x / dirtW - 0.0001f));
-            for (int col = 0; col < dirtColumns; col++)
+            previous = -1;
+            for (int col = 0; col < columns; col++)
             {
-                float x = left + col * dirtW;
-                if (PlaceGroundTile(block.transform, dirtTiles[TileVariant(name, center, col, row, 2)], x, rowTop - dirtH, size, order))
+                int variant = TileVariant(name, center, col, row, 1, previous);
+                previous = variant;
+                float x = left + col * stoneW;
+                if (PlaceGroundTile(block.transform, stoneTiles[variant], x, rowTop - stoneH, size, order))
                     placed++;
             }
 
-            rowTop -= dirtH;
+            rowTop -= stoneH;
             row++;
+        }
+
+        // 比一格石壁还薄的平台，下面没有泥土，多出来的石壁被遮罩裁掉。
+        if (!stoneColumn)
+        {
+            row = 0;
+            while (rowTop > bottom + 0.0001f && row < 64)
+            {
+                int dirtColumns = Mathf.Max(1, Mathf.CeilToInt(size.x / dirtW - 0.0001f));
+                previous = -1;
+                for (int col = 0; col < dirtColumns; col++)
+                {
+                    int variant = TileVariant(name, center, col, row, 2, previous);
+                    previous = variant;
+                    float x = left + col * dirtW;
+                    if (PlaceGroundTile(block.transform, dirtTiles[variant], x, rowTop - dirtH, size, order))
+                        placed++;
+                }
+
+                rowTop -= dirtH;
+                row++;
+            }
         }
 
         // 一格都没铺上就留着原来的纯色，不要变成透明。
