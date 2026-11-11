@@ -1,7 +1,9 @@
 """把地块大图切成单独的瓦片。换图后重跑：python3 Tools/slice_ground_tiles.py"""
 import uuid
+from collections import deque
 from pathlib import Path
 
+import numpy as np
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -133,6 +135,57 @@ TextureImporter:
 """
 
 
+def clear_black_frame(tile):
+    """去掉贴着四边的 1 像素黑框，不动内部的深色砖缝。"""
+    arr = np.array(tile.convert("RGBA"))
+    dark = arr[:, :, :3].max(axis=2) < 22
+    arr[0, dark[0], 3] = 0
+    arr[-1, dark[-1], 3] = 0
+    arr[dark[:, 0], 0, 3] = 0
+    arr[dark[:, -1], -1, 3] = 0
+    return Image.fromarray(arr, "RGBA")
+
+
+def clear_edge_checker(tile):
+    """从边缘向内清掉近白、浅灰的假棋盘格。柱身的灰更暗，连不到边缘就不会被清掉。"""
+    arr = np.array(tile.convert("RGBA"))
+    rgb = arr[:, :, :3].astype(np.int16)
+    luma = rgb.sum(axis=2) / 3.0
+    sat = rgb.max(axis=2) - rgb.min(axis=2)
+    fake = (luma >= 210) & (sat <= 20) & (arr[:, :, 3] > 0)
+    height, width = fake.shape
+    seen = np.zeros_like(fake)
+    queue = deque()
+    for x in range(width):
+        for y in (0, height - 1):
+            if fake[y, x]:
+                seen[y, x] = True
+                queue.append((y, x))
+    for y in range(height):
+        for x in (0, width - 1):
+            if fake[y, x] and not seen[y, x]:
+                seen[y, x] = True
+                queue.append((y, x))
+    while queue:
+        y, x = queue.popleft()
+        arr[y, x, 3] = 0
+        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            ny, nx = y + dy, x + dx
+            if ny < 0 or nx < 0 or ny >= height or nx >= width or seen[ny, nx] or not fake[ny, nx]:
+                continue
+            seen[ny, nx] = True
+            queue.append((ny, nx))
+    return Image.fromarray(arr, "RGBA")
+
+
+def pad_bottom(tile, height):
+    if tile.height == height:
+        return tile
+    canvas = Image.new("RGBA", (tile.width, height), (0, 0, 0, 0))
+    canvas.paste(tile, (0, 0))
+    return canvas
+
+
 def write_tiles(prefix, tiles):
     for index, tile in enumerate(tiles):
         path = OUT / f"{prefix}_{index}.png"
@@ -165,6 +218,50 @@ def main():
     write_tiles("stone", crop_grid(stone, 1, 29))
     # 泥土：丢掉每格顶部 6 行亮带，从 y = r*33+7 取到 r*33+29，高 23。
     write_tiles("dirt", crop_grid(dirt, 7, 23))
+    import_extra_sheets()
+
+
+# 墙面 A 里这几格角落有白色假透明，整格不用。
+WALL_A_SKIP = {(0, 1), (0, 2), (0, 3), (2, 3)}
+
+
+def import_extra_sheets():
+    wall_a = Image.open(INCOMING / "wall_face_a.png").convert("RGBA")
+    wall_b = Image.open(INCOMING / "wall_face_b.png").convert("RGBA")
+    walls = []
+    for row, col, tile in indexed(crop_grid(wall_b, 1, 29)):
+        walls.append(clear_black_frame(tile))
+    for row, col, tile in indexed(crop_grid(wall_a, 1, 29)):
+        if (row, col) in WALL_A_SKIP:
+            print(f"skip wall_a r{row}c{col}: white corner")
+            continue
+        walls.append(clear_black_frame(tile))
+    write_tiles("wall", walls)
+
+    markers = Image.open(INCOMING / "markers.png").convert("RGBA")
+    groups = {"seal": [], "pillar": [], "gold": [], "rail": [], "lip": []}
+    keys = ("seal", "pillar", "gold", "split")
+    for row, col, tile in indexed(crop_grid(markers, 3, 25)):
+        cleaned = clear_edge_checker(clear_black_frame(tile))
+        if keys[row] != "split":
+            groups[keys[row]].append(cleaned)
+            continue
+        # 上半是灰栏杆，下半是砖红边沿。从第 12 行分开。
+        groups["rail"].append(cleaned.crop((0, 0, cleaned.width, 12)))
+        groups["lip"].append(cleaned.crop((0, 12, cleaned.width, cleaned.height)))
+    for name, tiles in groups.items():
+        write_tiles(name, tiles)
+
+    ground = Image.open(INCOMING / "ground_variants_32x22.png").convert("RGBA")
+    # 这是整格地面，不是左右收边。垫成 23 高，才能和泥土行对齐。
+    extras = [pad_bottom(clear_black_frame(tile), 23) for _, _, tile in indexed(crop_grid(ground, 5, 22))]
+    write_tiles("ground", extras)
+    print("thin_ledge.png 只有 3 像素高，第 1、3 行还是假透明，不导入。")
+
+
+def indexed(tiles):
+    for index, tile in enumerate(tiles):
+        yield divmod(index, COLS)[0], divmod(index, COLS)[1], tile
 
 
 if __name__ == "__main__":

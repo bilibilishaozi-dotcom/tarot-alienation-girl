@@ -1801,9 +1801,14 @@ public class FirstLevel : MonoBehaviour
         BoxCollider2D box = block.AddComponent<BoxCollider2D>();
         box.size = Vector2.one;
         if (KeepSolidColor(name))
+        {
             AddMarkerRim(block, color, sortingOrder);
+            ApplyMarkerTiles(block, sprite, name, center, size);
+        }
         else
+        {
             ApplyGroundTiles(block, sprite, name, center, size);
+        }
         return block;
     }
 
@@ -1827,6 +1832,7 @@ public class FirstLevel : MonoBehaviour
     // 每块地面用自己的排序号。遮罩范围是 (back, front]，back 不含在内，所以 back 必须是 order - 1。
     // 每块只减 1，范围是 (-2,-1]、(-3,-2]……互不重叠，也不会裁到旁边那块。
     private int groundTileOrder = -1;
+    private int markerTileOrder = 8;
     private static bool tileLoadWarned;
 
     private static bool tilesReady;
@@ -1853,13 +1859,67 @@ public class FirstLevel : MonoBehaviour
         }
 
         tilesReady = true;
+        LoadExtraTiles();
         return true;
+    }
+
+    private static Sprite[] wallTiles;
+    private static Sprite[] groundExtra;
+    private static Sprite[] sealTiles;
+    private static Sprite[] pillarTiles;
+    private static Sprite[] goldTiles;
+    private static Sprite[] railTiles;
+    private static Sprite[] lipTiles;
+
+    private static void LoadExtraTiles()
+    {
+        if (wallTiles != null || sealTiles != null)
+            return;
+
+        wallTiles = LoadTileSet("wall", 28);
+        groundExtra = LoadTileSet("ground", 16);
+        sealTiles = LoadTileSet("seal", 4);
+        pillarTiles = LoadTileSet("pillar", 4);
+        goldTiles = LoadTileSet("gold", 4);
+        railTiles = LoadTileSet("rail", 4);
+        lipTiles = LoadTileSet("lip", 4);
+    }
+
+    private static Sprite[] LoadTileSet(string prefix, int count)
+    {
+        Sprite[] set = new Sprite[count];
+        for (int i = 0; i < count; i++)
+        {
+            set[i] = Resources.Load<Sprite>("Art/Tiles/" + prefix + "_" + i);
+            if (set[i] == null)
+                return null;
+        }
+
+        return set;
+    }
+
+    private static Sprite[] MarkerSet(string name)
+    {
+        if (name == "ExitSeal" || name == "EchoBossGate")
+            return sealTiles;
+        if (name == "FinaleGate" || name == "FoolLeapLedge")
+            return goldTiles;
+        if (name == "ClimbPillar")
+            return pillarTiles;
+        if (name == "FoolRail" || name == "FinaleRail")
+            return railTiles;
+        if (name == "StrengthLip" || name == "FinaleLip")
+            return lipTiles;
+        return null;
     }
 
     // 名字和位置一起做种子，同一块每次进游戏都是同一套格子。不用字符串的 GetHashCode，那个每次运行会变。
     // avoid 是左边或上边已经用过的变体，相邻格尽量不重复。
-    private static int TileVariant(string blockName, Vector2 center, int col, int row, int kind, int avoid)
+    private static int TileVariant(string blockName, Vector2 center, int col, int row, int kind, int avoid, int count)
     {
+        if (count <= 1)
+            return 0;
+
         unchecked
         {
             int hash = 216613626;
@@ -1870,15 +1930,16 @@ public class FirstLevel : MonoBehaviour
             hash = (hash * 16777619) ^ (col * 13);
             hash = (hash * 16777619) ^ (row * 29);
             hash = (hash * 16777619) ^ kind;
-            int index = (hash & 0x7fffffff) % 16;
+            int index = (hash & 0x7fffffff) % count;
             if (index == avoid)
-                index = (index + 1 + ((hash >> 4) & 7)) % 16;
+                index = (index + 1) % count;
             return index;
         }
     }
 
     private void ApplyGroundTiles(GameObject block, SpriteRenderer colorSprite, string name, Vector2 center, Vector2 size)
     {
+        LoadExtraTiles();
         if (size.x < 0.01f || size.y < 0.01f || !LoadGroundTiles())
         {
             if (!tileLoadWarned && (size.x >= 0.01f && size.y >= 0.01f))
@@ -1904,9 +1965,12 @@ public class FirstLevel : MonoBehaviour
         float top = size.y * 0.5f;
         float bottom = -size.y * 0.5f;
         int placed = 0;
-        // 窄而高的墙、拱门只用石壁往下铺。宽地面才是石顶加泥土。
+        // 窄而高的墙、拱门用墙面瓦片往下铺。没有墙面图时退回石壁顶。宽地面才是石顶加泥土。
         bool stoneColumn = size.x <= stoneW * 1.15f && size.y > stoneH;
-        int columns = Mathf.Max(1, Mathf.CeilToInt(size.x / stoneW - 0.0001f));
+        Sprite[] face = stoneColumn && wallTiles != null ? wallTiles : stoneTiles;
+        float faceW = face[0].rect.width / GroundTilePixelsPerUnit;
+        float faceH = face[0].rect.height / GroundTilePixelsPerUnit;
+        int columns = Mathf.Max(1, Mathf.CeilToInt(size.x / Mathf.Max(faceW, 0.01f) - 0.0001f));
         int previous = -1;
         int row = 0;
         float rowTop = top;
@@ -1916,14 +1980,14 @@ public class FirstLevel : MonoBehaviour
             previous = -1;
             for (int col = 0; col < columns; col++)
             {
-                int variant = TileVariant(name, center, col, row, 1, previous);
+                int variant = TileVariant(name, center, col, row, 1, previous, face.Length);
                 previous = variant;
-                float x = left + col * stoneW;
-                if (PlaceGroundTile(block.transform, stoneTiles[variant], x, rowTop - stoneH, size, order))
+                float x = left + col * faceW;
+                if (PlaceGroundTile(block.transform, face[variant], x, rowTop - faceH, size, order))
                     placed++;
             }
 
-            rowTop -= stoneH;
+            rowTop -= faceH;
             row++;
         }
 
@@ -1937,10 +2001,12 @@ public class FirstLevel : MonoBehaviour
                 previous = -1;
                 for (int col = 0; col < dirtColumns; col++)
                 {
-                    int variant = TileVariant(name, center, col, row, 2, previous);
+                    bool useExtra = groundExtra != null && ((col + row) % 3 == 0);
+                    int variant = TileVariant(name, center, col, row, useExtra ? 3 : 2, previous, useExtra ? groundExtra.Length : dirtTiles.Length);
                     previous = variant;
                     float x = left + col * dirtW;
-                    if (PlaceGroundTile(block.transform, dirtTiles[variant], x, rowTop - dirtH, size, order))
+                    Sprite fill = useExtra ? groundExtra[variant] : dirtTiles[variant];
+                    if (PlaceGroundTile(block.transform, fill, x, rowTop - dirtH, size, order))
                         placed++;
                 }
 
@@ -1963,6 +2029,59 @@ public class FirstLevel : MonoBehaviour
         mask.backSortingLayerID = groundLayer;
         mask.frontSortingOrder = order;
         mask.backSortingOrder = order - 1;
+    }
+
+    private bool ApplyMarkerTiles(GameObject block, SpriteRenderer colorSprite, string name, Vector2 center, Vector2 size)
+    {
+        LoadExtraTiles();
+        Sprite[] set = MarkerSet(name);
+        if (set == null || size.x < 0.01f || size.y < 0.01f)
+            return false;
+
+        float tileW = set[0].rect.width / GroundTilePixelsPerUnit;
+        float tileH = set[0].rect.height / GroundTilePixelsPerUnit;
+        if (tileW < 0.01f || tileH < 0.01f)
+            return false;
+
+        // 提示块要画在地面瓦片前面，所以从 8 往上排。每块仍只占一个号。
+        int order = markerTileOrder;
+        markerTileOrder++;
+        float left = -size.x * 0.5f;
+        float top = size.y * 0.5f;
+        float bottom = -size.y * 0.5f;
+        int placed = 0;
+        int row = 0;
+        float rowTop = top;
+        while (rowTop > bottom + 0.0001f && row < 64)
+        {
+            int columns = Mathf.Max(1, Mathf.CeilToInt(size.x / tileW - 0.0001f));
+            int previous = -1;
+            for (int col = 0; col < columns; col++)
+            {
+                int variant = TileVariant(name, center, col, row, 4, previous, set.Length);
+                previous = variant;
+                float x = left + col * tileW;
+                if (PlaceGroundTile(block.transform, set[variant], x, rowTop - tileH, size, order))
+                    placed++;
+            }
+
+            rowTop -= tileH;
+            row++;
+        }
+
+        if (placed == 0)
+            return false;
+
+        colorSprite.enabled = false;
+        SpriteMask mask = block.AddComponent<SpriteMask>();
+        mask.sprite = PixelSprite();
+        mask.isCustomRangeActive = true;
+        int groundLayer = SortingLayer.NameToID("Ground");
+        mask.frontSortingLayerID = groundLayer;
+        mask.backSortingLayerID = groundLayer;
+        mask.frontSortingOrder = order;
+        mask.backSortingOrder = order - 1;
+        return true;
     }
 
     private static bool PlaceGroundTile(Transform block, Sprite sprite, float offsetX, float offsetY, Vector2 size, int sortingOrder)
