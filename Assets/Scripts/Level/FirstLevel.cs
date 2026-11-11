@@ -8,6 +8,8 @@ public class FirstLevel : MonoBehaviour
     private const float FloorTop = 0f;
     private const float GrateLeft = 24.2f;
     private const float GrateHeight = 3.8f;
+    // 瓦片世界尺寸。32 表示图上 32 像素 = 1 个世界单位。改小则瓦片变大，改大则瓦片变小。
+    private const float GroundTilePixelsPerUnit = 32f;
 
     // 愚者试用结束：这一章的收尾，愚者牌到手。
     private const string ChapterLine = "裂隙暂时合上了。\n她收好愚者牌，往更深处走去。";
@@ -201,12 +203,13 @@ public class FirstLevel : MonoBehaviour
         Solid("LeftWall", new Vector2(-1.7f, 3.2f), new Vector2(0.7f, 6.4f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
         Solid("RightWall", new Vector2(39f, 3.4f), new Vector2(0.7f, 6.8f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
 
-        // 两座薄平台。哨兵只在台面上巡逻，追击和受击也不会走下边缘。
-        const float deckTop = 1.7f;
+        // 两座薄平台错开高度。脚从地面大约能跳到 2.46，所以第二座顶放在 2.0，留出余量。
+        // 水平位置不动，和后面低台之间的空档保持原样。哨兵只在台面上巡逻。
         const float deckThickness = 0.4f;
-        float deckCenterY = deckTop - deckThickness * 0.5f;
-        Solid("PlatformA", new Vector2(6.3f, deckCenterY), new Vector2(4.8f, deckThickness), new Color(0.46f, 0.38f, 0.29f), ground, 1);
-        Solid("PlatformB", new Vector2(14.6f, deckCenterY), new Vector2(4.8f, deckThickness), new Color(0.46f, 0.38f, 0.29f), ground, 1);
+        const float deckTopA = 1.2f;
+        const float deckTopB = 2.0f;
+        Solid("PlatformA", new Vector2(6.3f, deckTopA - deckThickness * 0.5f), new Vector2(4.8f, deckThickness), new Color(0.46f, 0.38f, 0.29f), ground, 1);
+        Solid("PlatformB", new Vector2(14.6f, deckTopB - deckThickness * 0.5f), new Vector2(4.8f, deckThickness), new Color(0.46f, 0.38f, 0.29f), ground, 1);
 
         // 低台大约 0.62 高。跳跃攻击的刀光贴近身体，离开低台、面向右侧敌人时按鼠标左键能打到。
         const float lipTop = 0.62f;
@@ -218,11 +221,11 @@ public class FirstLevel : MonoBehaviour
         arena = new BasicEnemy[3];
 
         // ① 孢子怪：守在平台 A，玩家靠近就鼓起来，约 1.1 秒后原地大范围喷发。
-        arena[0] = SpawnArenaEnemy("Spore", 6.3f, deckTop + feetLift, 3, "孢子怪",
+        arena[0] = SpawnArenaEnemy("Spore", 6.3f, deckTopA + 0.5f, 3, "孢子怪",
             new Color(0.42f, 0.7f, 0.3f), new Vector3(1.15f, 1f, 1f), ground);
 
         // 碰撞盒按美术躯干重设，并让它的底边正好压在台面上：
-        // 敌人轴心在台面上方 0.5，胶囊高 1.6、中心偏上 0.3 → 底边落在 deckTop。
+        // 敌人轴心在台面上方 0.5，胶囊高 1.6、中心偏上 0.3 → 底边落在 deckTopA。
         CapsuleCollider2D sporeBody = arena[0].GetComponent<CapsuleCollider2D>();
         if (sporeBody != null)
         {
@@ -230,7 +233,7 @@ public class FirstLevel : MonoBehaviour
             sporeBody.offset = new Vector2(0f, 0.3f);
         }
 
-        arena[0].transform.position = new Vector3(6.3f, deckTop + 0.5f, 0f);
+        arena[0].transform.position = new Vector3(6.3f, deckTopA + 0.5f, 0f);
         arena[0].SetAsSpore();
         arena[0].StayOnPlatform(4.4f, 8.2f, 1 << ground);
 
@@ -244,10 +247,10 @@ public class FirstLevel : MonoBehaviour
 
         // ② 骷髅兵：发现玩家就追过来挥刀；这一关先锁在平台 B 上，不往下跳。
         //    （以后的大关卡想让它跳下来追，只要不调用 StayOnPlatform 就行。）
-        arena[1] = SpawnArenaEnemy("Skeleton", 14.6f, deckTop + feetLift, 3, "骷髅兵",
+        arena[1] = SpawnArenaEnemy("Skeleton", 14.6f, deckTopB + 0.5f, 3, "骷髅兵",
             new Color(0.88f, 0.86f, 0.78f), new Vector3(1f, 1f, 1f), ground);
 
-        // 碰撞盒按美术躯干重设（0.9 x 1.7，中心偏上 0.35），底边压到 deckTop = 轴心 2.2
+        // 碰撞盒按美术躯干重设（0.9 x 1.7，中心偏上 0.35），底边压到 deckTopB，轴心再高 0.5。
         CapsuleCollider2D skeletonBody = arena[1].GetComponent<CapsuleCollider2D>();
         if (skeletonBody != null)
         {
@@ -255,7 +258,7 @@ public class FirstLevel : MonoBehaviour
             skeletonBody.offset = new Vector2(0f, 0.35f);
         }
 
-        arena[1].transform.position = new Vector3(14.6f, deckTop + 0.5f, 0f);
+        arena[1].transform.position = new Vector3(14.6f, deckTopB + 0.5f, 0f);
         arena[1].SetAsSkeleton();
         arena[1].StayOnPlatform(12.4f, 16.8f, 1 << ground);
 
@@ -1770,6 +1773,20 @@ public class FirstLevel : MonoBehaviour
             legacy.SetActive(false);
     }
 
+    // 这些方块靠颜色当提示或机关，不铺地块。
+    private static bool KeepSolidColor(string name)
+    {
+        return name == "ExitSeal"
+            || name == "ClimbPillar"
+            || name == "FoolLeapLedge"
+            || name == "EchoBossGate"
+            || name == "FoolRail"
+            || name == "FinaleRail"
+            || name == "FinaleGate"
+            || name == "StrengthLip"
+            || name == "FinaleLip";
+    }
+
     private GameObject Solid(string name, Vector2 center, Vector2 size, Color color, int layer, int sortingOrder)
     {
         GameObject block = new GameObject(name);
@@ -1784,7 +1801,316 @@ public class FirstLevel : MonoBehaviour
         sprite.sortingOrder = sortingOrder;
         BoxCollider2D box = block.AddComponent<BoxCollider2D>();
         box.size = Vector2.one;
+        if (KeepSolidColor(name))
+        {
+            AddMarkerRim(block, color, sortingOrder);
+            ApplyMarkerTiles(block, sprite, name, center, size);
+        }
+        else
+        {
+            ApplyGroundTiles(block, sprite, name, center, size);
+        }
         return block;
+    }
+
+    // 描边跟在原色后面，碰撞盒不变。玩家仍然靠这块的颜色认出它。
+    private static void AddMarkerRim(GameObject block, Color fill, int sortingOrder)
+    {
+        Vector3 scale = block.transform.localScale;
+        float pad = 0.08f;
+        GameObject rim = new GameObject("Rim");
+        rim.transform.SetParent(block.transform, false);
+        rim.transform.localScale = new Vector3((scale.x + pad * 2f) / Mathf.Max(0.01f, scale.x), (scale.y + pad * 2f) / Mathf.Max(0.01f, scale.y), 1f);
+        SpriteRenderer sprite = rim.AddComponent<SpriteRenderer>();
+        sprite.sprite = PixelSprite();
+        sprite.color = new Color(fill.r * 0.28f, fill.g * 0.28f, fill.b * 0.28f, 1f);
+        sprite.sortingLayerName = "Ground";
+        sprite.sortingOrder = sortingOrder - 1;
+    }
+
+    private static Sprite[] stoneTiles;
+    private static Sprite[] dirtTiles;
+    // 每块地面用自己的排序号。遮罩范围是 (back, front]，back 不含在内，所以 back 必须是 order - 1。
+    // 每块只减 1，范围是 (-2,-1]、(-3,-2]……互不重叠，也不会裁到旁边那块。
+    private int groundTileOrder = -1;
+    private int markerTileOrder = 8;
+    private static bool tileLoadWarned;
+
+    private static bool tilesReady;
+    private static bool tilesFailed;
+
+    private static bool LoadGroundTiles()
+    {
+        if (tilesReady)
+            return true;
+        if (tilesFailed)
+            return false;
+
+        stoneTiles = new Sprite[16];
+        dirtTiles = new Sprite[16];
+        for (int i = 0; i < 16; i++)
+        {
+            stoneTiles[i] = Resources.Load<Sprite>("Art/Tiles/stone_" + i);
+            dirtTiles[i] = Resources.Load<Sprite>("Art/Tiles/dirt_" + i);
+            if (stoneTiles[i] == null || dirtTiles[i] == null)
+            {
+                tilesFailed = true;
+                return false;
+            }
+        }
+
+        tilesReady = true;
+        LoadExtraTiles();
+        return true;
+    }
+
+    private static Sprite[] wallTiles;
+    private static Sprite[] sealTiles;
+    private static Sprite[] pillarTiles;
+    private static Sprite[] goldTiles;
+    private static Sprite[] railTiles;
+    private static Sprite[] lipTiles;
+
+    private static void LoadExtraTiles()
+    {
+        if (wallTiles != null || sealTiles != null)
+            return;
+
+        // 只用 wall_face_b 的 16 格。wall_16 往后是 wall_face_a，树根和亮块太多，这一步先不用。
+        wallTiles = LoadTileSet("wall", 16);
+        sealTiles = LoadTileSet("seal", 4);
+        pillarTiles = LoadTileSet("pillar", 4);
+        goldTiles = LoadTileSet("gold", 4);
+        railTiles = LoadTileSet("rail", 4);
+        lipTiles = LoadTileSet("lip", 4);
+    }
+
+    private static Sprite[] LoadTileSet(string prefix, int count)
+    {
+        Sprite[] set = new Sprite[count];
+        for (int i = 0; i < count; i++)
+        {
+            set[i] = Resources.Load<Sprite>("Art/Tiles/" + prefix + "_" + i);
+            if (set[i] == null)
+                return null;
+        }
+
+        return set;
+    }
+
+    private static Sprite[] MarkerSet(string name)
+    {
+        if (name == "ExitSeal" || name == "EchoBossGate")
+            return sealTiles;
+        if (name == "FinaleGate" || name == "FoolLeapLedge")
+            return goldTiles;
+        if (name == "ClimbPillar")
+            return pillarTiles;
+        if (name == "FoolRail" || name == "FinaleRail")
+            return railTiles;
+        if (name == "StrengthLip" || name == "FinaleLip")
+            return lipTiles;
+        return null;
+    }
+
+    // 名字和位置一起做种子，同一块每次进游戏都是同一套格子。不用字符串的 GetHashCode，那个每次运行会变。
+    // avoid 是左边或上边已经用过的变体，相邻格尽量不重复。
+    private static int TileVariant(string blockName, Vector2 center, int col, int row, int kind, int avoid, int count)
+    {
+        if (count <= 1)
+            return 0;
+
+        unchecked
+        {
+            int hash = 216613626;
+            for (int i = 0; i < blockName.Length; i++)
+                hash = (hash * 16777619) ^ blockName[i];
+            hash = (hash * 16777619) ^ (Mathf.RoundToInt(center.x * 100f) * 17);
+            hash = (hash * 16777619) ^ (Mathf.RoundToInt(center.y * 100f) * 31);
+            hash = (hash * 16777619) ^ (col * 13);
+            hash = (hash * 16777619) ^ (row * 29);
+            hash = (hash * 16777619) ^ kind;
+            int index = (hash & 0x7fffffff) % count;
+            if (index == avoid)
+                index = (index + 1) % count;
+            return index;
+        }
+    }
+
+    private void ApplyGroundTiles(GameObject block, SpriteRenderer colorSprite, string name, Vector2 center, Vector2 size)
+    {
+        LoadExtraTiles();
+        if (size.x < 0.01f || size.y < 0.01f || !LoadGroundTiles())
+        {
+            if (!tileLoadWarned && (size.x >= 0.01f && size.y >= 0.01f))
+            {
+                tileLoadWarned = true;
+                Debug.LogWarning("地面瓦片没加载到，这些方块继续用纯色。");
+            }
+            return;
+        }
+
+        Sprite stone = stoneTiles[0];
+        Sprite dirt = dirtTiles[0];
+        float stoneW = stone.rect.width / GroundTilePixelsPerUnit;
+        float stoneH = stone.rect.height / GroundTilePixelsPerUnit;
+        float dirtW = dirt.rect.width / GroundTilePixelsPerUnit;
+        float dirtH = dirt.rect.height / GroundTilePixelsPerUnit;
+        if (stoneW < 0.01f || stoneH < 0.01f || dirtH < 0.01f)
+            return;
+
+        int order = groundTileOrder;
+        groundTileOrder--;
+        float left = -size.x * 0.5f;
+        float top = size.y * 0.5f;
+        float bottom = -size.y * 0.5f;
+        int placed = 0;
+        // 窄而高的墙、拱门用墙面瓦片往下铺。没有墙面图时退回石壁顶。宽地面才是石顶加泥土。
+        bool stoneColumn = size.x <= stoneW * 1.15f && size.y > stoneH;
+        Sprite[] face = stoneColumn && wallTiles != null ? wallTiles : stoneTiles;
+        float faceW = face[0].rect.width / GroundTilePixelsPerUnit;
+        float faceH = face[0].rect.height / GroundTilePixelsPerUnit;
+        int columns = Mathf.Max(1, Mathf.CeilToInt(size.x / Mathf.Max(faceW, 0.01f) - 0.0001f));
+        int previous = -1;
+        int row = 0;
+        float rowTop = top;
+        int rowLimit = stoneColumn ? 64 : 1;
+        while (row < rowLimit && rowTop > bottom + 0.0001f)
+        {
+            previous = -1;
+            for (int col = 0; col < columns; col++)
+            {
+                bool capEnds = !stoneColumn && (name == "PlatformA" || name == "PlatformB");
+                bool leftCap = capEnds && col == 0;
+                bool rightSlot = capEnds && col == columns - 1;
+                if (rightSlot)
+                    continue;
+                int variant = leftCap ? 4 : TileVariant(name, center, col, row, 1, previous, face.Length);
+                previous = variant;
+                float x = left + col * faceW;
+                if (PlaceGroundTile(block.transform, face[variant], x, rowTop - faceH, size, order))
+                    placed++;
+            }
+
+            if (!stoneColumn && (name == "PlatformA" || name == "PlatformB") && row == 0)
+            {
+                // 右端整格对齐平台边缘，用较暗的石顶，避免遮罩从格子中间切一刀。
+                if (PlaceGroundTile(block.transform, stoneTiles[15], left + size.x - faceW, rowTop - faceH, size, order))
+                    placed++;
+            }
+
+            rowTop -= faceH;
+            row++;
+        }
+
+        // 比一格石壁还薄的平台，下面没有泥土，多出来的石壁被遮罩裁掉。
+        if (!stoneColumn)
+        {
+            row = 0;
+            while (rowTop > bottom + 0.0001f && row < 64)
+            {
+                int dirtColumns = Mathf.Max(1, Mathf.CeilToInt(size.x / dirtW - 0.0001f));
+                previous = -1;
+                for (int col = 0; col < dirtColumns; col++)
+                {
+                    int variant = TileVariant(name, center, col, row, 2, previous, dirtTiles.Length);
+                    previous = variant;
+                    float x = left + col * dirtW;
+                    if (PlaceGroundTile(block.transform, dirtTiles[variant], x, rowTop - dirtH, size, order))
+                        placed++;
+                }
+
+                rowTop -= dirtH;
+                row++;
+            }
+        }
+
+        // 一格都没铺上就留着原来的纯色，不要变成透明。
+        if (placed == 0)
+            return;
+
+        colorSprite.enabled = false;
+        // 父物体已经被拉成碰撞盒的尺寸。遮罩用原来的 1x1 白块，正好盖住碰撞范围。
+        SpriteMask mask = block.AddComponent<SpriteMask>();
+        mask.sprite = PixelSprite();
+        mask.isCustomRangeActive = true;
+        int groundLayer = SortingLayer.NameToID("Ground");
+        mask.frontSortingLayerID = groundLayer;
+        mask.backSortingLayerID = groundLayer;
+        mask.frontSortingOrder = order;
+        mask.backSortingOrder = order - 1;
+    }
+
+    private bool ApplyMarkerTiles(GameObject block, SpriteRenderer colorSprite, string name, Vector2 center, Vector2 size)
+    {
+        LoadExtraTiles();
+        Sprite[] set = MarkerSet(name);
+        if (set == null || size.x < 0.01f || size.y < 0.01f)
+            return false;
+
+        float tileW = set[0].rect.width / GroundTilePixelsPerUnit;
+        float tileH = set[0].rect.height / GroundTilePixelsPerUnit;
+        if (tileW < 0.01f || tileH < 0.01f)
+            return false;
+
+        // 提示块要画在地面瓦片前面，所以从 8 往上排。每块仍只占一个号。
+        int order = markerTileOrder;
+        markerTileOrder++;
+        float left = -size.x * 0.5f;
+        float top = size.y * 0.5f;
+        float bottom = -size.y * 0.5f;
+        int placed = 0;
+        int row = 0;
+        float rowTop = top;
+        while (rowTop > bottom + 0.0001f && row < 64)
+        {
+            int columns = Mathf.Max(1, Mathf.CeilToInt(size.x / tileW - 0.0001f));
+            int previous = -1;
+            for (int col = 0; col < columns; col++)
+            {
+                int variant = TileVariant(name, center, col, row, 4, previous, set.Length);
+                previous = variant;
+                float x = left + col * tileW;
+                if (PlaceGroundTile(block.transform, set[variant], x, rowTop - tileH, size, order))
+                    placed++;
+            }
+
+            rowTop -= tileH;
+            row++;
+        }
+
+        if (placed == 0)
+            return false;
+
+        colorSprite.enabled = false;
+        SpriteMask mask = block.AddComponent<SpriteMask>();
+        mask.sprite = PixelSprite();
+        mask.isCustomRangeActive = true;
+        int groundLayer = SortingLayer.NameToID("Ground");
+        mask.frontSortingLayerID = groundLayer;
+        mask.backSortingLayerID = groundLayer;
+        mask.frontSortingOrder = order;
+        mask.backSortingOrder = order - 1;
+        return true;
+    }
+
+    private static bool PlaceGroundTile(Transform block, Sprite sprite, float offsetX, float offsetY, Vector2 size, int sortingOrder)
+    {
+        if (sprite == null)
+            return false;
+
+        GameObject tile = new GameObject(sprite.name);
+        tile.transform.SetParent(block, false);
+        // 瓦片轴心在左下角。offset 是相对方块中心的世界位移，要除掉父物体的缩放。
+        tile.transform.localPosition = new Vector3(offsetX / size.x, offsetY / size.y, 0f);
+        float unit = sprite.pixelsPerUnit / GroundTilePixelsPerUnit;
+        tile.transform.localScale = new Vector3(unit / size.x, unit / size.y, 1f);
+        SpriteRenderer renderer = tile.AddComponent<SpriteRenderer>();
+        renderer.sprite = sprite;
+        renderer.sortingLayerName = "Ground";
+        renderer.sortingOrder = sortingOrder;
+        renderer.maskInteraction = SpriteMaskInteraction.VisibleInsideMask;
+        return true;
     }
 
     private void Decor(string name, Vector2 center, Vector2 size, Color color, int sortingOrder)
