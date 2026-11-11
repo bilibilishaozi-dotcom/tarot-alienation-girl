@@ -1864,7 +1864,6 @@ public class FirstLevel : MonoBehaviour
     }
 
     private static Sprite[] wallTiles;
-    private static Sprite[] groundExtra;
     private static Sprite[] sealTiles;
     private static Sprite[] pillarTiles;
     private static Sprite[] goldTiles;
@@ -1876,8 +1875,8 @@ public class FirstLevel : MonoBehaviour
         if (wallTiles != null || sealTiles != null)
             return;
 
-        wallTiles = LoadTileSet("wall", 28);
-        groundExtra = LoadTileSet("ground", 16);
+        // 只用 wall_face_b 的 16 格。wall_16 往后是 wall_face_a，树根和亮块太多，这一步先不用。
+        wallTiles = LoadTileSet("wall", 16);
         sealTiles = LoadTileSet("seal", 4);
         pillarTiles = LoadTileSet("pillar", 4);
         goldTiles = LoadTileSet("gold", 4);
@@ -2001,12 +2000,10 @@ public class FirstLevel : MonoBehaviour
                 previous = -1;
                 for (int col = 0; col < dirtColumns; col++)
                 {
-                    bool useExtra = groundExtra != null && ((col + row) % 3 == 0);
-                    int variant = TileVariant(name, center, col, row, useExtra ? 3 : 2, previous, useExtra ? groundExtra.Length : dirtTiles.Length);
+                    int variant = TileVariant(name, center, col, row, 2, previous, dirtTiles.Length);
                     previous = variant;
                     float x = left + col * dirtW;
-                    Sprite fill = useExtra ? groundExtra[variant] : dirtTiles[variant];
-                    if (PlaceGroundTile(block.transform, fill, x, rowTop - dirtH, size, order))
+                    if (PlaceGroundTile(block.transform, dirtTiles[variant], x, rowTop - dirtH, size, order))
                         placed++;
                 }
 
