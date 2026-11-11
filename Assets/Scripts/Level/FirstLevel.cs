@@ -203,12 +203,13 @@ public class FirstLevel : MonoBehaviour
         Solid("LeftWall", new Vector2(-1.7f, 3.2f), new Vector2(0.7f, 6.4f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
         Solid("RightWall", new Vector2(39f, 3.4f), new Vector2(0.7f, 6.8f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
 
-        // 两座薄平台。哨兵只在台面上巡逻，追击和受击也不会走下边缘。
-        const float deckTop = 1.7f;
+        // 两座薄平台错开高度。脚从地面大约能跳到 2.46，所以第二座顶放在 2.0，留出余量。
+        // 水平位置不动，和后面低台之间的空档保持原样。哨兵只在台面上巡逻。
         const float deckThickness = 0.4f;
-        float deckCenterY = deckTop - deckThickness * 0.5f;
-        Solid("PlatformA", new Vector2(6.3f, deckCenterY), new Vector2(4.8f, deckThickness), new Color(0.46f, 0.38f, 0.29f), ground, 1);
-        Solid("PlatformB", new Vector2(14.6f, deckCenterY), new Vector2(4.8f, deckThickness), new Color(0.46f, 0.38f, 0.29f), ground, 1);
+        const float deckTopA = 1.2f;
+        const float deckTopB = 2.0f;
+        Solid("PlatformA", new Vector2(6.3f, deckTopA - deckThickness * 0.5f), new Vector2(4.8f, deckThickness), new Color(0.46f, 0.38f, 0.29f), ground, 1);
+        Solid("PlatformB", new Vector2(14.6f, deckTopB - deckThickness * 0.5f), new Vector2(4.8f, deckThickness), new Color(0.46f, 0.38f, 0.29f), ground, 1);
 
         // 低台大约 0.62 高。跳跃攻击的刀光贴近身体，离开低台、面向右侧敌人时按鼠标左键能打到。
         const float lipTop = 0.62f;
@@ -220,11 +221,11 @@ public class FirstLevel : MonoBehaviour
         arena = new BasicEnemy[3];
 
         // ① 孢子怪：守在平台 A，玩家靠近就鼓起来，约 1.1 秒后原地大范围喷发。
-        arena[0] = SpawnArenaEnemy("Spore", 6.3f, deckTop + feetLift, 3, "孢子怪",
+        arena[0] = SpawnArenaEnemy("Spore", 6.3f, deckTopA + 0.5f, 3, "孢子怪",
             new Color(0.42f, 0.7f, 0.3f), new Vector3(1.15f, 1f, 1f), ground);
 
         // 碰撞盒按美术躯干重设，并让它的底边正好压在台面上：
-        // 敌人轴心在台面上方 0.5，胶囊高 1.6、中心偏上 0.3 → 底边落在 deckTop。
+        // 敌人轴心在台面上方 0.5，胶囊高 1.6、中心偏上 0.3 → 底边落在 deckTopA。
         CapsuleCollider2D sporeBody = arena[0].GetComponent<CapsuleCollider2D>();
         if (sporeBody != null)
         {
@@ -232,7 +233,7 @@ public class FirstLevel : MonoBehaviour
             sporeBody.offset = new Vector2(0f, 0.3f);
         }
 
-        arena[0].transform.position = new Vector3(6.3f, deckTop + 0.5f, 0f);
+        arena[0].transform.position = new Vector3(6.3f, deckTopA + 0.5f, 0f);
         arena[0].SetAsSpore();
         arena[0].StayOnPlatform(4.4f, 8.2f, 1 << ground);
 
@@ -246,10 +247,10 @@ public class FirstLevel : MonoBehaviour
 
         // ② 骷髅兵：发现玩家就追过来挥刀；这一关先锁在平台 B 上，不往下跳。
         //    （以后的大关卡想让它跳下来追，只要不调用 StayOnPlatform 就行。）
-        arena[1] = SpawnArenaEnemy("Skeleton", 14.6f, deckTop + feetLift, 3, "骷髅兵",
+        arena[1] = SpawnArenaEnemy("Skeleton", 14.6f, deckTopB + 0.5f, 3, "骷髅兵",
             new Color(0.88f, 0.86f, 0.78f), new Vector3(1f, 1f, 1f), ground);
 
-        // 碰撞盒按美术躯干重设（0.9 x 1.7，中心偏上 0.35），底边压到 deckTop = 轴心 2.2
+        // 碰撞盒按美术躯干重设（0.9 x 1.7，中心偏上 0.35），底边压到 deckTopB，轴心再高 0.5。
         CapsuleCollider2D skeletonBody = arena[1].GetComponent<CapsuleCollider2D>();
         if (skeletonBody != null)
         {
@@ -257,7 +258,7 @@ public class FirstLevel : MonoBehaviour
             skeletonBody.offset = new Vector2(0f, 0.35f);
         }
 
-        arena[1].transform.position = new Vector3(14.6f, deckTop + 0.5f, 0f);
+        arena[1].transform.position = new Vector3(14.6f, deckTopB + 0.5f, 0f);
         arena[1].SetAsSkeleton();
         arena[1].StayOnPlatform(12.4f, 16.8f, 1 << ground);
 
@@ -1979,10 +1980,22 @@ public class FirstLevel : MonoBehaviour
             previous = -1;
             for (int col = 0; col < columns; col++)
             {
-                int variant = TileVariant(name, center, col, row, 1, previous, face.Length);
+                bool capEnds = !stoneColumn && (name == "PlatformA" || name == "PlatformB");
+                bool leftCap = capEnds && col == 0;
+                bool rightSlot = capEnds && col == columns - 1;
+                if (rightSlot)
+                    continue;
+                int variant = leftCap ? 4 : TileVariant(name, center, col, row, 1, previous, face.Length);
                 previous = variant;
                 float x = left + col * faceW;
                 if (PlaceGroundTile(block.transform, face[variant], x, rowTop - faceH, size, order))
+                    placed++;
+            }
+
+            if (!stoneColumn && (name == "PlatformA" || name == "PlatformB") && row == 0)
+            {
+                // 右端整格对齐平台边缘，用较暗的石顶，避免遮罩从格子中间切一刀。
+                if (PlaceGroundTile(block.transform, stoneTiles[15], left + size.x - faceW, rowTop - faceH, size, order))
                     placed++;
             }
 
