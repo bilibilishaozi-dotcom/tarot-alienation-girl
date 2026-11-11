@@ -8,6 +8,8 @@ public class FirstLevel : MonoBehaviour
     private const float FloorTop = 0f;
     private const float GrateLeft = 24.2f;
     private const float GrateHeight = 3.8f;
+    // 瓦片世界尺寸。32 表示图上 32 像素 = 1 个世界单位。改小则瓦片变大，改大则瓦片变小。
+    private const float GroundTilePixelsPerUnit = 32f;
 
     // 愚者试用结束：这一章的收尾，愚者牌到手。
     private const string ChapterLine = "裂隙暂时合上了。\n她收好愚者牌，往更深处走去。";
@@ -1770,6 +1772,20 @@ public class FirstLevel : MonoBehaviour
             legacy.SetActive(false);
     }
 
+    // 这些方块靠颜色当提示或机关，不铺地块。
+    private static bool KeepSolidColor(string name)
+    {
+        return name == "ExitSeal"
+            || name == "ClimbPillar"
+            || name == "FoolLeapLedge"
+            || name == "EchoBossGate"
+            || name == "FoolRail"
+            || name == "FinaleRail"
+            || name == "FinaleGate"
+            || name == "StrengthLip"
+            || name == "FinaleLip";
+    }
+
     private GameObject Solid(string name, Vector2 center, Vector2 size, Color color, int layer, int sortingOrder)
     {
         GameObject block = new GameObject(name);
@@ -1784,7 +1800,121 @@ public class FirstLevel : MonoBehaviour
         sprite.sortingOrder = sortingOrder;
         BoxCollider2D box = block.AddComponent<BoxCollider2D>();
         box.size = Vector2.one;
+        if (!KeepSolidColor(name))
+            ApplyGroundTiles(block, sprite, name, center, size);
         return block;
+    }
+
+    private static Sprite[] stoneTiles;
+    private static Sprite[] dirtTiles;
+    // 每块地面用自己的排序号，遮罩才不会把旁边那块的瓦片也裁进来。负数停在 Ground 层已有标记的后面。
+    private int groundTileOrder = -1;
+
+    private static bool LoadGroundTiles()
+    {
+        if (stoneTiles != null && dirtTiles != null)
+            return stoneTiles[0] != null && dirtTiles[0] != null;
+
+        stoneTiles = new Sprite[16];
+        dirtTiles = new Sprite[16];
+        for (int i = 0; i < 16; i++)
+        {
+            stoneTiles[i] = Resources.Load<Sprite>("Art/Tiles/stone_" + i);
+            dirtTiles[i] = Resources.Load<Sprite>("Art/Tiles/dirt_" + i);
+            if (stoneTiles[i] == null || dirtTiles[i] == null)
+                return false;
+        }
+
+        return true;
+    }
+
+    // 名字和位置一起做种子，同一块每次进游戏都是同一套格子。不用字符串的 GetHashCode，那个每次运行会变。
+    private static int TileVariant(string blockName, Vector2 center, int col, int row, int kind)
+    {
+        unchecked
+        {
+            int hash = 216613626;
+            for (int i = 0; i < blockName.Length; i++)
+                hash = (hash * 16777619) ^ blockName[i];
+            hash = (hash * 16777619) ^ (Mathf.RoundToInt(center.x * 100f) * 17);
+            hash = (hash * 16777619) ^ (Mathf.RoundToInt(center.y * 100f) * 31);
+            hash = (hash * 16777619) ^ (col * 13);
+            hash = (hash * 16777619) ^ (row * 29);
+            hash = (hash * 16777619) ^ kind;
+            return (hash & 0x7fffffff) % 16;
+        }
+    }
+
+    private void ApplyGroundTiles(GameObject block, SpriteRenderer colorSprite, string name, Vector2 center, Vector2 size)
+    {
+        if (size.x < 0.01f || size.y < 0.01f || !LoadGroundTiles())
+            return;
+
+        Sprite stone = stoneTiles[0];
+        Sprite dirt = dirtTiles[0];
+        float stoneW = stone.rect.width / GroundTilePixelsPerUnit;
+        float stoneH = stone.rect.height / GroundTilePixelsPerUnit;
+        float dirtW = dirt.rect.width / GroundTilePixelsPerUnit;
+        float dirtH = dirt.rect.height / GroundTilePixelsPerUnit;
+        if (stoneW < 0.01f || stoneH < 0.01f || dirtH < 0.01f)
+            return;
+
+        // 父物体已经被拉成碰撞盒的尺寸。遮罩用原来的 1x1 白块，正好盖住碰撞范围。
+        colorSprite.enabled = false;
+        int order = groundTileOrder;
+        groundTileOrder--;
+        SpriteMask mask = block.AddComponent<SpriteMask>();
+        mask.sprite = PixelSprite();
+        mask.isCustomRangeActive = true;
+        int groundLayer = SortingLayer.NameToID("Ground");
+        mask.frontSortingLayerID = groundLayer;
+        mask.backSortingLayerID = groundLayer;
+        mask.frontSortingOrder = order;
+        mask.backSortingOrder = order;
+
+        float left = -size.x * 0.5f;
+        float top = size.y * 0.5f;
+        float bottom = -size.y * 0.5f;
+        int columns = Mathf.Max(1, Mathf.CeilToInt(size.x / stoneW - 0.0001f));
+        for (int col = 0; col < columns; col++)
+        {
+            float x = left + col * stoneW;
+            PlaceGroundTile(block.transform, stoneTiles[TileVariant(name, center, col, 0, 1)], x, top - stoneH, size, order);
+        }
+
+        // 比一格石壁还薄的平台，下面没有泥土，多出来的石壁被遮罩裁掉。
+        float rowTop = top - stoneH;
+        int row = 0;
+        while (rowTop > bottom + 0.0001f && row < 64)
+        {
+            int dirtColumns = Mathf.Max(1, Mathf.CeilToInt(size.x / dirtW - 0.0001f));
+            for (int col = 0; col < dirtColumns; col++)
+            {
+                float x = left + col * dirtW;
+                PlaceGroundTile(block.transform, dirtTiles[TileVariant(name, center, col, row, 2)], x, rowTop - dirtH, size, order);
+            }
+
+            rowTop -= dirtH;
+            row++;
+        }
+    }
+
+    private static void PlaceGroundTile(Transform block, Sprite sprite, float offsetX, float offsetY, Vector2 size, int sortingOrder)
+    {
+        if (sprite == null)
+            return;
+
+        GameObject tile = new GameObject(sprite.name);
+        tile.transform.SetParent(block, false);
+        // 瓦片轴心在左下角。offset 是相对方块中心的世界位移，要除掉父物体的缩放。
+        tile.transform.localPosition = new Vector3(offsetX / size.x, offsetY / size.y, 0f);
+        float unit = sprite.pixelsPerUnit / GroundTilePixelsPerUnit;
+        tile.transform.localScale = new Vector3(unit / size.x, unit / size.y, 1f);
+        SpriteRenderer renderer = tile.AddComponent<SpriteRenderer>();
+        renderer.sprite = sprite;
+        renderer.sortingLayerName = "Ground";
+        renderer.sortingOrder = sortingOrder;
+        renderer.maskInteraction = SpriteMaskInteraction.VisibleInsideMask;
     }
 
     private void Decor(string name, Vector2 center, Vector2 size, Color color, int sortingOrder)
