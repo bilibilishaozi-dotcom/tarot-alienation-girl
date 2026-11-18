@@ -9,7 +9,7 @@ public static class AttackFeedback
     private static AudioClip thud;
     private static Sprite pixel;
 
-    public static void Swing(Bounds bounds, int facing, bool empowered)
+    public static void Swing(Bounds bounds, int facing, bool empowered, bool playSound = true)
     {
         Color slash = empowered
             ? new Color(1f, 0.78f, 0.22f, 0.9f)
@@ -24,22 +24,25 @@ public static class AttackFeedback
             Spawn(tip, new Vector3(0.28f, 0.28f, 1f), 0f, new Color(1f, 0.95f, 0.7f, 1f), 0.16f, 19);
         }
 
-        Play(empowered ? HeavySwing : LightSwing, center, empowered ? 0.55f : 0.35f);
+        if (playSound)
+            Play(empowered ? HeavySwing : LightSwing, center, empowered ? 0.55f : 0.35f);
     }
 
-    public static void Hit(Vector2 point, bool empowered)
+    public static void Hit(Vector2 point, bool empowered, bool playSound = true)
     {
         Color spark = empowered
             ? new Color(1f, 0.72f, 0.18f, 1f)
             : new Color(1f, 1f, 1f, 0.95f);
         float size = empowered ? 0.72f : 0.34f;
         Spawn(point, new Vector3(size, size * 0.45f, 1f), 40f, spark, empowered ? 0.2f : 0.1f, 22);
-        Play(empowered ? HeavyHit : LightHit, point, empowered ? 0.7f : 0.4f);
+        if (playSound)
+            Play(empowered ? HeavyHit : LightHit, point, empowered ? 0.7f : 0.4f);
     }
 
-    public static void Thud(Vector3 point)
+    public static void Thud(Vector3 point, bool playSound = true)
     {
-        Play(ThudClip, point, 0.6f);
+        if (playSound)
+            Play(ThudClip, point, 0.6f);
     }
 
     private static AudioClip LightSwing => swingLight != null ? swingLight : swingLight = Tone(720f, 240f, 0.09f, 0.35f);

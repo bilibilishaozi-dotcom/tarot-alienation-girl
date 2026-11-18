@@ -20,6 +20,7 @@ public class Player_DashState : EntityState
         originalGravtiyScale = rb.gravityScale;
         rb.gravityScale = 0;
         player.BeginDodge();
+        HitFeel.Dash();
         if (player.HasChariot)
             echo = ChariotEcho.Spawn(player, dashDir);
     }

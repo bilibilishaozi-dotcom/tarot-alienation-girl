@@ -342,6 +342,7 @@ public class JuiceCameraShake : MonoBehaviour
     private Vector3 lastOffset;
     private Quaternion lastRotation = Quaternion.identity;
     private float power;
+    private float worldAmplitude;
     private float time;
     private float duration;
 
@@ -367,6 +368,14 @@ public class JuiceCameraShake : MonoBehaviour
         time = duration;
     }
 
+    // 直接用世界单位的振幅。打击感配置走这条，避免和上面的 power 系数叠在一起。
+    public void PlayWorld(float amplitude, float seconds)
+    {
+        worldAmplitude = Mathf.Max(worldAmplitude, amplitude);
+        duration = Mathf.Max(duration, seconds);
+        time = duration;
+    }
+
     private void LateUpdate()
     {
         // 先撤掉上一帧叠加的量，拿到"本帧相机真实位置"
@@ -382,7 +391,7 @@ public class JuiceCameraShake : MonoBehaviour
 
         time -= Time.unscaledDeltaTime;
         float k = Mathf.Clamp01(time / Mathf.Max(0.01f, duration));
-        float amplitude = power * k * k * 0.22f;
+        float amplitude = power * k * k * 0.22f + worldAmplitude * k * k;
 
         lastOffset = new Vector3(Random.Range(-amplitude, amplitude), Random.Range(-amplitude, amplitude), 0f);
         lastRotation = Quaternion.Euler(0f, 0f, Random.Range(-amplitude, amplitude) * 3f);
@@ -390,6 +399,9 @@ public class JuiceCameraShake : MonoBehaviour
         transform.rotation = baseRotation * lastRotation;
 
         if (time <= 0f)
+        {
             power = 0f;
+            worldAmplitude = 0f;
+        }
     }
 }

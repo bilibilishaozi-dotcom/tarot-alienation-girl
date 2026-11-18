@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a91c4e2b7d6f4c0e8b3a5d1f9c7e4b20, type: 3}
+  m_Name: HitFeelSettings
+  m_EditorClassIdentifier: 
+  enabled: 1
+  lightHitStop: 0.05
+  heavyHitStop: 0.08
+  blockHitStop: 0.04
+  hurtHitStop: 0.05
+  hitShake: 0.035
+  heavyShake: 0.055
+  blockShake: 0.02
+  hurtShake: 0.07
+  impactShake: 0.05
+  shakeDuration: 0.12
+  flashDuration: 0.08
+  enemyFlash: {r: 1, g: 1, b: 1, a: 1}
+  playerFlash: {r: 1, g: 0.28, b: 0.28, a: 1}
+  enemyShove: 0.12
+  bossShove: 0
+  sparkLife: 0.12
+  sparkSize: 0.16
+  sparkCount: 5
+  sfxVolume: 0.7
+  swing: {fileID: 0}
+  hit: {fileID: 0}
+  block: {fileID: 0}
+  hurt: {fileID: 0}
+  jump: {fileID: 0}
+  dash: {fileID: 0}
+  bossTell: {fileID: 0}
+  bossImpact: {fileID: 0}
