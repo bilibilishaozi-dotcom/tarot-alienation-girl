@@ -58,6 +58,7 @@ public class FirstLevel : MonoBehaviour
     private SpriteRenderer gapMark;
     private SpriteRenderer extensionMark;
     private Vector3 spawnPoint;
+    private LevelTerrain terrain;
     private float standCenter;
     private float cardX = 20.6f;
     private bool gateOpen;
@@ -179,14 +180,30 @@ public class FirstLevel : MonoBehaviour
         endPanel.SetActive(true);
     }
 
+    private LevelTerrainCatalog.Pose SpawnPose(string levelId, string spawnId)
+    {
+        LevelTerrainCatalog.Pose pose = LevelTerrainCatalog.PoseOf(levelId, spawnId);
+        if (terrain != null && terrain.TrySpawn(spawnId, out Vector3 at, out float leashMin, out float leashMax))
+        {
+            pose.x = at.x;
+            pose.y = at.y;
+            pose.leashMin = leashMin;
+            pose.leashMax = leashMax;
+        }
+
+        return pose;
+    }
+
     private void Build()
     {
         int ground = LayerMask.NameToLayer("Ground");
         if (ground < 0)
             ground = 6;
 
+        terrain = LevelTerrainHost.Show(GameFlow.ActiveLevelId);
+
         if (bossLevel)
-            BuildBossArena(ground);
+            BuildBossArena();
         else if (foolTrial)
             BuildFoolTrial(ground);
         else if (chariotTrial)
@@ -197,31 +214,17 @@ public class FirstLevel : MonoBehaviour
 
     private void BuildBasicCombat(int ground)
     {
-        const float floorTop = 0f;
-        // 三个教学段之间留出明显的空档，跑动时能看清一段一段的节奏。
-        Solid("Floor", new Vector2(18.8f, floorTop - 1f), new Vector2(40f, 2f), new Color(0.31f, 0.27f, 0.23f), ground, 0);
-        Solid("LeftWall", new Vector2(-1.7f, 3.2f), new Vector2(0.7f, 6.4f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
-        Solid("RightWall", new Vector2(39f, 3.4f), new Vector2(0.7f, 6.8f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
+        // 地面、墙、两座平台、低台、矮台和高台都在 BasicCombat 的 Tilemap 里。
+        // 封印和攀墙柱仍由代码生成，颜色提示不变。
+        LevelTerrainCatalog.Pose spore = SpawnPose(LevelCatalog.BasicCombatId, "Spore");
+        LevelTerrainCatalog.Pose skeleton = SpawnPose(LevelCatalog.BasicCombatId, "Skeleton");
+        LevelTerrainCatalog.Pose beetle = SpawnPose(LevelCatalog.BasicCombatId, "Beetle");
+        float highTop = LevelTerrainCatalog.Rasterize(LevelTerrainCatalog.Must(LevelCatalog.BasicCombatId, "HighLedge")).Top;
 
-        // 两座薄平台错开高度。脚从地面大约能跳到 2.46，所以第二座顶放在 2.0，留出余量。
-        // 水平位置不动，和后面低台之间的空档保持原样。哨兵只在台面上巡逻。
-        const float deckThickness = 0.4f;
-        const float deckTopA = 1.2f;
-        const float deckTopB = 2.0f;
-        Solid("PlatformA", new Vector2(6.3f, deckTopA - deckThickness * 0.5f), new Vector2(4.8f, deckThickness), new Color(0.46f, 0.38f, 0.29f), ground, 1);
-        Solid("PlatformB", new Vector2(14.6f, deckTopB - deckThickness * 0.5f), new Vector2(4.8f, deckThickness), new Color(0.46f, 0.38f, 0.29f), ground, 1);
-
-        // 低台大约 0.62 高。跳跃攻击的刀光贴近身体，离开低台、面向右侧敌人时按鼠标左键能打到。
-        const float lipTop = 0.62f;
-        Solid("LowLip", new Vector2(21.6f, lipTop * 0.5f), new Vector2(3.6f, lipTop), new Color(0.43f, 0.36f, 0.28f), ground, 1);
-        const float plinthTop = 0.28f;
-        Solid("EnemyPlinth", new Vector2(25.6f, plinthTop * 0.5f), new Vector2(1.8f, plinthTop), new Color(0.34f, 0.28f, 0.24f), ground, 1);
-
-        float feetLift = 0.92f;
         arena = new BasicEnemy[3];
 
         // ① 孢子怪：守在平台 A，玩家靠近就鼓起来，约 1.1 秒后原地大范围喷发。
-        arena[0] = SpawnArenaEnemy("Spore", 6.3f, deckTopA + 0.5f, 3, "孢子怪",
+        arena[0] = SpawnArenaEnemy("Spore", spore.x, spore.y, 3, "孢子怪",
             new Color(0.42f, 0.7f, 0.3f), new Vector3(1.15f, 1f, 1f), ground);
 
         // 碰撞盒按美术躯干重设，并让它的底边正好压在台面上：
@@ -233,9 +236,9 @@ public class FirstLevel : MonoBehaviour
             sporeBody.offset = new Vector2(0f, 0.3f);
         }
 
-        arena[0].transform.position = new Vector3(6.3f, deckTopA + 0.5f, 0f);
+        arena[0].transform.position = new Vector3(spore.x, spore.y, 0f);
         arena[0].SetAsSpore();
-        arena[0].StayOnPlatform(4.4f, 8.2f, 1 << ground);
+        arena[0].StayOnPlatform(spore.leashMin, spore.leashMax, 1 << ground);
 
         // 换成真美术：关掉占位方块，挂上 parts.json 搭的骨骼动画（待机 + 蓄力喷发）
         SpriteRenderer sporePlaceholder = arena[0].GetComponent<SpriteRenderer>();
@@ -247,7 +250,7 @@ public class FirstLevel : MonoBehaviour
 
         // ② 骷髅兵：发现玩家就追过来挥刀；这一关先锁在平台 B 上，不往下跳。
         //    （以后的大关卡想让它跳下来追，只要不调用 StayOnPlatform 就行。）
-        arena[1] = SpawnArenaEnemy("Skeleton", 14.6f, deckTopB + 0.5f, 3, "骷髅兵",
+        arena[1] = SpawnArenaEnemy("Skeleton", skeleton.x, skeleton.y, 3, "骷髅兵",
             new Color(0.88f, 0.86f, 0.78f), new Vector3(1f, 1f, 1f), ground);
 
         // 碰撞盒按美术躯干重设（0.9 x 1.7，中心偏上 0.35），底边压到 deckTopB，轴心再高 0.5。
@@ -258,9 +261,9 @@ public class FirstLevel : MonoBehaviour
             skeletonBody.offset = new Vector2(0f, 0.35f);
         }
 
-        arena[1].transform.position = new Vector3(14.6f, deckTopB + 0.5f, 0f);
+        arena[1].transform.position = new Vector3(skeleton.x, skeleton.y, 0f);
         arena[1].SetAsSkeleton();
-        arena[1].StayOnPlatform(12.4f, 16.8f, 1 << ground);
+        arena[1].StayOnPlatform(skeleton.leashMin, skeleton.leashMax, 1 << ground);
 
         // 换成真美术：关掉占位方块与肋骨装饰，挂上 10 块部件的骨骼动画（待机 + 举剑劈砍）
         SpriteRenderer skeletonPlaceholder = arena[1].GetComponent<SpriteRenderer>();
@@ -274,7 +277,7 @@ public class FirstLevel : MonoBehaviour
         arena[1].SetHudLift(2.0f);
 
         // ③ 石甲虫：甲壳很硬，横向普通攻击只会被弹开，只有从上方砸下来的下落攻击能破甲。
-        arena[2] = SpawnArenaEnemy("Armored", 25.6f, plinthTop + feetLift, 3, "石甲虫",
+        arena[2] = SpawnArenaEnemy("Armored", beetle.x, beetle.y, 3, "石甲虫",
             new Color(0.4f, 0.42f, 0.48f), new Vector3(1f, 1f, 1f), ground);
 
         // 碰撞盒按甲虫的重心重设（2.0 x 1.15，中心偏上 0.575），底边正好压在矮台上
@@ -285,9 +288,9 @@ public class FirstLevel : MonoBehaviour
             beetleBody.offset = new Vector2(0f, 0.575f);
         }
 
-        arena[2].transform.position = new Vector3(25.6f, plinthTop, 0f);
+        arena[2].transform.position = new Vector3(beetle.x, beetle.y, 0f);
         arena[2].SetAsArmored();
-        arena[2].StayOnPlatform(24.95f, 26.45f, 1 << ground);
+        arena[2].StayOnPlatform(beetle.leashMin, beetle.leashMax, 1 << ground);
 
         // 换成真美术：关掉占位方块与甲壳装饰，挂上 8 块部件的骨骼（六足爬行 + 弹刀亮壳）
         SpriteRenderer beetlePlaceholder = arena[2].GetComponent<SpriteRenderer>();
@@ -305,10 +308,10 @@ public class FirstLevel : MonoBehaviour
         // 柱子右侧到高台左侧留 2.85 的空档，必须靠左右蹬墙才能上去。
         basicSeal = Solid("ExitSeal", new Vector2(27.8f, 1.55f), new Vector2(0.55f, 3.1f), new Color(0.45f, 0.2f, 0.22f), ground, 3);
         Solid("ClimbPillar", new Vector2(29f, 4.25f), new Vector2(0.7f, 3.7f), new Color(0.62f, 0.66f, 0.72f), ground, 2);
-        Solid("HighLedge", new Vector2(35.4f, 1.7f), new Vector2(6.4f, 3.4f), new Color(0.38f, 0.32f, 0.28f), ground, 1);
+        // 出口触发器底边贴着高台顶。高台被收成整格后，顶从 3.4 落到 3.0，触发器跟着下移 0.4。
         Sign("WallJumpSign", root, new Vector3(30.8f, 1.45f, 0f), "蹬墙跳", 160f);
-        Sign("ExitLabel", root, new Vector3(36.4f, 4.55f, 0f), "出口", 140f);
-        CreateBasicExit(36.4f, 4.7f);
+        Sign("ExitLabel", root, new Vector3(36.4f, highTop + 1.15f, 0f), "出口", 140f);
+        CreateBasicExit(36.4f, highTop + 1.3f);
     }
 
     private BasicEnemy SpawnLeashed(string objectName, float x, float y, string displayName, Color color, float minX, float maxX, int ground)
@@ -322,18 +325,9 @@ public class FirstLevel : MonoBehaviour
     }
 
     // 终局：一间封闭的 Boss 房。进来之前已经在「牌之回响」里选好了要带的牌。
-    private void BuildBossArena(int ground)
+    private void BuildBossArena()
     {
-        Solid("Floor", new Vector2(14f, -1f), new Vector2(30.4f, 2f), new Color(0.26f, 0.21f, 0.2f), ground, 0);
-        Solid("LeftWall", new Vector2(-1.5f, 3.6f), new Vector2(0.8f, 7.2f), new Color(0.18f, 0.15f, 0.16f), ground, 0);
-        Solid("RightWall", new Vector2(29.5f, 3.6f), new Vector2(0.8f, 7.2f), new Color(0.18f, 0.15f, 0.16f), ground, 0);
-
-        // 台子整体抬高/左移，给 Boss 留出一条能走通的地面通道：
-        // Boss 巡走范围是 20.3~27.7，这条通道上不能有低于 3 格的台子。
-        Solid("LedgeA", new Vector2(7.5f, 1.5f), new Vector2(4f, 0.4f), new Color(0.42f, 0.34f, 0.32f), ground, 1);
-        Solid("LedgeB", new Vector2(13f, 2.6f), new Vector2(3.6f, 0.4f), new Color(0.42f, 0.34f, 0.32f), ground, 1);
-        Solid("LedgeC", new Vector2(19.5f, 3.4f), new Vector2(3.4f, 0.4f), new Color(0.34f, 0.27f, 0.26f), ground, 1);
-        Solid("LedgeD", new Vector2(26.5f, 3.4f), new Vector2(3f, 0.4f), new Color(0.38f, 0.3f, 0.29f), ground, 1);
+        // 地板、墙和四座台子在 BossArena 的 Tilemap 里。通道上的两座高台仍在 y=3 以上。
 
         // 场中央的暗红地板，提示这是 Boss 房
         CreateSprite(root, "ArenaMark", new Vector3(20.5f, 0.02f, 0f), new Vector3(12f, 0.05f, 1f), new Color(0.55f, 0.16f, 0.18f, 0.75f), "Ground", 3);
@@ -465,10 +459,7 @@ public class FirstLevel : MonoBehaviour
 
     private void BuildFoolTrial(int ground)
     {
-        Solid("Floor", new Vector2(16.25f, -1f), new Vector2(36.5f, 2f), new Color(0.31f, 0.27f, 0.23f), ground, 0);
-        Solid("LeftWall", new Vector2(-2.35f, 3.75f), new Vector2(0.7f, 7.5f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
-        Solid("RightWall", new Vector2(34.15f, 3f), new Vector2(0.7f, 6f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
-        Solid("Arch", new Vector2(20.4f, 5.5f), new Vector2(0.75f, 3.8f), new Color(0.2f, 0.17f, 0.16f), ground, 1);
+        // 地板、墙和拱门在 FoolTrial 的 Tilemap 里。金色跳台仍由代码生成。
 
         MonsterCardData fool = Resources.Load<MonsterCardData>("Cards/Fool");
         if (fool == null)
@@ -498,10 +489,8 @@ public class FirstLevel : MonoBehaviour
 
     private void BuildEchoRoom(int ground)
     {
-        // 右端多留一间小房间给回响守卫。左边起点仍在 -1.5。
-        Solid("Floor", new Vector2(35.75f, -1f), new Vector2(74.5f, 2f), new Color(0.31f, 0.27f, 0.23f), ground, 0);
-        Solid("LeftWall", new Vector2(-1.8f, 3f), new Vector2(0.7f, 6f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
-        Solid("RightWall", new Vector2(73.3f, 3f), new Vector2(0.7f, 6f), new Color(0.22f, 0.19f, 0.17f), ground, 0);
+        // 右端多留一间小房间给回响守卫。地板和左右墙在 EchoRoom 的 Tilemap 里，左缘收到格子 -2。
+        // 栏杆、门和唇台仍由代码生成。
         Sign("HubSign", root, new Vector3(2.4f, 2.3f, 0f), "左边单牌，右边收束", 280f);
 
         MonsterCardData fool = Resources.Load<MonsterCardData>("Cards/Fool");
@@ -606,7 +595,7 @@ public class FirstLevel : MonoBehaviour
         finaleGate = Solid("FinaleGate", new Vector2(40.3f, 1.6f), new Vector2(0.55f, 3.2f), new Color(0.45f, 0.36f, 0.18f), ground, 4);
         PlaceSeal(new Vector3(42.2f, 1.15f, 0f), chariot, "换战车", new Color(0.45f, 0.78f, 0.95f));
         Sign("FinaleDashHint", root, new Vector3(44.4f, 2.35f, 0f), "冲到核心", 180f);
-        Solid("FinaleLintel", new Vector2(44.6f, 2.45f), new Vector2(4.2f, 0.35f), new Color(0.22f, 0.2f, 0.24f), ground, 2);
+        // 门楣在 EchoRoom 的 Tilemap 里。为了不挡住人，底放在 y=3，顶在 y=4。
         finaleLane = new BasicEnemy[3];
         float[] xs = { 43.4f, 44.6f, 45.8f };
         for (int i = 0; i < finaleLane.Length; i++)
@@ -1766,6 +1755,7 @@ public class FirstLevel : MonoBehaviour
         loadout.EquippedCard != null &&
         loadout.EquippedCard.effectType == CardEffectType.FoolLunge;
 
+    // SampleScene 里原来那块蓝色 Platform 已经删掉。再找一次，旧场景如果还带着它就关掉。
     private void DisableLegacyGround()
     {
         GameObject legacy = GameObject.Find("Platform");
