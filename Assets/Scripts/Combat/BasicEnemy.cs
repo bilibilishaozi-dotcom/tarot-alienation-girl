@@ -272,7 +272,7 @@ public class BasicEnemy : MonoBehaviour, IDamageable, IHudTarget
 
     private void Update()
     {
-        if (dead)
+        if (dead || HitFeel.IsFrozen(gameObject))
             return;
 
         if (blockedTimer > 0f)

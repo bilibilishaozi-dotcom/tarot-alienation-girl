@@ -14,6 +14,7 @@ public class Player_WallJumpState : EntityState
         // 蹬出去之后短时间内别再被同一面墙吸回去
         player.ReleaseWall(0.3f);
         player.SetVelocity(player.wallJumpForce.x * -player.facingDir, player.wallJumpForce.y);
+        HitFeel.Jump();
     }
 
     public override void Update()

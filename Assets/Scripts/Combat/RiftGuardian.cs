@@ -209,7 +209,7 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
 
     private void Update()
     {
-        if (dead)
+        if (dead || HitFeel.IsFrozen(gameObject))
             return;
 
         if (hitFlash > 0f)
@@ -336,6 +336,7 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
         step = Step.Windup;
         timer = WindupTime(move);
         strikeConnected = false;
+        HitFeel.BossTell();
     }
 
     // 算出这一招的起止位置（只有终局那只会移动的 Boss 才用得到）
@@ -431,8 +432,13 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
 
             if (currentMove == Move.Drop)
             {
-                AttackFeedback.Thud(transform.position);
-                AttackFeedback.Hit((Vector2)transform.position, true);
+                AttackFeedback.Thud(transform.position, !HitFeel.Enabled);
+                AttackFeedback.Hit((Vector2)transform.position, true, !HitFeel.Enabled);
+                HitFeel.GroundImpact(transform.position);
+            }
+            else if (currentMove == Move.Thrust)
+            {
+                HitFeel.GroundImpact(transform.position);
             }
         }
 

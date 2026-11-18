@@ -28,7 +28,8 @@ public static class StrengthSlam
             claw.Pulse();
 
         SpawnWave(center, size, facing);
-        AttackFeedback.Thud(center);
+        AttackFeedback.Thud(center, !HitFeel.Enabled);
+        HitFeel.GroundImpact(center);
 
         Collider2D[] hits = Physics2D.OverlapBoxAll(center, size, 0f);
         HashSet<IDamageable> already = new HashSet<IDamageable>();
@@ -44,7 +45,9 @@ public static class StrengthSlam
                 continue;
 
             damageable.TakeDamage(amount, center);
-            AttackFeedback.Hit(hit.bounds.center, true);
+            if (!HitFeel.Enabled)
+                AttackFeedback.Hit(hit.bounds.center, true);
+            HitFeel.WeaponHit(player, damageable as Component, hit.bounds.center, false, true);
         }
     }
 

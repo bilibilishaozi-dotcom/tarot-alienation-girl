@@ -114,6 +114,7 @@ public static class GameFlow
         reloadFrame = Time.frameCount;
         KeepLoadoutOnNextLoad = true;
         Juice.CancelHitStop();
+        HitFeel.ReleaseAll();
         Time.timeScale = 1f;
         SceneManager.LoadScene(sceneName);
     }
@@ -121,6 +122,7 @@ public static class GameFlow
     public static void Quit()
     {
         Juice.CancelHitStop();
+        HitFeel.ReleaseAll();
         Time.timeScale = 1f;
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;
@@ -135,6 +137,7 @@ public static class GameFlow
     {
         KeepLoadoutOnNextLoad = false;
         Juice.CancelHitStop();
+        HitFeel.ReleaseAll();
         Time.timeScale = 1f;
         if (string.IsNullOrEmpty(sceneName) || !Application.CanStreamedLevelBeLoaded(sceneName))
         {

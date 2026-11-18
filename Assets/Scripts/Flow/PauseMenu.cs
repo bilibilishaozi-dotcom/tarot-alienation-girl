@@ -60,6 +60,7 @@ public class PauseMenu : MonoBehaviour
     {
         open = true;
         Juice.CancelHitStop();
+        HitFeel.ReleaseAll();
         Time.timeScale = 0f;
         if (player != null)
             player.SetGameplayInputEnabled(false);

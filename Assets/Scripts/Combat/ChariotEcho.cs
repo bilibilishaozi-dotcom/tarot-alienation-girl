@@ -100,7 +100,9 @@ public class ChariotEcho : MonoBehaviour
                 continue;
 
             damageable.TakeDamage(damage, center);
-            AttackFeedback.Hit(hit.bounds.center, false);
+            if (!HitFeel.Enabled)
+                AttackFeedback.Hit(hit.bounds.center, false);
+            HitFeel.WeaponHit(player, damageable as Component, hit.bounds.center, false);
         }
     }
 

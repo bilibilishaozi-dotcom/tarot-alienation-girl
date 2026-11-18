@@ -307,6 +307,9 @@ public class WitchFrames : MonoBehaviour
             return;
 
         AirAttackHoldVisible = false;
+        if (HitFeel.IsFrozen(player.gameObject))
+            return;
+
         float dt = Time.deltaTime;
 
         bool moving = player.IsMoving && player.groundDetected && !player.IsDefeated;
