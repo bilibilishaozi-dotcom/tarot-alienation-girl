@@ -43,6 +43,8 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
     private const float WakeTime = 0.72f;
     private const float RecoverTime = 0.8f;
     private const float IdleGap = 0.25f;
+    private const float LungeReach = 2.4f;
+    private const float LungeStandOff = 0.6f;
     private static readonly Move[] Pattern = { Move.Slash, Move.Thrust, Move.Drop };
 
     private SpriteRenderer spriteRenderer;
@@ -228,14 +230,15 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
 
         timer -= Time.deltaTime;
 
-        // 巡走：蓄力/出手/未唤醒时不动，其余时间朝玩家挪，但不会贴到脸上
+        // 巡走：蓄力/出手/未唤醒时不动，其余时间朝玩家挪，但不会贴到脸上。
+        // 房间 Boss 醒着就会走近；走不到（到了巡走边界）时下面会改放突进或落点，不再干等。
         if (mobile && step != Step.Windup && step != Step.Strike && step != Step.Dormant)
             StepTowardsPlayer();
 
         switch (step)
         {
             case Step.Dormant:
-                if (foolReady && PlayerInArena())
+                if (foolReady && (RoomBoss() || PlayerInArena()))
                     BeginWake();
                 break;
             case Step.Wake:
@@ -247,6 +250,8 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
                     break;
                 if (PlayerInZone())
                     BeginWindup(NextMove());
+                else if (RoomBoss() && PinnedAwayFromPlayer())
+                    BeginWindup(FarMove());
                 else
                     timer = 0.2f;
                 break;
@@ -354,9 +359,9 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
             if (Mathf.Abs(dir) < 0.5f)
                 dir = 1f;
 
-            // 冲 2.4 格，但如果玩家就在眼前，就停在它前面一点，别穿过去
-            float distance = player != null ? Mathf.Abs(player.transform.position.x - lungeFromX) : 2.4f;
-            float lunge = Mathf.Clamp(distance - 0.6f, 0.7f, 2.4f);
+            // 冲 LungeReach 格，但如果玩家就在眼前，就停在它前面一点，别穿过去
+            float distance = player != null ? Mathf.Abs(player.transform.position.x - lungeFromX) : LungeReach;
+            float lunge = Mathf.Clamp(distance - LungeStandOff, 0.7f, LungeReach);
 
             float target = lungeFromX + dir * lunge;
             float low = Mathf.Min(moveMinX, moveMaxX);
@@ -601,6 +606,41 @@ public class RiftGuardian : MonoBehaviour, IDamageable, IHudTarget
 
         return bounds.max.x >= zone.MinX && bounds.min.x <= zone.MaxX
             && bounds.max.y >= zone.MinY && bounds.min.y <= zone.MaxY;
+    }
+
+    // 终局会巡走，回响守卫给了战场余量。这两关的门开了（foolReady）就整场都算战场。
+    // 愚者试用那只栏杆后的守卫没有这两项，仍然要走近才醒。
+    private bool RoomBoss()
+    {
+        return mobile || arenaPad > 0f;
+    }
+
+    // 玩家还在挥击圈外，而这只 Boss 又不能再往前走了。
+    private bool PinnedAwayFromPlayer()
+    {
+        if (player == null)
+            return false;
+
+        float delta = player.transform.position.x - transform.position.x;
+        if (!mobile)
+            return true;
+
+        float dir = Mathf.Sign(delta);
+        if (Mathf.Abs(dir) < 0.5f)
+            return true;
+        if (dir > 0f)
+            return transform.position.x >= moveMaxX - 0.05f;
+        return transform.position.x <= moveMinX + 0.05f;
+    }
+
+    // 突进最远 LungeReach，再留 LungeStandOff 的身位。够得着就冲，够不着就往巡走范围里离玩家最近的那一格落砸。
+    // 伤害和这两招原来的时长都不改。
+    private Move FarMove()
+    {
+        float distance = player == null ? 99f : Mathf.Abs(player.transform.position.x - transform.position.x);
+        if (distance <= LungeReach + LungeStandOff)
+            return Move.Thrust;
+        return Move.Drop;
     }
 
     private bool PlayerInArena()

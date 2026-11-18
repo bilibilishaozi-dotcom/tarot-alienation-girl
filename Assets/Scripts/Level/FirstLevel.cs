@@ -374,7 +374,7 @@ public class FirstLevel : MonoBehaviour
             playerHeight + 0.22f, playerHeight * 0.4f, Mathf.Max(1.15f, playerWidth * 2.2f));
         boss.Died += OnBossDefeated;
 
-        // 终局 Boss：会在场地里横向巡走，攻击区跟着一起动；玩家走近就醒
+        // 终局 Boss：在通道里横向巡走。人在这间房里就算离得很远也会醒，走近或在边界上出招。
         boss.SetMobile(x - 4.2f, x + 3.2f, 1.7f);
         boss.SetArenaPad(14f);
     }
@@ -614,7 +614,7 @@ public class FirstLevel : MonoBehaviour
         CreateSprite(finaleCore.transform, "CoreHeart", new Vector3(0f, 0.05f, 0f), new Vector3(0.38f, 0.48f, 1f), new Color(1f, 0.9f, 0.7f, 1f), "Player", 8);
     }
 
-    // 牌之回响尽头的小 Boss：不动，沿用裂隙守卫的三招（挥击、突进、落点），都先给地面预兆。
+    // 牌之回响尽头的小 Boss：和终局共用裂隙守卫的三招。门开了就在这间房里走近玩家，走不到就突进或落砸。
     private void CreateEchoBoss(float x)
     {
         CapsuleCollider2D body = player != null ? player.GetComponent<CapsuleCollider2D>() : null;
@@ -646,6 +646,8 @@ public class FirstLevel : MonoBehaviour
 
         boss.Bind(player, 6, "回响守卫", slashMin, stand + normalReach, slashMin - normalReach, 0f,
             playerHeight + 0.22f, playerHeight * 0.4f, Mathf.Max(1.15f, playerWidth * 2.2f));
+        // 出生点大约 64.5。左界停在门内侧，右界停在右墙前，避免跟到前面的试炼段。走速沿用终局的 1.7。
+        boss.SetMobile(x - 6.2f, x + 7.2f, 1.7f);
         boss.SetArenaPad(1.6f);
         boss.Died += OnEchoBossDefeated;
         Sign("EchoBossLabel", root, new Vector3(x, 3.6f, 0f), "回响守卫", 180f);
